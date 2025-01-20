@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 interface CalendarProps {
   onSelectDate: (date: Date) => void
   selectedDate: Date | null
-  bookedDates: Date[]
+  bookedDates: Array<{ date: Date, fullyBooked: boolean }>
 }
 
 export function Calendar({ onSelectDate, selectedDate, bookedDates }: CalendarProps) {
@@ -59,7 +59,15 @@ export function Calendar({ onSelectDate, selectedDate, bookedDates }: CalendarPr
   const isDisabled = (date: Date) => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    return date <= today
+    return date <= today || isFullyBooked(date)
+  }
+
+  const isFullyBooked = (date: Date) => {
+    return bookedDates.some(bookedDate => 
+      bookedDate.date.getDate() === date.getDate() &&
+      bookedDate.date.getMonth() === date.getMonth() &&
+      bookedDate.date.getFullYear() === date.getFullYear()
+    )
   }
 
   return (
@@ -102,7 +110,11 @@ export function Calendar({ onSelectDate, selectedDate, bookedDates }: CalendarPr
           return (
             <button
               key={date.toISOString()}
-              onClick={() => !isDisabled(date) && onSelectDate(date)}
+              onClick={() => {
+                if (!isDisabled(date)) {
+                  onSelectDate(date)
+                }
+              }}
               disabled={isDisabled(date)}
               className={cn(
                 "p-2 w-full rounded-md text-sm transition-colors",
