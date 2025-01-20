@@ -32,7 +32,7 @@ export default function BookingConfirmation() {
       </button>
 
       <div className="bg-white rounded-lg shadow p-6">
-        <h1 className="text-2xl font-bold text-black mb-6">Booking Confirmed!</h1>
+        <h1 className="text-2xl font-bold text-black">Booking Confirmed!</h1>
         <p className="text-blue-600 mb-6 text-sm">
           You will receive this information in your email
         </p>
@@ -40,11 +40,18 @@ export default function BookingConfirmation() {
         <div className="space-y-4 text-black">
           <div>
             <h2 className="font-semibold">Date and Time</h2>
-            <p>{booking.date.toLocaleString()}</p>
+            <p>{booking.date.toLocaleString([], { 
+                weekday: 'long',
+                hour: '2-digit', 
+                minute: '2-digit',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+                })}</p>
           </div>
 
           <div>
-            <h2 className="font-semibold">Google Meet Link</h2>
+            <h2 className="font-semibold">Zoom Link</h2>
             <a 
               href={booking.meetLink} 
               className="text-blue-600 hover:underline"
