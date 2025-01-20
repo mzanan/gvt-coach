@@ -8,8 +8,9 @@ import { bookingService } from '../services/bookingService'
 import { UserProfile } from '@/lib/supabase/types'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
-import { ChevronDown, ChevronUp, Check, Edit2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, Check, Edit2, Loader2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
+import { toast } from '@/hooks/use-toast'
 
 interface Section {
   id: 'date' | 'time' | 'summary'
@@ -30,6 +31,8 @@ export function BookingCalendar() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null)
   const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [bookedDates, setBookedDates] = useState<Array<{ date: Date, fullyBooked: boolean }>>([])
+  const [isBookingLoading, setIsBookingLoading] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -38,6 +41,18 @@ export function BookingCalendar() {
       setUserProfile(profile)
       setShowInitialForm(false)
     }
+  }, [])
+
+  useEffect(() => {
+    const loadBookedDates = async () => {
+      try {
+        const dates = await bookingService.getFullyBookedDates(new Date())
+        setBookedDates(dates)
+      } catch (error) {
+        console.error('Error loading booked dates:', error)
+      }
+    }
+    loadBookedDates()
   }, [])
 
   const handleProfileComplete = () => {
@@ -53,6 +68,14 @@ export function BookingCalendar() {
   }
 
   const handleDateSelect = async (date: Date) => {
+    if (bookedDates.some(bookedDate => 
+      bookedDate.date.getDate() === date.getDate() &&
+      bookedDate.date.getMonth() === date.getMonth() &&
+      bookedDate.date.getFullYear() === date.getFullYear()
+    )) {
+      return
+    }
+
     setSelectedDate(date)
     setSelectedSlot(null)
     try {
@@ -91,11 +114,19 @@ export function BookingCalendar() {
   const handleBookingSubmit = async () => {
     if (!selectedSlot || !userProfile) return
     
+    setIsBookingLoading(true)
     try {
       const booking = await bookingService.createBooking(userProfile.email, selectedSlot.date)
       router.push(`/booking-confirmation/${booking.id}`)
     } catch (error) {
       console.error('Error creating booking:', error)
+      toast({
+        title: "Error",
+        description: "Failed to create meeting. Please try again later.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsBookingLoading(false)
     }
   }
 
@@ -106,7 +137,7 @@ export function BookingCalendar() {
           <Calendar 
             onSelectDate={handleDateSelect}
             selectedDate={selectedDate}
-            bookedDates={[]}
+            bookedDates={bookedDates}
           />
         )
       case 'time':
@@ -119,7 +150,7 @@ export function BookingCalendar() {
                   w-full p-3 text-left rounded-md transition-colors duration-200
                   ${slot.available 
                     ? 'hover:bg-accent cursor-pointer'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-muted text-gray-400 cursor-not-allowed'
                   }
                   ${selectedSlot?.id === slot.id ? 'ring-2 ring-blue-500' : ''}
                 `}
@@ -153,8 +184,16 @@ export function BookingCalendar() {
             <Button 
               className="w-full mt-4"
               onClick={handleBookingSubmit}
+              disabled={isBookingLoading}
             >
-              Confirm Booking
+              {isBookingLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating booking...
+                </>
+              ) : (
+                "Confirm Booking"
+              )}
             </Button>
           </div>
         )

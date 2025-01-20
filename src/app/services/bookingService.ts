@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase/client'
 import { BookingDB, UserProfile } from '@/lib/supabase/types'
 import { Booking, TimeSlot } from '../types/booking'
+import { zoomService } from './zoomService'
 
 export const bookingService = {
   saveUserProfile: async (profile: UserProfile) => {
@@ -94,13 +95,20 @@ export const bookingService = {
 
   createBooking: async (userEmail: string, date: Date): Promise<Booking> => {
     try {
+      // Create Zoom meeting
+      const meetLink = await zoomService.createMeeting(date)
+
+      if (!meetLink) {
+        throw new Error('Failed to generate meeting link')
+      }
+
       const { data, error } = await supabase
         .from('meetings_bookings')
         .insert({
           user_email: userEmail,
           booking_date: date.toISOString(),
           status: 'confirmed',
-          meet_link: `https://meet.google.com/oja-gwke-wnk`
+          meet_link: meetLink
         })
         .select()
         .single()
@@ -154,5 +162,37 @@ export const bookingService = {
       status: data.status,
       meetLink: data.meet_link
     }
+  },
+
+  getFullyBookedDates: async (month: Date): Promise<Array<{ date: Date, fullyBooked: boolean }>> => {
+    const startOfMonth = new Date(month.getFullYear(), month.getMonth(), 1)
+    const endOfMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0)
+    
+    const { data: bookings, error } = await supabase
+      .from('meetings_bookings')
+      .select('booking_date')
+      .eq('status', 'confirmed')
+      .gte('booking_date', startOfMonth.toISOString())
+      .lt('booking_date', endOfMonth.toISOString())
+
+    if (error) {
+      console.error('Error fetching booked dates:', error)
+      throw error
+    }
+
+    // Group bookings by date
+    const bookingsByDate = bookings.reduce((acc: { [key: string]: number }, booking) => {
+      const date = new Date(booking.booking_date).toDateString()
+      acc[date] = (acc[date] || 0) + 1
+      return acc
+    }, {})
+
+    // Find dates with all slots booked (in this case, 2 slots per day)
+    return Object.entries(bookingsByDate)
+      .filter(([_, count]) => count >= 2) // Since you have 2 slots (9AM and 10AM)
+      .map(([dateStr]) => ({
+        date: new Date(dateStr),
+        fullyBooked: true
+      }))
   }
 } 
