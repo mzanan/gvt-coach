@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Loader2 } from "lucide-react"
+import { TimezoneDropdown } from "@/app/components/TimezoneDropdown"
 
 const formSchema = z.object({
   email: z.string().email('Invalid email'),
@@ -31,13 +32,17 @@ interface UserProfileFormProps {
   initialData?: UserProfile | null
   showCard?: boolean
   showTitle?: boolean
+  selectedTimezone?: string
+  onTimezoneChange?: (timezone: string) => void
 }
 
 export function UserProfileForm({ 
   onComplete, 
   initialData,
   showCard = true,
-  showTitle = true 
+  showTitle = true,
+  selectedTimezone,
+  onTimezoneChange
 }: UserProfileFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -121,11 +126,16 @@ export function UserProfileForm({
             <FormItem>
               <FormLabel>Phone</FormLabel>
               <FormControl>
-                <Input placeholder="+1 234 567-8900" {...field} />
+                <Input placeholder="Phone number" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
+        />
+
+        <TimezoneDropdown
+          selectedTimezone={selectedTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone}
+          onTimezoneChange={onTimezoneChange || (() => {})}
         />
 
         {form.formState.errors.root && (

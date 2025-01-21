@@ -1,7 +1,10 @@
+import { DateTime } from 'luxon'
 import { supabase } from '@/lib/supabase/client'
 import { BookingDB, UserProfile } from '@/lib/supabase/types'
 import { Booking, TimeSlot } from '../types/booking'
 import { zoomService } from './zoomService'
+
+const COACH_TIMEZONE = process.env.COACH_TIMEZONE || 'UTC'; // Default to UTC if not set
 
 export const bookingService = {
   saveUserProfile: async (profile: UserProfile) => {
@@ -50,52 +53,62 @@ export const bookingService = {
   },
 
   getAvailableSlots: async (date: Date): Promise<TimeSlot[]> => {
-    // Ajustamos la fecha para que sea UTC y evitar problemas de zona horaria
-    const startOfDay = new Date(date)
-    startOfDay.setHours(0, 0, 0, 0)
-    
-    const endOfDay = new Date(date)
-    endOfDay.setHours(23, 59, 59, 999)
+    const luxonDate = DateTime.fromJSDate(date).setZone(COACH_TIMEZONE);
+    const startOfDay = luxonDate.startOf('day');
+    const endOfDay = luxonDate.endOf('day');
 
-    // Obtenemos las reservas existentes para el día
     const { data: existingBookings, error } = await supabase
       .from('meetings_bookings')
       .select('booking_date')
       .eq('status', 'confirmed')
-      .gte('booking_date', startOfDay.toISOString())
-      .lt('booking_date', endOfDay.toISOString())
+      .gte('booking_date', startOfDay.toISO())
+      .lt('booking_date', endOfDay.toISO());
 
     if (error) {
-      console.error('Error fetching bookings:', error)
-      throw error
+      console.error('Error fetching bookings:', error);
+      throw error;
     }
 
-    const slots: TimeSlot[] = []
-    
-    // Creamos slots para cada hora entre 9 AM y 4 PM
-    for (let hour = 9; hour < 17; hour++) {
-      const slotDate = new Date(date)
-      slotDate.setHours(hour, 0, 0, 0)
-      
-      // Verificamos si el slot está reservado
+    const slots: TimeSlot[] = [];
+
+    // Morning slots (8 AM to 11 AM)
+    for (let hour = 1; hour <= 4; hour++) {
+      const slotDateTime = luxonDate.set({ hour, minute: 0 });
+
       const isBooked = existingBookings?.some(booking => {
-        const bookingDate = new Date(booking.booking_date)
-        return bookingDate.getHours() === hour
-      })
-      
+        const bookingDateTime = DateTime.fromISO(booking.booking_date).setZone(COACH_TIMEZONE);
+        return bookingDateTime.hour === hour;
+      });
+
       slots.push({
         id: `${date.toDateString()}-${hour}`,
-        date: slotDate,
+        date: slotDateTime.toJSDate(),
         available: !isBooked
-      })
+      });
     }
-    
-    return slots
+
+    // Evening slots (7 PM to 11 PM)
+    for (let hour = 12; hour <= 16; hour++) {
+      const slotDateTime = luxonDate.set({ hour, minute: 0 });
+
+      const isBooked = existingBookings?.some(booking => {
+        const bookingDateTime = DateTime.fromISO(booking.booking_date).setZone(COACH_TIMEZONE);
+        return bookingDateTime.hour === hour;
+      });
+
+      slots.push({
+        id: `${date.toDateString()}-${hour}`,
+        date: slotDateTime.toJSDate(),
+        available: !isBooked
+      });
+    }
+
+    return slots;
   },
 
   createBooking: async (userEmail: string, date: Date): Promise<Booking> => {
     try {
-      // Create Zoom meeting
+      const bookingDateTime = DateTime.fromJSDate(date)
       const meetLink = await zoomService.createMeeting(date)
 
       if (!meetLink) {
@@ -106,7 +119,7 @@ export const bookingService = {
         .from('meetings_bookings')
         .insert({
           user_email: userEmail,
-          booking_date: date.toISOString(),
+          booking_date: bookingDateTime.toISO(),
           status: 'confirmed',
           meet_link: meetLink
         })
@@ -118,7 +131,7 @@ export const bookingService = {
       return {
         id: data.id,
         userId: userEmail,
-        date: new Date(data.booking_date),
+        date: DateTime.fromISO(data.booking_date).toJSDate(),
         status: data.status,
         meetLink: data.meet_link
       }

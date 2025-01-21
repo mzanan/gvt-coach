@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Calendar } from './Calendar'
 import { UserProfileForm } from './UserProfileForm'
-import { TimeSlot, Booking } from '../types/booking'
+import { TimeSlot } from '../types/booking'
 import { bookingService } from '../services/bookingService'
 import { UserProfile } from '@/lib/supabase/types'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronDown, ChevronUp, Check, Edit2, Loader2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { toast } from '@/hooks/use-toast'
+import { DateTime } from 'luxon'
 
 interface Section {
   id: 'date' | 'time' | 'summary'
@@ -33,6 +34,7 @@ export function BookingCalendar() {
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [bookedDates, setBookedDates] = useState<Array<{ date: Date, fullyBooked: boolean }>>([])
   const [isBookingLoading, setIsBookingLoading] = useState(false)
+  const [selectedTimezone, setSelectedTimezone] = useState<string>('')
   const router = useRouter()
 
   useEffect(() => {
@@ -53,6 +55,10 @@ export function BookingCalendar() {
       }
     }
     loadBookedDates()
+  }, [])
+
+  useEffect(() => {
+    setSelectedTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)
   }, [])
 
   const handleProfileComplete = () => {
@@ -130,6 +136,10 @@ export function BookingCalendar() {
     }
   }
 
+  const handleTimezoneChange = (timezone: string) => {
+    setSelectedTimezone(timezone)
+  }
+
   const renderSectionContent = (sectionId: string) => {
     switch (sectionId) {
       case 'date':
@@ -142,12 +152,12 @@ export function BookingCalendar() {
         )
       case 'time':
         return (
-          <div className="grid gap-2">
+          <div className="flex flex-wrap gap">
             {availableSlots.map((slot) => (
               <button
                 key={slot.id}
                 className={`
-                  w-full p-3 text-left rounded-md transition-colors duration-200
+                  w-1/3 p-3 text-left rounded-md transition-colors duration-200 text-center
                   ${slot.available 
                     ? 'hover:bg-accent cursor-pointer'
                     : 'bg-muted text-gray-400 cursor-not-allowed'
@@ -157,10 +167,7 @@ export function BookingCalendar() {
                 onClick={() => slot.available && handleSlotSelect(slot)}
                 disabled={!slot.available}
               >
-                {slot.date.toLocaleTimeString([], { 
-                  hour: '2-digit', 
-                  minute: '2-digit' 
-                })}
+                {DateTime.fromJSDate(slot.date).toLocaleString(DateTime.TIME_SIMPLE)}
               </button>
             ))}
           </div>
@@ -227,13 +234,19 @@ export function BookingCalendar() {
               setIsEditingProfile(false)
             }}
             initialData={userProfile}
-            showCard={false} showTitle={false}
+            showCard={false}
+            showTitle={false}
+            selectedTimezone={selectedTimezone}
+            onTimezoneChange={handleTimezoneChange}
           />
         ) : (
-          <div className="space-y-2">
-            <p><span className="font-medium">Name:</span> {userProfile?.first_name} {userProfile?.last_name}</p>
-            <p><span className="font-medium">Email:</span> {userProfile?.email}</p>
-            <p><span className="font-medium">Phone:</span> {userProfile?.phone}</p>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p><span className="font-medium">Name:</span> {userProfile?.first_name} {userProfile?.last_name}</p>
+              <p><span className="font-medium">Email:</span> {userProfile?.email}</p>
+              <p><span className="font-medium">Phone:</span> {userProfile?.phone}</p>
+              <p><span className="font-medium">Timezone:</span> {selectedTimezone || 'Loading...'}</p>
+            </div>
           </div>
         )}
       </Card>
