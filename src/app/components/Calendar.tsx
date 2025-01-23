@@ -112,7 +112,13 @@ export function Calendar({ onSelectDate, selectedDate, bookedDates }: CalendarPr
               key={date.toISOString()}
               onClick={() => {
                 if (!isDisabled(date)) {
-                  onSelectDate(date)
+                  const localDate = new Date(
+                    date.getFullYear(),
+                    date.getMonth(),
+                    date.getDate(),
+                    0, 0, 0, 0
+                  );
+                  onSelectDate(localDate);
                 }
               }}
               disabled={isDisabled(date)}

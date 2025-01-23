@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon'
 import { supabase } from '@/lib/supabase/client'
 import { BookingDB, UserProfile } from '@/lib/supabase/types'
-import { Booking, TimeSlot } from '../types/booking'
+import { Booking, BookingFrequency, TimeSlot } from '../types/booking'
 import { zoomService } from './zoomService'
 
 const COACH_TIMEZONE = process.env.COACH_TIMEZONE || 'UTC'; // Default to UTC if not set
@@ -53,91 +53,113 @@ export const bookingService = {
   },
 
   getAvailableSlots: async (date: Date): Promise<TimeSlot[]> => {
-    const luxonDate = DateTime.fromJSDate(date).setZone(COACH_TIMEZONE);
+    const userDateTime = DateTime.fromJSDate(date);
+    const luxonDate = userDateTime.setZone('UTC', { keepLocalTime: true });
+    
     const startOfDay = luxonDate.startOf('day');
     const endOfDay = luxonDate.endOf('day');
 
+    // Obtener tanto las reservas normales como las recurrentes
     const { data: existingBookings, error } = await supabase
       .from('meetings_bookings')
-      .select('booking_date')
+      .select('booking_date, frequency, recurring_day, recurring_time, end_date')
       .eq('status', 'confirmed')
-      .gte('booking_date', startOfDay.toISO())
-      .lt('booking_date', endOfDay.toISO());
+      .filter('booking_date', 'gte', startOfDay.toISO())
+      .filter('booking_date', 'lte', endOfDay.toISO());
 
     if (error) {
       console.error('Error fetching bookings:', error);
       throw error;
     }
 
+    const isSlotBooked = (slotDateTime: DateTime) => {
+      return existingBookings?.some(booking => {
+        if (booking.frequency === 'once') {
+          const bookingDateTime = DateTime.fromISO(booking.booking_date);
+          return bookingDateTime.toUTC().toMillis() === slotDateTime.toUTC().toMillis();
+        } else if (booking.recurring_day === slotDateTime.weekdayLong && booking.recurring_time) {
+          const startDate = DateTime.fromISO(booking.booking_date);
+          const endDate = booking.end_date ? DateTime.fromISO(booking.end_date) : null;
+          const bookingTime = booking.recurring_time;
+          
+          return slotDateTime >= startDate &&
+                 (!endDate || slotDateTime <= endDate) &&
+                 bookingTime === slotDateTime.toFormat('HH:mm');
+        }
+        return false;
+      });
+    };
+
     const slots: TimeSlot[] = [];
 
-    // Morning slots (8 AM to 11 AM)
+    // Morning slots (1 AM UTC = 8 AM Asia/Saigon)
     for (let hour = 1; hour <= 4; hour++) {
       const slotDateTime = luxonDate.set({ hour, minute: 0 });
+      const localDateTime = slotDateTime.setZone(COACH_TIMEZONE);
 
-      const isBooked = existingBookings?.some(booking => {
-        const bookingDateTime = DateTime.fromISO(booking.booking_date).setZone(COACH_TIMEZONE);
-        return bookingDateTime.hour === hour;
-      });
+      const isBooked = isSlotBooked(slotDateTime);
 
       slots.push({
-        id: `${date.toDateString()}-${hour}`,
-        date: slotDateTime.toJSDate(),
-        available: !isBooked
+        id: `${userDateTime.toFormat('yyyy-MM-dd')}-${hour}`,
+        date: localDateTime.toJSDate(),
+        available: !isBooked,
+        utcDate: slotDateTime.toJSDate()
       });
     }
 
-    // Evening slots (7 PM to 11 PM)
+    // Evening slots (12 PM UTC = 7 PM Asia/Saigon)
     for (let hour = 12; hour <= 16; hour++) {
       const slotDateTime = luxonDate.set({ hour, minute: 0 });
+      const localDateTime = slotDateTime.setZone(COACH_TIMEZONE);
 
-      const isBooked = existingBookings?.some(booking => {
-        const bookingDateTime = DateTime.fromISO(booking.booking_date).setZone(COACH_TIMEZONE);
-        return bookingDateTime.hour === hour;
-      });
+      const isBooked = isSlotBooked(slotDateTime);
 
       slots.push({
-        id: `${date.toDateString()}-${hour}`,
-        date: slotDateTime.toJSDate(),
-        available: !isBooked
+        id: `${userDateTime.toFormat('yyyy-MM-dd')}-${hour}`,
+        date: localDateTime.toJSDate(),
+        available: !isBooked,
+        utcDate: slotDateTime.toJSDate()
       });
     }
 
     return slots;
   },
 
-  createBooking: async (userEmail: string, date: Date): Promise<Booking> => {
+  createBooking: async (
+    email: string,
+    startDate: Date,
+    frequency: BookingFrequency,
+    endDate: Date | null
+  ): Promise<BookingDB> => {
     try {
-      const bookingDateTime = DateTime.fromJSDate(date)
-      const meetLink = await zoomService.createMeeting(date)
+      const startDateTime = DateTime.fromJSDate(startDate).toUTC();
+      const endDateTime = endDate ? DateTime.fromJSDate(endDate).toUTC() : null;
+      
+      // Crear un solo link de Zoom para todas las recurrencias
+      const meetLink = await zoomService.createMeeting(startDate);
 
-      if (!meetLink) {
-        throw new Error('Failed to generate meeting link')
-      }
+      const booking = {
+        user_email: email,
+        booking_date: startDateTime.toISO(),
+        end_date: endDateTime?.toISO() || null,
+        frequency,
+        status: 'confirmed',
+        meet_link: meetLink,
+        recurring_day: frequency !== 'once' ? startDateTime.weekdayLong : null,
+        recurring_time: frequency !== 'once' ? startDateTime.toFormat('HH:mm') : null
+      };
 
-      const { data, error } = await supabase
+      const { data: savedBooking, error } = await supabase
         .from('meetings_bookings')
-        .insert({
-          user_email: userEmail,
-          booking_date: bookingDateTime.toISO(),
-          status: 'confirmed',
-          meet_link: meetLink
-        })
+        .insert(booking)
         .select()
-        .single()
+        .single();
 
-      if (error) throw error
-
-      return {
-        id: data.id,
-        userId: userEmail,
-        date: DateTime.fromISO(data.booking_date).toJSDate(),
-        status: data.status,
-        meetLink: data.meet_link
-      }
+      if (error) throw error;
+      return savedBooking;
     } catch (error) {
-      console.error('Create booking error:', error)
-      throw error
+      console.error('Create booking error:', error);
+      throw error;
     }
   },
 
@@ -178,34 +200,91 @@ export const bookingService = {
   },
 
   getFullyBookedDates: async (month: Date): Promise<Array<{ date: Date, fullyBooked: boolean }>> => {
-    const startOfMonth = new Date(month.getFullYear(), month.getMonth(), 1)
-    const endOfMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0)
+    const startOfMonth = DateTime.fromJSDate(new Date(month.getFullYear(), month.getMonth(), 1)).startOf('day');
+    const endOfMonth = DateTime.fromJSDate(new Date(month.getFullYear(), month.getMonth() + 1, 0)).endOf('day');
     
-    const { data: bookings, error } = await supabase
+    // Primero obtenemos las reservas únicas
+    const { data: singleBookings, error: singleError } = await supabase
       .from('meetings_bookings')
       .select('booking_date')
       .eq('status', 'confirmed')
-      .gte('booking_date', startOfMonth.toISOString())
-      .lt('booking_date', endOfMonth.toISOString())
+      .eq('frequency', 'once')
+      .gte('booking_date', startOfMonth.toISO())
+      .lte('booking_date', endOfMonth.toISO());
 
-    if (error) {
-      console.error('Error fetching booked dates:', error)
-      throw error
+    if (singleError) throw singleError;
+
+    // Luego obtenemos las reservas recurrentes
+    const { data: recurringBookings, error: recurringError } = await supabase
+      .from('meetings_bookings')
+      .select('booking_date, recurring_day, recurring_time, end_date')
+      .eq('status', 'confirmed')
+      .neq('frequency', 'once');
+
+    if (recurringError) throw recurringError;
+
+    const bookingsByDate = new Map<string, number>();
+    const TOTAL_SLOTS_PER_DAY = 9;
+
+    // Procesar reservas únicas
+    singleBookings.forEach(booking => {
+      const dateStr = DateTime.fromISO(booking.booking_date).toFormat('yyyy-MM-dd');
+      bookingsByDate.set(dateStr, (bookingsByDate.get(dateStr) || 0) + 1);
+    });
+
+    // Procesar reservas recurrentes
+    for (let d = startOfMonth; d <= endOfMonth; d = d.plus({ days: 1 })) {
+      const dateStr = d.toFormat('yyyy-MM-dd');
+      let currentCount = bookingsByDate.get(dateStr) || 0;
+
+      recurringBookings.forEach(booking => {
+        if (booking.recurring_day === d.weekdayLong) {
+          const startDate = DateTime.fromISO(booking.booking_date);
+          const endDate = booking.end_date ? DateTime.fromISO(booking.end_date) : null;
+          
+          if (d >= startDate && (!endDate || d <= endDate)) {
+            currentCount++;
+          }
+        }
+      });
+
+      if (currentCount > 0) {
+        bookingsByDate.set(dateStr, currentCount);
+      }
     }
 
-    // Group bookings by date
-    const bookingsByDate = bookings.reduce((acc: { [key: string]: number }, booking) => {
-      const date = new Date(booking.booking_date).toDateString()
-      acc[date] = (acc[date] || 0) + 1
-      return acc
-    }, {})
-
-    // Find dates with all slots booked (in this case, 2 slots per day)
-    return Object.entries(bookingsByDate)
-      .filter(([_, count]) => count >= 2) // Since you have 2 slots (9AM and 10AM)
-      .map(([dateStr]) => ({
-        date: new Date(dateStr),
+    return Array.from(bookingsByDate.entries())
+      .filter(([_, count]) => count >= TOTAL_SLOTS_PER_DAY)
+      .map(([dateStr, _]) => ({
+        date: DateTime.fromFormat(dateStr, 'yyyy-MM-dd').toJSDate(),
         fullyBooked: true
-      }))
+      }));
+  },
+
+  createRecurringBookings: async (
+    startDate: Date,
+    frequency: BookingFrequency,
+    duration: number,
+    userEmail: string,
+    meetLink: string
+  ) => {
+    const start = DateTime.fromJSDate(startDate)
+    const end = start.plus({ months: duration })
+
+    const { data, error } = await supabase
+      .from('meetings_bookings')
+      .insert({
+        user_email: userEmail,
+        booking_date: startDate.toISOString(),
+        end_date: end.toJSON(),
+        frequency: frequency,
+        status: 'confirmed',
+        meet_link: meetLink,
+        recurring_day: start.toFormat('cccc'),
+        recurring_time: start.toFormat('HH:mm')
+      })
+
+    if (error) throw error
+    return data
   }
 } 

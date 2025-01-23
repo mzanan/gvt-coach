@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Calendar } from './Calendar'
 import { UserProfileForm } from './UserProfileForm'
-import { TimeSlot } from '../types/booking'
+import { TimeSlot, BookingFrequency, BookingPlan } from '../types/booking'
 import { bookingService } from '../services/bookingService'
 import { UserProfile } from '@/lib/supabase/types'
 import { Button } from '@/components/ui/button'
@@ -12,9 +12,11 @@ import { ChevronDown, ChevronUp, Check, Edit2, Loader2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { toast } from '@/hooks/use-toast'
 import { DateTime } from 'luxon'
+import { FrequencySelector } from './FrequencySelector'
+import { getBookingSummary } from '@/lib/utils'
 
 interface Section {
-  id: 'date' | 'time' | 'summary'
+  id: 'date' | 'time' | 'summary' | 'frequency'
   title: string
   completed: boolean
 }
@@ -22,6 +24,7 @@ interface Section {
 export function BookingCalendar() {
   const [showInitialForm, setShowInitialForm] = useState(true)
   const [sections, setSections] = useState<Section[]>([
+    { id: 'frequency', title: 'Select Frequency', completed: false },
     { id: 'date', title: 'Select Date', completed: false },
     { id: 'time', title: 'Select Time', completed: false },
     { id: 'summary', title: 'Booking Summary', completed: false }
@@ -35,6 +38,8 @@ export function BookingCalendar() {
   const [bookedDates, setBookedDates] = useState<Array<{ date: Date, fullyBooked: boolean }>>([])
   const [isBookingLoading, setIsBookingLoading] = useState(false)
   const [selectedTimezone, setSelectedTimezone] = useState<string>('')
+  const [bookingPlan, setBookingPlan] = useState<BookingPlan | null>(null)
+  const [secondDateSelection, setSecondDateSelection] = useState<boolean>(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -48,14 +53,19 @@ export function BookingCalendar() {
   useEffect(() => {
     const loadBookedDates = async () => {
       try {
-        const dates = await bookingService.getFullyBookedDates(new Date())
-        setBookedDates(dates)
+        const dates = await bookingService.getFullyBookedDates(new Date());
+        setBookedDates(dates);
       } catch (error) {
-        console.error('Error loading booked dates:', error)
+        console.error('Error loading booked dates:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load calendar availability. Please try again later.",
+          variant: "destructive"
+        });
       }
-    }
-    loadBookedDates()
-  }, [])
+    };
+    loadBookedDates();
+  }, []);
 
   useEffect(() => {
     setSelectedTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)
@@ -74,35 +84,61 @@ export function BookingCalendar() {
   }
 
   const handleDateSelect = async (date: Date) => {
-    if (bookedDates.some(bookedDate => 
-      bookedDate.date.getDate() === date.getDate() &&
-      bookedDate.date.getMonth() === date.getMonth() &&
-      bookedDate.date.getFullYear() === date.getFullYear()
-    )) {
-      return
+    if (bookingPlan?.frequency === 'weekly') {
+      const endDate = DateTime.fromJSDate(date)
+        .plus({ months: bookingPlan.duration || 0 })
+        .toJSDate();
+
+      const dayOfWeek = date.getDay();
+      const conflictingDates = bookedDates.filter(bookedDate => {
+        const bookingDate = bookedDate.date;
+        return bookingDate >= date && 
+               bookingDate <= endDate && 
+               bookingDate.getDay() === dayOfWeek;
+      });
+
+      if (conflictingDates.length > 0) {
+        toast({
+          title: "Date not available",
+          description: "One or more dates in this recurring schedule are already booked.",
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
-    setSelectedDate(date)
-    setSelectedSlot(null)
+    setSelectedDate(date);
+    setSelectedSlot(null);
     try {
-      const slots = await bookingService.getAvailableSlots(date)
-      setAvailableSlots(slots)
+      const slots = await bookingService.getAvailableSlots(date);
+      setAvailableSlots(slots);
       setSections(prev => prev.map(s => 
         s.id === 'date' ? { ...s, completed: true } : s
-      ))
-      setActiveSection('time')
+      ));
+      setActiveSection('time');
     } catch (error) {
-      console.error('Error loading slots:', error)
+      console.error('Error loading slots:', error);
     }
   }
 
   const handleSlotSelect = (slot: TimeSlot) => {
     if (!slot.available) return
-    setSelectedSlot(slot)
-    setSections(prev => prev.map(s => 
-      s.id === 'time' ? { ...s, completed: true } : s
-    ))
-    setActiveSection('summary')
+    
+    if (bookingPlan?.frequency === 'twice-weekly' && !secondDateSelection) {
+      setSelectedSlot(slot)
+      setSecondDateSelection(true)
+      // Clear date selection for second slot
+      setSelectedDate(null)
+    } else {
+      setSelectedSlot(slot)
+      if (bookingPlan?.frequency === 'twice-weekly') {
+        setBookingPlan(prev => prev ? { ...prev, secondSlot: slot } : prev)
+      }
+      setSections(prev => prev.map(s => 
+        s.id === 'time' ? { ...s, completed: true } : s
+      ))
+      setActiveSection('summary')
+    }
   }
 
   const handleSectionClick = (sectionId: string) => {
@@ -118,21 +154,34 @@ export function BookingCalendar() {
   }
 
   const handleBookingSubmit = async () => {
-    if (!selectedSlot || !userProfile) return
+    if (!selectedSlot || !userProfile || !bookingPlan) return;
     
-    setIsBookingLoading(true)
+    setIsBookingLoading(true);
     try {
-      const booking = await bookingService.createBooking(userProfile.email, selectedSlot.date)
-      router.push(`/booking-confirmation/${booking.id}`)
+      const startDate = selectedSlot.date;
+      const endDate = bookingPlan.frequency !== 'once' 
+        ? DateTime.fromJSDate(startDate)
+            .plus({ months: bookingPlan.duration || 0 })
+            .toJSDate()
+        : null;
+
+      const booking = await bookingService.createBooking(
+        userProfile.email, 
+        startDate,
+        bookingPlan.frequency,
+        endDate
+      );
+      
+      router.push(`/booking-confirmation/${booking.id}`);
     } catch (error) {
-      console.error('Error creating booking:', error)
+      console.error('Error creating booking:', error);
       toast({
         title: "Error",
         description: "Failed to create meeting. Please try again later.",
         variant: "destructive"
-      })
+      });
     } finally {
-      setIsBookingLoading(false)
+      setIsBookingLoading(false);
     }
   }
 
@@ -142,6 +191,18 @@ export function BookingCalendar() {
 
   const renderSectionContent = (sectionId: string) => {
     switch (sectionId) {
+      case 'frequency':
+        return (
+          <FrequencySelector 
+            onFrequencySelect={(frequency, duration) => {
+              setBookingPlan({ frequency, duration })
+              setSections(prev => prev.map(s => 
+                s.id === 'frequency' ? { ...s, completed: true } : s
+              ))
+              setActiveSection('date')
+            }}
+          />
+        )
       case 'date':
         return (
           <Calendar 
@@ -152,12 +213,12 @@ export function BookingCalendar() {
         )
       case 'time':
         return (
-          <div className="flex flex-wrap gap">
+          <div className="grid grid-cols-3 gap-2">
             {availableSlots.map((slot) => (
               <button
                 key={slot.id}
                 className={`
-                  w-1/3 p-3 text-left rounded-md transition-colors duration-200 text-center
+                  p-3 text-left rounded-md transition-colors duration-200 text-center
                   ${slot.available 
                     ? 'hover:bg-accent cursor-pointer'
                     : 'bg-muted text-gray-400 cursor-not-allowed'
@@ -174,22 +235,24 @@ export function BookingCalendar() {
         )
       case 'summary':
         return (
-          <div className="space-y-4">
-            <div className="grid gap-2">
-              <h3 className="font-semibold">Selected Date & Time</h3>
-              <p>{selectedDate?.toLocaleDateString('en-US', { 
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}</p>
-              <p>{selectedSlot?.date.toLocaleTimeString([], { 
-                hour: '2-digit', 
-                minute: '2-digit' 
-              })}</p>
-            </div>
+          <div className="space-y-6">
+            {selectedSlot?.date && (() => {
+              const summary = getBookingSummary(
+                selectedSlot.utcDate,
+                bookingPlan?.frequency || 'once',
+                bookingPlan?.duration,
+                true,
+                selectedTimezone
+              );
+              return (
+                <div className="space-y-2 text-center">
+                  <p className="text-xl">{summary}</p>
+                </div>
+              );
+            })()}
+            
             <Button 
-              className="w-full mt-4"
+              className="w-full" 
               onClick={handleBookingSubmit}
               disabled={isBookingLoading}
             >
@@ -214,7 +277,7 @@ export function BookingCalendar() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-[46rem] mx-auto space-y-6">
       {/* User Profile Section */}
       <Card className="p-6">
         <div className="flex justify-between items-center mb-4">
