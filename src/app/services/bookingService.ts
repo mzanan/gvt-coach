@@ -8,14 +8,12 @@ const COACH_TIMEZONE = process.env.COACH_TIMEZONE || 'UTC'; // Default to UTC if
 
 export const bookingService = {
   saveUserProfile: async (profile: UserProfile) => {
-    // Guardar en localStorage
     const profileData = {
       value: profile,
-      expiry: new Date().getTime() + 24 * 60 * 60 * 1000 // 24 horas
+      expiry: new Date().getTime() + 24 * 60 * 60 * 1000
     }
     localStorage.setItem('userProfile', JSON.stringify(profileData))
 
-    // Actualizar en Supabase
     const { data, error } = await supabase
       .from('meetings_user_profiles')
       .upsert({
@@ -23,6 +21,7 @@ export const bookingService = {
         first_name: profile.first_name,
         last_name: profile.last_name,
         phone: profile.phone,
+        timezone: profile.timezone,
         updated_at: new Date().toISOString()
       }, {
         onConflict: 'email'

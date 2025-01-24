@@ -46,6 +46,7 @@ export function BookingCalendar() {
     const profile = bookingService.getUserProfile()
     if (profile) {
       setUserProfile(profile)
+      setSelectedTimezone(profile.timezone)
       setShowInitialForm(false)
     }
   }, [])
@@ -75,6 +76,7 @@ export function BookingCalendar() {
     const profile = bookingService.getUserProfile()
     if (profile) {
       setUserProfile(profile)
+      setSelectedTimezone(profile.timezone)
       setShowInitialForm(false)
     }
   }
@@ -125,7 +127,9 @@ export function BookingCalendar() {
     if (!slot.available) return
     
     if (bookingPlan?.frequency === 'twice-weekly' && !secondDateSelection) {
+      // First slot selection
       setSelectedSlot(slot)
+      setBookingPlan(prev => prev ? { ...prev, firstSlot: slot } : prev)
       setSecondDateSelection(true)
       // Clear date selection for second slot
       setSelectedDate(null)
@@ -165,14 +169,14 @@ export function BookingCalendar() {
             .toJSDate()
         : null;
 
-      const booking = await bookingService.createBooking(
-        userProfile.email, 
-        startDate,
-        bookingPlan.frequency,
-        endDate
-      );
+        const booking = await bookingService.createBooking(
+          userProfile.email,
+          startDate,
+          bookingPlan.frequency,
+          endDate
+        );
       
-      router.push(`/booking-confirmation/${booking.id}`);
+        router.push(`/booking-confirmation/${booking.id}`);
     } catch (error) {
       console.error('Error creating booking:', error);
       toast({
@@ -237,18 +241,18 @@ export function BookingCalendar() {
         return (
           <div className="space-y-6">
             {selectedSlot?.date && (() => {
-              const summary = getBookingSummary(
-                selectedSlot.utcDate,
-                bookingPlan?.frequency || 'once',
-                bookingPlan?.duration,
-                true,
-                selectedTimezone
-              );
-              return (
-                <div className="space-y-2 text-center">
-                  <p className="text-xl">{summary}</p>
-                </div>
-              );
+                const summary = getBookingSummary(
+                  selectedSlot.utcDate,
+                  bookingPlan?.frequency || 'once',
+                  bookingPlan?.duration,
+                  true,
+                  selectedTimezone
+                );
+                return (
+                  <div className="space-y-2 text-center">
+                    <p className="text-xl">{summary}</p>
+                  </div>
+                );
             })()}
             
             <Button 

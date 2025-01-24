@@ -19,12 +19,21 @@ import {
 import { Input } from "@/components/ui/input"
 import { Loader2 } from "lucide-react"
 import { TimezoneDropdown } from "@/app/components/TimezoneDropdown"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { DateTime } from "luxon"
 
 const formSchema = z.object({
   email: z.string().email('Invalid email'),
   first_name: z.string().min(2, 'First name must be at least 2 characters'),
   last_name: z.string().min(2, 'Last name must be at least 2 characters'),
-  phone: z.string().min(8, 'Invalid phone number')
+  phone: z.string().min(8, 'Invalid phone number'),
+  timezone: z.string()
 })
 
 interface UserProfileFormProps {
@@ -50,7 +59,8 @@ export function UserProfileForm({
       email: initialData?.email || '',
       first_name: initialData?.first_name || '',
       last_name: initialData?.last_name || '',
-      phone: initialData?.phone || ''
+      phone: initialData?.phone || '',
+      timezone: initialData?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
     },
   })
 
@@ -59,13 +69,17 @@ export function UserProfileForm({
         values.email === initialData.email &&
         values.first_name === initialData.first_name &&
         values.last_name === initialData.last_name &&
-        values.phone === initialData.phone) {
+        values.phone === initialData.phone &&
+        values.timezone === initialData.timezone) {
       onComplete()
       return
     }
 
     try {
       await bookingService.saveUserProfile(values)
+      if (onTimezoneChange) {
+        onTimezoneChange(values.timezone)
+      }
       onComplete()
     } catch (error) {
       form.setError("root", { 
@@ -133,9 +147,35 @@ export function UserProfileForm({
           )}
         />
 
-        <TimezoneDropdown
-          selectedTimezone={selectedTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone}
-          onTimezoneChange={onTimezoneChange || (() => {})}
+        <FormField
+          control={form.control}
+          name="timezone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Timezone</FormLabel>
+              <FormControl>
+                <Select 
+                  value={field.value} 
+                  onValueChange={(value) => {
+                    field.onChange(value);
+                    onTimezoneChange?.(value);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select timezone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Intl.supportedValuesOf('timeZone').map((tz) => (
+                      <SelectItem key={tz} value={tz}>
+                        {tz} ({DateTime.now().setZone(tz).toFormat('ZZZZ')})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
 
         {form.formState.errors.root && (
@@ -146,8 +186,8 @@ export function UserProfileForm({
 
         <Button 
           type="submit" 
-          className="w-full" 
           disabled={form.formState.isSubmitting}
+          className="w-full"
         >
           {form.formState.isSubmitting ? (
             <>

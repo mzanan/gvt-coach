@@ -18,7 +18,8 @@ export type BookingFrequency = 'once' | 'weekly' | 'twice-weekly'
 export interface BookingPlan {
   frequency: BookingFrequency
   duration?: number // number of months for recurring bookings
-  secondSlot?: TimeSlot // for twice-weekly bookings
+  firstSlot?: TimeSlot
+  secondSlot?: TimeSlot
 }
 
 export interface CreateBookingParams {
