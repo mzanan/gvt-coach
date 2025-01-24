@@ -14,6 +14,8 @@ import { toast } from '@/hooks/use-toast'
 import { DateTime } from 'luxon'
 import { FrequencySelector } from './FrequencySelector'
 import { getBookingSummary } from '@/lib/utils'
+import { TwiceWeeklySelector } from './TwiceWeeklySelector'
+import { cn } from '@/lib/utils'
 
 interface Section {
   id: 'date' | 'time' | 'summary' | 'frequency'
@@ -29,17 +31,19 @@ export function BookingCalendar() {
     { id: 'time', title: 'Select Time', completed: false },
     { id: 'summary', title: 'Booking Summary', completed: false }
   ])
-  const [activeSection, setActiveSection] = useState<string>('date')
+  const [activeSection, setActiveSection] = useState<string>('frequency')
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
-  const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([])
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [suggestedDate, setSuggestedDate] = useState<Date | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null)
+  const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([])
+  const [bookingPlan, setBookingPlan] = useState<BookingPlan | null>(null)
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [bookedDates, setBookedDates] = useState<Array<{ date: Date, fullyBooked: boolean }>>([])
   const [isBookingLoading, setIsBookingLoading] = useState(false)
-  const [selectedTimezone, setSelectedTimezone] = useState<string>('')
-  const [bookingPlan, setBookingPlan] = useState<BookingPlan | null>(null)
-  const [secondDateSelection, setSecondDateSelection] = useState<boolean>(false)
+  const [selectedTimezone, setSelectedTimezone] = useState(
+    Intl.DateTimeFormat().resolvedOptions().timeZone
+  )
   const router = useRouter()
 
   useEffect(() => {
@@ -86,58 +90,75 @@ export function BookingCalendar() {
   }
 
   const handleDateSelect = async (date: Date) => {
-    if (bookingPlan?.frequency === 'weekly') {
-      const endDate = DateTime.fromJSDate(date)
-        .plus({ months: bookingPlan.duration || 0 })
-        .toJSDate();
-
-      const dayOfWeek = date.getDay();
-      const conflictingDates = bookedDates.filter(bookedDate => {
-        const bookingDate = bookedDate.date;
-        return bookingDate >= date && 
-               bookingDate <= endDate && 
-               bookingDate.getDay() === dayOfWeek;
-      });
-
-      if (conflictingDates.length > 0) {
+    if (bookingPlan?.frequency === 'twice-weekly') {
+      const suggested = DateTime.fromJSDate(date).plus({ days: 3 }).toJSDate()
+      setSelectedDate(date)
+      setSuggestedDate(suggested)
+    } else {
+      setSelectedDate(date)
+      setSuggestedDate(null)
+      try {
+        const slots = await bookingService.getAvailableSlots(date)
+        setAvailableSlots(slots)
+        setSections(prev => prev.map(s => 
+          s.id === 'date' ? { ...s, completed: true } : s
+        ))
+        setActiveSection('time')
+      } catch (error) {
+        console.error('Error loading slots:', error)
         toast({
-          title: "Date not available",
-          description: "One or more dates in this recurring schedule are already booked.",
+          title: "Error",
+          description: "Failed to load available time slots. Please try again.",
           variant: "destructive"
-        });
-        return;
+        })
       }
     }
+  }
 
-    setSelectedDate(date);
-    setSelectedSlot(null);
-    try {
-      const slots = await bookingService.getAvailableSlots(date);
-      setAvailableSlots(slots);
-      setSections(prev => prev.map(s => 
-        s.id === 'date' ? { ...s, completed: true } : s
-      ));
-      setActiveSection('time');
-    } catch (error) {
-      console.error('Error loading slots:', error);
+  const handleSecondDateSelect = async (date: Date) => {
+    if (!selectedDate || !suggestedDate) return;
+    
+    // Verificar que la fecha seleccionada sea la sugerida
+    const suggestedDateTime = DateTime.fromJSDate(suggestedDate)
+    const selectedDateTime = DateTime.fromJSDate(date)
+    
+    if (suggestedDateTime.hasSame(selectedDateTime, 'day')) {
+      try {
+        const slots = await bookingService.getAvailableSlots(date)
+        setAvailableSlots(slots)
+        setSections(prev => prev.map(s => 
+          s.id === 'date' ? { ...s, completed: true } : s
+        ))
+        setActiveSection('time')
+      } catch (error) {
+        console.error('Error loading slots:', error)
+        toast({
+          title: "Error",
+          description: "Failed to load available time slots. Please try again.",
+          variant: "destructive"
+        })
+      }
+    } else {
+      toast({
+        title: "Invalid Selection",
+        description: "Please select the suggested date (highlighted in green) for your second weekly session.",
+        variant: "destructive"
+      })
     }
   }
 
   const handleSlotSelect = (slot: TimeSlot) => {
     if (!slot.available) return
     
-    if (bookingPlan?.frequency === 'twice-weekly' && !secondDateSelection) {
-      // First slot selection
+    if (bookingPlan?.frequency === 'twice-weekly') {
       setSelectedSlot(slot)
       setBookingPlan(prev => prev ? { ...prev, firstSlot: slot } : prev)
-      setSecondDateSelection(true)
-      // Clear date selection for second slot
-      setSelectedDate(null)
+      setSections(prev => prev.map(s => 
+        s.id === 'time' ? { ...s, completed: true } : s
+      ))
+      setActiveSection('summary')
     } else {
       setSelectedSlot(slot)
-      if (bookingPlan?.frequency === 'twice-weekly') {
-        setBookingPlan(prev => prev ? { ...prev, secondSlot: slot } : prev)
-      }
       setSections(prev => prev.map(s => 
         s.id === 'time' ? { ...s, completed: true } : s
       ))
@@ -193,42 +214,83 @@ export function BookingCalendar() {
     setSelectedTimezone(timezone)
   }
 
+  const handleFrequencySelect = (frequency: BookingFrequency, duration?: number) => {
+    // Limpiar estados previos
+    setSelectedDate(null)
+    setSuggestedDate(null)
+    setSelectedSlot(null)
+    setAvailableSlots([])
+    
+    // Establecer nuevo plan
+    setBookingPlan({ 
+      frequency, 
+      duration: duration || 1 
+    })
+    
+    // Marcar sección como completada
+    setSections(prev => prev.map(s => 
+      s.id === 'frequency' ? { ...s, completed: true } : s
+    ))
+    setActiveSection('date')
+  }
+
   const renderSectionContent = (sectionId: string) => {
     switch (sectionId) {
       case 'frequency':
         return (
           <FrequencySelector 
-            onFrequencySelect={(frequency, duration) => {
-              setBookingPlan({ frequency, duration })
-              setSections(prev => prev.map(s => 
-                s.id === 'frequency' ? { ...s, completed: true } : s
-              ))
-              setActiveSection('date')
-            }}
+            onFrequencySelect={handleFrequencySelect}
           />
         )
       case 'date':
         return (
           <Calendar 
             onSelectDate={handleDateSelect}
+            onConfirmDates={(firstDate, secondDate) => {
+              setSelectedDate(firstDate)
+              setSuggestedDate(secondDate)
+              setSections(prev => prev.map(s => 
+                s.id === 'date' ? { ...s, completed: true } : s
+              ))
+              setActiveSection('time')
+            }}
             selectedDate={selectedDate}
             bookedDates={bookedDates}
+            frequency={bookingPlan?.frequency}
+            suggestedDate={suggestedDate}
           />
         )
       case 'time':
+        if (bookingPlan?.frequency === 'twice-weekly') {
+          return (
+            <TwiceWeeklySelector
+              firstDate={selectedDate!}
+              duration={bookingPlan.duration}
+              onComplete={(firstSlot, secondSlot) => {
+                setBookingPlan(prev => prev ? {
+                  ...prev,
+                  firstSlot,
+                  secondSlot
+                } : prev)
+                setSections(prev => prev.map(s => 
+                  s.id === 'time' ? { ...s, completed: true } : s
+                ))
+                setActiveSection('summary')
+              }}
+            />
+          )
+        }
+        
         return (
           <div className="grid grid-cols-3 gap-2">
             {availableSlots.map((slot) => (
               <button
                 key={slot.id}
-                className={`
-                  p-3 text-left rounded-md transition-colors duration-200 text-center
-                  ${slot.available 
-                    ? 'hover:bg-accent cursor-pointer'
-                    : 'bg-muted text-gray-400 cursor-not-allowed'
-                  }
-                  ${selectedSlot?.id === slot.id ? 'ring-2 ring-blue-500' : ''}
-                `}
+                className={cn(
+                  "p-2 rounded-md text-sm transition-colors",
+                  slot.available ? "hover:bg-accent cursor-pointer" : "bg-muted text-gray-400 cursor-not-allowed",
+                  selectedSlot?.id === slot.id && "ring-2 ring-blue-500"
+                )}
                 onClick={() => slot.available && handleSlotSelect(slot)}
                 disabled={!slot.available}
               >
@@ -240,23 +302,44 @@ export function BookingCalendar() {
       case 'summary':
         return (
           <div className="space-y-6">
-            {selectedSlot?.date && (() => {
-                const summary = getBookingSummary(
-                  selectedSlot.utcDate,
-                  bookingPlan?.frequency || 'once',
-                  bookingPlan?.duration,
-                  true,
-                  selectedTimezone
-                );
-                return (
-                  <div className="space-y-2 text-center">
-                    <p className="text-xl">{summary}</p>
-                  </div>
-                );
-            })()}
+            {bookingPlan?.frequency === 'twice-weekly' ? (
+              <div className="flex justify-center">
+              <div className="space-y-4 text-left">
+                <div className="space-y-2">
+                  <p>First Session: Every {DateTime.fromJSDate(selectedDate!).toFormat('cccc')} at {
+                    DateTime.fromJSDate(bookingPlan.firstSlot?.date!).toFormat('hh:mm a')
+                  }</p>
+                  <p>Second Session: Every {DateTime.fromJSDate(suggestedDate!).toFormat('cccc')} at {
+                    DateTime.fromJSDate(bookingPlan.secondSlot?.date!).toFormat('hh:mm a')
+                  }</p>
+                  <p className="mt-4">
+                    Starting from {DateTime.fromJSDate(selectedDate!).toFormat('MMMM d, yyyy')}
+                  </p>
+                  <p>
+                    Duration: {bookingPlan.duration} {bookingPlan.duration === 1 ? 'month' : 'months'}
+                  </p>
+                  <p>
+                    Ending on {DateTime.fromJSDate(selectedDate!).plus({ months: bookingPlan.duration }).toFormat('MMMM d, yyyy')}
+                  </p>
+                </div>
+              </div>
+              </div>
+            ) : (
+              <div className="space-y-2 text-center">
+                <p className="text-xl">
+                  {getBookingSummary(
+                    selectedSlot!.utcDate,
+                    bookingPlan?.frequency || 'once',
+                    bookingPlan?.duration,
+                    true,
+                    selectedTimezone
+                  )}
+                </p>
+              </div>
+            )}
             
             <Button 
-              className="w-full" 
+              className="w-full"
               onClick={handleBookingSubmit}
               disabled={isBookingLoading}
             >
@@ -266,7 +349,7 @@ export function BookingCalendar() {
                   Creating booking...
                 </>
               ) : (
-                "Confirm Booking"
+                'Confirm Booking'
               )}
             </Button>
           </div>

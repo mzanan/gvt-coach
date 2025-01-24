@@ -3,14 +3,26 @@
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { BookingFrequency } from '../types/booking'
+import { Button } from '@/components/ui/button'
 
 interface CalendarProps {
   onSelectDate: (date: Date) => void
+  onConfirmDates: (firstDate: Date, secondDate: Date) => void
   selectedDate: Date | null
   bookedDates: Array<{ date: Date, fullyBooked: boolean }>
+  frequency?: BookingFrequency
+  suggestedDate?: Date | null
 }
 
-export function Calendar({ onSelectDate, selectedDate, bookedDates }: CalendarProps) {
+export function Calendar({ 
+  onSelectDate, 
+  onConfirmDates,
+  selectedDate, 
+  bookedDates,
+  frequency,
+  suggestedDate 
+}: CalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date())
 
   const getDaysInMonth = (date: Date) => {
@@ -19,16 +31,27 @@ export function Calendar({ onSelectDate, selectedDate, bookedDates }: CalendarPr
     const daysInMonth = new Date(year, month + 1, 0).getDate()
     const firstDayOfMonth = new Date(year, month, 1).getDay()
     
-    const days: (Date | null)[] = []
+    const days: Date[] = []
     
-    // Agregar días vacíos al inicio
-    for (let i = 0; i < firstDayOfMonth; i++) {
-      days.push(null)
+    // Agregar días del mes anterior
+    const lastMonthLastDay = new Date(year, month, 0).getDate()
+    for (let i = firstDayOfMonth - 1; i >= 0; i--) {
+      const day = new Date(year, month - 1, lastMonthLastDay - i)
+      days.push(day)
     }
     
-    // Agregar días del mes
+    // Agregar días del mes actual
     for (let day = 1; day <= daysInMonth; day++) {
       days.push(new Date(year, month, day))
+    }
+    
+    // Agregar días del mes siguiente hasta completar la última semana y una semana adicional
+    const remainingDays = (7 - (days.length % 7)) % 7
+    const extraWeek = 7
+    const totalDaysToAdd = remainingDays + extraWeek
+    
+    for (let day = 1; day <= totalDaysToAdd; day++) {
+      days.push(new Date(year, month + 1, day))
     }
     
     return days
@@ -56,6 +79,12 @@ export function Calendar({ onSelectDate, selectedDate, bookedDates }: CalendarPr
       selectedDate?.getFullYear() === date.getFullYear()
   }
 
+  const isSuggestedDate = (date: Date) => {
+    return suggestedDate?.getDate() === date.getDate() &&
+      suggestedDate?.getMonth() === date.getMonth() &&
+      suggestedDate?.getFullYear() === date.getFullYear()
+  }
+
   const isDisabled = (date: Date) => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -68,6 +97,22 @@ export function Calendar({ onSelectDate, selectedDate, bookedDates }: CalendarPr
       bookedDate.date.getMonth() === date.getMonth() &&
       bookedDate.date.getFullYear() === date.getFullYear()
     )
+  }
+
+  const handleDateSelect = (date: Date) => {
+    if (!isDisabled(date)) {
+      const localDate = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+        0, 0, 0, 0
+      );
+      onSelectDate(localDate);
+    }
+  }
+
+  const isCurrentMonth = (date: Date) => {
+    return date.getMonth() === currentMonth.getMonth()
   }
 
   return (
@@ -110,17 +155,7 @@ export function Calendar({ onSelectDate, selectedDate, bookedDates }: CalendarPr
           return (
             <button
               key={date.toISOString()}
-              onClick={() => {
-                if (!isDisabled(date)) {
-                  const localDate = new Date(
-                    date.getFullYear(),
-                    date.getMonth(),
-                    date.getDate(),
-                    0, 0, 0, 0
-                  );
-                  onSelectDate(localDate);
-                }
-              }}
+              onClick={() => handleDateSelect(date)}
               disabled={isDisabled(date)}
               className={cn(
                 "p-2 w-full rounded-md text-sm transition-colors",
@@ -128,9 +163,11 @@ export function Calendar({ onSelectDate, selectedDate, bookedDates }: CalendarPr
                 "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
                 {
                   "bg-primary text-primary-foreground": isSelected(date),
-                  "bg-accent/50": isToday(date) && !isSelected(date),
+                  "bg-green-100 text-green-700": isSuggestedDate(date),
+                  "bg-accent/50": isToday(date),
                   "text-muted-foreground cursor-not-allowed": isDisabled(date),
-                  "text-foreground": !isDisabled(date) && !isSelected(date),
+                  "text-muted-foreground/50": !isCurrentMonth(date),
+                  "text-foreground": !isDisabled(date) && !isSelected(date) && !isSuggestedDate(date) && isCurrentMonth(date),
                 }
               )}
             >
@@ -139,6 +176,15 @@ export function Calendar({ onSelectDate, selectedDate, bookedDates }: CalendarPr
           )
         })}
       </div>
+
+      {frequency === 'twice-weekly' && selectedDate && suggestedDate && (
+        <Button 
+          className="w-full mt-4"
+          onClick={() => onConfirmDates(selectedDate, suggestedDate)}
+        >
+          Confirm Selected Dates
+        </Button>
+      )}
     </div>
   )
 } 
