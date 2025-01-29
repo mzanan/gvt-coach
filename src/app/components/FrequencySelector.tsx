@@ -12,13 +12,42 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
 
 interface FrequencySelectorProps {
   onFrequencySelect: (frequency: BookingFrequency, duration?: number) => void
+  selectedFrequency?: BookingFrequency
 }
 
-export function FrequencySelector({ onFrequencySelect }: FrequencySelectorProps) {
-  const [selectedFrequency, setSelectedFrequency] = useState<BookingFrequency | null>(null)
+interface FrequencyOption {
+  value: BookingFrequency;
+  title: string;
+  description: string;
+}
+
+const frequencies: FrequencyOption[] = [
+  {
+    value: 'once',
+    title: 'Single Session',
+    description: 'Book a one-time consultation session'
+  },
+  {
+    value: 'weekly',
+    title: 'Weekly Sessions',
+    description: 'Schedule recurring weekly sessions'
+  },
+  {
+    value: 'twice-weekly',
+    title: 'Twice Weekly',
+    description: 'Schedule two sessions per week'
+  }
+];
+
+export function FrequencySelector({ 
+  onFrequencySelect, 
+  selectedFrequency 
+}: FrequencySelectorProps) {
+  const [selectedFrequencyState, setSelectedFrequency] = useState<BookingFrequency | null>(selectedFrequency || null)
   const [duration, setDuration] = useState<string>("1")
 
   const handleSelect = (frequency: BookingFrequency) => {
@@ -33,40 +62,33 @@ export function FrequencySelector({ onFrequencySelect }: FrequencySelectorProps)
   }
 
   const handleConfirm = () => {
-    if (selectedFrequency && selectedFrequency !== 'once') {
-      onFrequencySelect(selectedFrequency, parseInt(duration))
+    if (selectedFrequencyState && selectedFrequencyState !== 'once') {
+      onFrequencySelect(selectedFrequencyState, parseInt(duration))
     }
   }
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card 
-          className="p-6 cursor-pointer hover:bg-accent transition-colors"
-          onClick={() => handleSelect('once')}
-        >
-          <h3 className="font-semibold mb-2">Single Session</h3>
-          <p className="text-sm text-muted-foreground">Book a one-time consultation session</p>
-        </Card>
-
-        <Card 
-          className="p-6 cursor-pointer hover:bg-accent transition-colors"
-          onClick={() => handleSelect('weekly')}
-        >
-          <h3 className="font-semibold mb-2">Weekly Sessions</h3>
-          <p className="text-sm text-muted-foreground">Schedule recurring weekly sessions</p>
-        </Card>
-
-        <Card 
-          className="p-6 cursor-pointer hover:bg-accent transition-colors"
-          onClick={() => handleSelect('twice-weekly')}
-        >
-          <h3 className="font-semibold mb-2">Twice Weekly</h3>
-          <p className="text-sm text-muted-foreground">Schedule two sessions per week</p>
-        </Card>
+        {frequencies.map((freq) => (
+          <button
+            key={freq.value}
+            onClick={() => handleSelect(freq.value)}
+            className={cn(
+              "flex flex-col items-start p-6 rounded-lg transition-colors text-left",
+              "border border-border hover:border-primary",
+              selectedFrequencyState === freq.value 
+                ? "bg-white text-black" 
+                : "bg-background text-white"
+            )}
+          >
+            <h3 className="font-semibold mb-2">{freq.title}</h3>
+            <p className="text-sm text-muted-foreground">{freq.description}</p>
+          </button>
+        ))}
       </div>
 
-      {selectedFrequency && selectedFrequency !== 'once' && (
+      {selectedFrequencyState && selectedFrequencyState !== 'once' && (
         <div className="space-y-4 w-full">
           <div className="space-y-2 md:w-1/3">
             <Label>Duration (months)</Label>

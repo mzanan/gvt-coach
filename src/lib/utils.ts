@@ -7,35 +7,40 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export const bookingSummaryTexts = {
+  once: (dateTime: DateTime, time: string) => 
+    `One-time meeting on ${dateTime.toFormat('EEEE, MMMM d, yyyy')} at ${time}`,
+  weekly: (dateTime: DateTime, time: string, duration?: number | null) => 
+    `Every ${dateTime.toFormat('EEEE')} at ${time} from ${dateTime.toFormat('MMMM d, yyyy')} until ${dateTime.plus({ months: duration! }).toFormat('MMMM d, yyyy')}`,
+  twiceWeekly: (firstDateTime: DateTime, secondDateTime: DateTime) => 
+    `Every ${firstDateTime.toFormat('EEEE')} at ${firstDateTime.toFormat('hh:mm a')} and ${secondDateTime.toFormat('EEEE')} at ${secondDateTime.toFormat('hh:mm a')}`
+}
+
 export function getBookingSummary(
   startDate: Date | string,
   frequency: BookingFrequency = 'once',
   duration?: number | null,
   includeTime: boolean = true,
-  timezone: string = Intl.DateTimeFormat().resolvedOptions().timeZone
+  timezone: string = Intl.DateTimeFormat().resolvedOptions().timeZone,
+  secondDate?: Date | string
 ) {
-  const start = typeof startDate === 'string' 
-    ? DateTime.fromISO(startDate).setZone(timezone, { keepLocalTime: true })
-    : DateTime.fromJSDate(startDate).setZone(timezone, { keepLocalTime: true })
-    
-  const endDate = duration 
-    ? start.plus({ months: duration }) 
-    : null
-    
-  const time = start.toFormat('hh:mm a')
-  const fullDate = start.toFormat('EEEE, MMMM d, yyyy')
+  const firstDateTime = typeof startDate === 'string' 
+    ? DateTime.fromISO(startDate).setZone(timezone)
+    : DateTime.fromJSDate(startDate).setZone(timezone)
+  
+  if (!includeTime) return '';
 
   switch (frequency) {
     case 'once':
-      return `One-time meeting on ${fullDate}${includeTime ? ` at ${time}` : ''}`
+      return bookingSummaryTexts.once(firstDateTime, firstDateTime.toFormat('hh:mm a'))
     case 'weekly':
-      return endDate 
-        ? `Every ${start.toFormat('EEEE')} at ${time} from ${start.toFormat('MMMM d, yyyy')} until ${endDate.toFormat('MMMM d, yyyy')}`
-        : `Weekly meetings every ${start.toFormat('EEEE')}${includeTime ? ` at ${time}` : ''}`
+      return bookingSummaryTexts.weekly(firstDateTime, firstDateTime.toFormat('hh:mm a'), duration)
     case 'twice-weekly':
-      return endDate 
-        ? `Every ${start.toFormat('EEEE')} and ${start.plus({ days: 2 }).toFormat('EEEE')} at ${time} from ${start.toFormat('MMMM d, yyyy')} until ${endDate.toFormat('MMMM d, yyyy')}`
-        : `Twice-weekly meetings every ${start.toFormat('EEEE')} and ${start.plus({ days: 2 }).toFormat('EEEE')}${includeTime ? ` at ${time}` : ''}`
+      if (!secondDate) return ''
+      const secondDateTime = typeof secondDate === 'string'
+        ? DateTime.fromISO(secondDate).setZone(timezone)
+        : DateTime.fromJSDate(secondDate).setZone(timezone)
+      return bookingSummaryTexts.twiceWeekly(firstDateTime, secondDateTime)
     default:
       return ''
   }

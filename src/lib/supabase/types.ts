@@ -16,4 +16,6 @@ export interface BookingDB {
   meet_link: string
   recurring_day?: string // Day of the week for recurring bookings
   recurring_time?: string // Time for recurring bookings
+  second_booking_date?: string | null;
+  duration?: number
 } 

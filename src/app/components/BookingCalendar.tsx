@@ -15,12 +15,26 @@ import { DateTime } from 'luxon'
 import { FrequencySelector } from './FrequencySelector'
 import { getBookingSummary } from '@/lib/utils'
 import { TwiceWeeklySelector } from './TwiceWeeklySelector'
+import { TimezoneInfo } from './TimezoneInfo'
 import { cn } from '@/lib/utils'
+
+const COACH_TIMEZONE = process.env.COACH_TIMEZONE || 'UTC'
 
 interface Section {
   id: 'date' | 'time' | 'summary' | 'frequency'
   title: string
   completed: boolean
+}
+
+interface GroupedTimeSlots {
+  date: Date;
+  available: boolean;
+  slot: TimeSlot | null;
+}
+
+interface DayGroup {
+  date: Date;
+  slots: GroupedTimeSlots[];
 }
 
 export function BookingCalendar() {
@@ -35,22 +49,25 @@ export function BookingCalendar() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [suggestedDate, setSuggestedDate] = useState<Date | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null)
-  const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([])
+  const [availableSlots, setAvailableSlots] = useState<DayGroup[]>([])
   const [bookingPlan, setBookingPlan] = useState<BookingPlan | null>(null)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [bookedDates, setBookedDates] = useState<Array<{ date: Date, fullyBooked: boolean }>>([])
   const [isBookingLoading, setIsBookingLoading] = useState(false)
-  const [selectedTimezone, setSelectedTimezone] = useState(
-    Intl.DateTimeFormat().resolvedOptions().timeZone
-  )
+  const [selectedTimezone, setSelectedTimezone] = useState<string>(() => {
+    const profile = bookingService.getUserProfile();
+    return profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  });
   const router = useRouter()
 
   useEffect(() => {
     const profile = bookingService.getUserProfile()
     if (profile) {
       setUserProfile(profile)
-      setSelectedTimezone(profile.timezone)
+      if (profile.timezone !== selectedTimezone) {
+        setSelectedTimezone(profile.timezone)
+      }
       setShowInitialForm(false)
     }
   }, [])
@@ -73,8 +90,54 @@ export function BookingCalendar() {
   }, []);
 
   useEffect(() => {
-    setSelectedTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)
-  }, [])
+    if (selectedDate) {
+      const loadSlots = async () => {
+        try {
+          const groupedSlots = await bookingService.getAvailableSlots(selectedDate, selectedTimezone)
+          
+          // Group slots by day
+          const slotsMap = new Map<string, GroupedTimeSlots[]>();
+          
+          groupedSlots.flatMap(group => 
+            group.slots.forEach(slot => {
+              const slotDateTime = DateTime.fromJSDate(slot.date)
+                .setZone(selectedTimezone);
+              const dayKey = slotDateTime.toFormat('yyyy-MM-dd');
+              
+              if (!slotsMap.has(dayKey)) {
+                slotsMap.set(dayKey, []);
+              }
+              
+              slotsMap.get(dayKey)?.push({
+                date: slot.date,
+                available: slot.available,
+                slot: slot
+              });
+            })
+          );
+
+          // Convert map to array and sort by date
+          const transformedSlots = Array.from(slotsMap.entries())
+            .sort(([dateA], [dateB]) => DateTime.fromFormat(dateA, 'yyyy-MM-dd').toMillis() - 
+                                      DateTime.fromFormat(dateB, 'yyyy-MM-dd').toMillis())
+            .map(([date, slots]) => ({
+              date: DateTime.fromFormat(date, 'yyyy-MM-dd').toJSDate(),
+              slots
+            }));
+
+          setAvailableSlots(transformedSlots);
+        } catch (error) {
+          console.error('Error loading slots:', error)
+          toast({
+            title: "Error",
+            description: "Failed to load available time slots. Please try again.",
+            variant: "destructive"
+          })
+        }
+      }
+      loadSlots()
+    }
+  }, [selectedTimezone, selectedDate])
 
   const handleProfileComplete = () => {
     const profile = bookingService.getUserProfile()
@@ -90,27 +153,42 @@ export function BookingCalendar() {
   }
 
   const handleDateSelect = async (date: Date) => {
+    // Mantener la misma fecha que se seleccionó visualmente
+    const selectedLocalDate = DateTime.fromJSDate(date)
+      .startOf('day')
+      .setZone(selectedTimezone, { keepLocalTime: true });
+    
     if (bookingPlan?.frequency === 'twice-weekly') {
-      const suggested = DateTime.fromJSDate(date).plus({ days: 3 }).toJSDate()
-      setSelectedDate(date)
-      setSuggestedDate(suggested)
+      const suggested = selectedLocalDate.plus({ days: 3 }).toJSDate();
+      setSelectedDate(selectedLocalDate.toJSDate());
+      setSuggestedDate(suggested);
     } else {
-      setSelectedDate(date)
-      setSuggestedDate(null)
+      setSelectedDate(selectedLocalDate.toJSDate());
+      setSuggestedDate(null);
       try {
-        const slots = await bookingService.getAvailableSlots(date)
-        setAvailableSlots(slots)
+        const groupedSlots = await bookingService.getAvailableSlots(selectedLocalDate.toJSDate(), selectedTimezone);
+        const transformedSlots = [{
+          date: selectedLocalDate.toJSDate(),
+          slots: groupedSlots.flatMap(group => 
+            group.slots.map(slot => ({
+              date: slot.date,
+              available: slot.available,
+              slot: slot
+            }))
+          )
+        }];
+        setAvailableSlots(transformedSlots);
         setSections(prev => prev.map(s => 
           s.id === 'date' ? { ...s, completed: true } : s
-        ))
-        setActiveSection('time')
+        ));
+        setActiveSection('time');
       } catch (error) {
-        console.error('Error loading slots:', error)
+        console.error('Error loading slots:', error);
         toast({
           title: "Error",
           description: "Failed to load available time slots. Please try again.",
           variant: "destructive"
-        })
+        });
       }
     }
   }
@@ -124,8 +202,18 @@ export function BookingCalendar() {
     
     if (suggestedDateTime.hasSame(selectedDateTime, 'day')) {
       try {
-        const slots = await bookingService.getAvailableSlots(date)
-        setAvailableSlots(slots)
+        const groupedSlots = await bookingService.getAvailableSlots(date, selectedTimezone)
+        const transformedSlots = [{
+          date: date,
+          slots: groupedSlots.flatMap(group => 
+            group.slots.map(slot => ({
+              date: slot.date,
+              available: slot.available,
+              slot: slot
+            }))
+          )
+        }];
+        setAvailableSlots(transformedSlots)
         setSections(prev => prev.map(s => 
           s.id === 'date' ? { ...s, completed: true } : s
         ))
@@ -148,21 +236,33 @@ export function BookingCalendar() {
   }
 
   const handleSlotSelect = (slot: TimeSlot) => {
-    if (!slot.available) return
+    if (!slot.available) return;
+    
+    // Create DateTime object in user's timezone
+    const slotDateTime = DateTime.fromJSDate(slot.date)
+      .setZone(selectedTimezone);
+    
+    console.log('Selected slot datetime:', slotDateTime.toFormat('yyyy-MM-dd HH:mm ZZ'));
+    
+    const correctedSlot = {
+      ...slot,
+      date: slotDateTime.toJSDate(),
+      utcDate: slotDateTime.toUTC().toJSDate()
+    };
     
     if (bookingPlan?.frequency === 'twice-weekly') {
-      setSelectedSlot(slot)
-      setBookingPlan(prev => prev ? { ...prev, firstSlot: slot } : prev)
+      setSelectedSlot(correctedSlot);
+      setBookingPlan(prev => prev ? { ...prev, firstSlot: correctedSlot } : prev);
       setSections(prev => prev.map(s => 
         s.id === 'time' ? { ...s, completed: true } : s
-      ))
-      setActiveSection('summary')
+      ));
+      setActiveSection('summary');
     } else {
-      setSelectedSlot(slot)
+      setSelectedSlot(correctedSlot);
       setSections(prev => prev.map(s => 
         s.id === 'time' ? { ...s, completed: true } : s
-      ))
-      setActiveSection('summary')
+      ));
+      setActiveSection('summary');
     }
   }
 
@@ -210,8 +310,69 @@ export function BookingCalendar() {
     }
   }
 
-  const handleTimezoneChange = (timezone: string) => {
+  const handleTimezoneChange = async (timezone: string) => {
     setSelectedTimezone(timezone)
+
+    // Si estamos en el último paso (summary), necesitamos actualizar todos los datos
+    if (activeSection === 'summary' && selectedDate) {
+      try {
+        // Actualizar la fecha seleccionada a la nueva timezone
+        const newSelectedDate = DateTime.fromJSDate(selectedDate)
+          .setZone(timezone, { keepLocalTime: true })
+          .toJSDate()
+        setSelectedDate(newSelectedDate)
+
+        // Si es twice-weekly, actualizar también la fecha sugerida
+        if (suggestedDate && bookingPlan?.frequency === 'twice-weekly') {
+          const newSuggestedDate = DateTime.fromJSDate(suggestedDate)
+            .setZone(timezone, { keepLocalTime: true })
+            .toJSDate()
+          setSuggestedDate(newSuggestedDate)
+        }
+
+        // Recargar los slots disponibles con la nueva timezone
+        const groupedSlots = await bookingService.getAvailableSlots(newSelectedDate, timezone)
+        const transformedSlots = [{
+          date: newSelectedDate,
+          slots: groupedSlots.flatMap(group => 
+            group.slots.map(slot => ({
+              date: slot.date,
+              available: slot.available,
+              slot: slot
+            }))
+          )
+        }];
+        setAvailableSlots(transformedSlots);
+
+        // Actualizar el slot seleccionado si existe
+        if (selectedSlot) {
+          const newSlotDateTime = DateTime.fromJSDate(selectedSlot.date)
+            .setZone(timezone, { keepLocalTime: true })
+          
+          const matchingSlot = transformedSlots[0].slots.find(slot => 
+            DateTime.fromJSDate(slot.date).toFormat('HH:mm') === 
+            newSlotDateTime.toFormat('HH:mm')
+          )
+
+          if (matchingSlot) {
+            setSelectedSlot(matchingSlot.slot)
+            if (bookingPlan?.frequency === 'twice-weekly') {
+              setBookingPlan(prev => prev ? {
+                ...prev,
+                firstSlot: matchingSlot.slot
+              } : prev)
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error updating timezone:', error)
+        toast({
+          title: "Error",
+          description: "Failed to update timezone. Please try again.",
+          variant: "destructive"
+        })
+      }
+    }
   }
 
   const handleFrequencySelect = (frequency: BookingFrequency, duration?: number) => {
@@ -234,12 +395,148 @@ export function BookingCalendar() {
     setActiveSection('date')
   }
 
+  const formatSlotTime = (date: Date) => {
+    // Convertir el slot a UTC primero
+    const slotUTC = DateTime.fromJSDate(date).toUTC();
+    
+    // Convertir a la timezone del usuario para mostrar
+    const slotInUserTZ = slotUTC.setZone(selectedTimezone);
+    
+    // Obtener la fecha seleccionada en la timezone del usuario
+    const selectedDateInUserTZ = DateTime.fromJSDate(selectedDate!)
+      .setZone(selectedTimezone)
+      .startOf('day');
+    
+    let prefix = '';
+    
+    // Comparar los días en la timezone del usuario
+    const slotDay = slotInUserTZ.startOf('day');
+    const selectedDay = selectedDateInUserTZ.startOf('day');
+    
+    if (slotDay.toMillis() < selectedDay.toMillis()) {
+      prefix = 'Previous day - ';
+    } else if (slotDay.toMillis() > selectedDay.toMillis()) {
+      prefix = 'Next day - ';
+    }
+    
+    return `${prefix}${slotInUserTZ.toFormat('hh:mm a')}`;
+  }
+
+  const handleBookingConfirm = async () => {
+    if (!bookingPlan || !userProfile?.email) return;
+    
+    setIsBookingLoading(true);
+    try {
+      if (bookingPlan.frequency === 'twice-weekly' && bookingPlan.firstSlot && bookingPlan.secondSlot) {
+        // Crear primera reserva
+        const firstBooking = await bookingService.createBooking(
+          userProfile.email,
+          bookingPlan.firstSlot.date,
+          bookingPlan.frequency,
+          DateTime.fromJSDate(bookingPlan.firstSlot.date)
+            .plus({ months: bookingPlan.duration })
+            .toJSDate()
+        );
+
+        // Crear segunda reserva
+        const secondBooking = await bookingService.createBooking(
+          userProfile.email,
+          bookingPlan.secondSlot.date,
+          bookingPlan.frequency,
+          DateTime.fromJSDate(bookingPlan.secondSlot.date)
+            .plus({ months: bookingPlan.duration })
+            .toJSDate()
+        );
+
+        // Redirigir a la página de confirmación
+        router.push(`/booking-confirmation/${firstBooking.id}`);
+      } else if (selectedSlot) {
+        const booking = await bookingService.createBooking(
+          userProfile.email,
+          selectedSlot.date,
+          bookingPlan.frequency,
+          bookingPlan.frequency !== 'once' 
+            ? DateTime.fromJSDate(selectedSlot.date)
+                .plus({ months: bookingPlan.duration })
+                .toJSDate()
+            : null
+        );
+        router.push(`/booking-confirmation/${booking.id}`);
+      }
+    } catch (error) {
+      console.error('Error creating booking:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create booking. Please try again.",
+        variant: "destructive"
+      });
+      setIsBookingLoading(false);
+    }
+  };
+
+  const renderSummary = () => {
+    if (bookingPlan?.frequency === 'twice-weekly') {
+      return (
+        <div className="flex justify-center">
+          <div className="space-y-4 text-left">
+            <div className="space-y-2">
+              <p>{getBookingSummary(
+                bookingPlan.firstSlot?.date!, 
+                'twice-weekly', 
+                null, 
+                true, 
+                selectedTimezone,
+                bookingPlan.secondSlot?.date
+              )}</p>
+              <p>Duration: {bookingPlan.duration} {bookingPlan.duration === 1 ? 'month' : 'months'}</p>
+              <p className="mt-4">Starting from {DateTime.fromJSDate(selectedDate!).toFormat('MMMM d, yyyy')}</p>
+              <p>Ending on {DateTime.fromJSDate(selectedDate!).plus({ months: bookingPlan.duration }).toFormat('MMMM d, yyyy')}</p>
+            </div>
+            <div className="flex justify-center mt-6">
+              <Button 
+                onClick={handleBookingConfirm} 
+                disabled={isBookingLoading}
+                className="w-full max-w-sm"
+              >
+                {isBookingLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Confirm Booking
+              </Button>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-4 text-center">
+        <p className="text-xl">
+          {getBookingSummary(selectedSlot!.date, bookingPlan?.frequency || 'once', bookingPlan?.duration, true, selectedTimezone)}
+        </p>
+        <div className="flex justify-center">
+          <Button 
+            onClick={handleBookingConfirm} 
+            disabled={isBookingLoading}
+            className="w-full max-w-sm"
+          >
+            {isBookingLoading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : null}
+            Confirm Booking
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   const renderSectionContent = (sectionId: string) => {
     switch (sectionId) {
       case 'frequency':
         return (
           <FrequencySelector 
-            onFrequencySelect={handleFrequencySelect}
+            onFrequencySelect={handleFrequencySelect} 
+            selectedFrequency={bookingPlan?.frequency}
           />
         )
       case 'date':
@@ -258,6 +555,7 @@ export function BookingCalendar() {
             bookedDates={bookedDates}
             frequency={bookingPlan?.frequency}
             suggestedDate={suggestedDate}
+            selectedTimezone={selectedTimezone}
           />
         )
       case 'time':
@@ -266,6 +564,7 @@ export function BookingCalendar() {
             <TwiceWeeklySelector
               firstDate={selectedDate!}
               duration={bookingPlan.duration}
+              timezone={selectedTimezone}
               onComplete={(firstSlot, secondSlot) => {
                 setBookingPlan(prev => prev ? {
                   ...prev,
@@ -282,77 +581,43 @@ export function BookingCalendar() {
         }
         
         return (
-          <div className="grid grid-cols-3 gap-2">
-            {availableSlots.map((slot) => (
-              <button
-                key={slot.id}
-                className={cn(
-                  "p-2 rounded-md text-sm transition-colors",
-                  slot.available ? "hover:bg-accent cursor-pointer" : "bg-muted text-gray-400 cursor-not-allowed",
-                  selectedSlot?.id === slot.id && "ring-2 ring-blue-500"
-                )}
-                onClick={() => slot.available && handleSlotSelect(slot)}
-                disabled={!slot.available}
-              >
-                {DateTime.fromJSDate(slot.date).toLocaleString(DateTime.TIME_SIMPLE)}
-              </button>
+          <>
+            <TimezoneInfo 
+              userTimezone={selectedTimezone} 
+              coachTimezone={COACH_TIMEZONE} 
+            />
+            {availableSlots.map((dayGroup) => (
+              <div key={dayGroup.date.toString()} className="mb-6">
+                <h3 className="text-sm font-medium mb-2">
+                  {DateTime.fromJSDate(dayGroup.date).toFormat('cccc, MMMM d')}
+                </h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {dayGroup.slots.map((slot, index) => (
+                    <Button
+                      key={`${slot.date.toString()}-${index}`}
+                      variant={selectedSlot?.date.toString() === slot.date.toString() ? 'default' : 'outline'}
+                      disabled={!slot.available}
+                      onClick={() => handleSlotSelect(slot.slot!)}
+                      className={cn(
+                        "whitespace-nowrap",
+                        !slot.available && "opacity-60 cursor-not-allowed dark:bg-gray-800 bg-gray-100 dark:text-gray-400 text-gray-500"
+                      )}
+                    >
+                      {DateTime.fromJSDate(slot.date)
+                        .setZone(selectedTimezone)
+                        .toFormat('hh:mm a')}
+                    </Button>
+                  ))}
+                </div>
+              </div>
             ))}
-          </div>
+          </>
         )
       case 'summary':
         return (
-          <div className="space-y-6">
-            {bookingPlan?.frequency === 'twice-weekly' ? (
-              <div className="flex justify-center">
-              <div className="space-y-4 text-left">
-                <div className="space-y-2">
-                  <p>First Session: Every {DateTime.fromJSDate(selectedDate!).toFormat('cccc')} at {
-                    DateTime.fromJSDate(bookingPlan.firstSlot?.date!).toFormat('hh:mm a')
-                  }</p>
-                  <p>Second Session: Every {DateTime.fromJSDate(suggestedDate!).toFormat('cccc')} at {
-                    DateTime.fromJSDate(bookingPlan.secondSlot?.date!).toFormat('hh:mm a')
-                  }</p>
-                  <p className="mt-4">
-                    Starting from {DateTime.fromJSDate(selectedDate!).toFormat('MMMM d, yyyy')}
-                  </p>
-                  <p>
-                    Duration: {bookingPlan.duration} {bookingPlan.duration === 1 ? 'month' : 'months'}
-                  </p>
-                  <p>
-                    Ending on {DateTime.fromJSDate(selectedDate!).plus({ months: bookingPlan.duration }).toFormat('MMMM d, yyyy')}
-                  </p>
-                </div>
-              </div>
-              </div>
-            ) : (
-              <div className="space-y-2 text-center">
-                <p className="text-xl">
-                  {getBookingSummary(
-                    selectedSlot!.utcDate,
-                    bookingPlan?.frequency || 'once',
-                    bookingPlan?.duration,
-                    true,
-                    selectedTimezone
-                  )}
-                </p>
-              </div>
-            )}
-            
-            <Button 
-              className="w-full"
-              onClick={handleBookingSubmit}
-              disabled={isBookingLoading}
-            >
-              {isBookingLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating booking...
-                </>
-              ) : (
-                'Confirm Booking'
-              )}
-            </Button>
-          </div>
+        <div className="space-y-6">
+          {renderSummary()}
+        </div>
         )
       default:
         return null

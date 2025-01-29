@@ -27,4 +27,9 @@ export interface CreateBookingParams {
   startDate: Date;
   frequency: BookingFrequency;
   endDate?: Date | null;
+}
+
+export interface GroupedTimeSlots {
+  date: Date;
+  slots: TimeSlot[];
 } 

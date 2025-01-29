@@ -6,6 +6,11 @@ import { zoomService } from './zoomService'
 
 const COACH_TIMEZONE = process.env.COACH_TIMEZONE || 'UTC'; // Default to UTC if not set
 
+interface GroupedTimeSlots {
+  date: Date;
+  slots: TimeSlot[];
+}
+
 export const bookingService = {
   saveUserProfile: async (profile: UserProfile) => {
     const profileData = {
@@ -51,77 +56,59 @@ export const bookingService = {
     return profileData.value
   },
 
-  getAvailableSlots: async (date: Date): Promise<TimeSlot[]> => {
-    const userDateTime = DateTime.fromJSDate(date);
-    const luxonDate = userDateTime.setZone('UTC', { keepLocalTime: true });
+  getAvailableSlots: async (date: Date, userTimezone: string): Promise<GroupedTimeSlots[]> => {
+    const userDateTime = DateTime.fromJSDate(date)
+      .setZone(userTimezone)
+      .startOf('day');
     
-    const startOfDay = luxonDate.startOf('day');
-    const endOfDay = luxonDate.endOf('day');
-
-    // Obtener tanto las reservas normales como las recurrentes
-    const { data: existingBookings, error } = await supabase
+    // Get UTC range we need to check
+    const utcStartOfDay = userDateTime.toUTC();
+    const utcEndOfDay = userDateTime.plus({ days: 1 }).toUTC();
+    
+    // First, get all bookings for this day
+    const { data: existingBookings } = await supabase
       .from('meetings_bookings')
-      .select('booking_date, frequency, recurring_day, recurring_time, end_date')
+      .select('booking_date, recurring_day, recurring_time')
       .eq('status', 'confirmed')
-      .filter('booking_date', 'gte', startOfDay.toISO())
-      .filter('booking_date', 'lte', endOfDay.toISO());
-
-    if (error) {
-      console.error('Error fetching bookings:', error);
-      throw error;
-    }
-
-    const isSlotBooked = (slotDateTime: DateTime) => {
-      return existingBookings?.some(booking => {
-        if (booking.frequency === 'once') {
-          const bookingDateTime = DateTime.fromISO(booking.booking_date);
-          return bookingDateTime.toUTC().toMillis() === slotDateTime.toUTC().toMillis();
-        } else if (booking.recurring_day === slotDateTime.weekdayLong && booking.recurring_time) {
-          const startDate = DateTime.fromISO(booking.booking_date);
-          const endDate = booking.end_date ? DateTime.fromISO(booking.end_date) : null;
-          const bookingTime = booking.recurring_time;
-          
-          return slotDateTime >= startDate &&
-                 (!endDate || slotDateTime <= endDate) &&
-                 bookingTime === slotDateTime.toFormat('HH:mm');
-        }
-        return false;
-      });
-    };
-
+      .or(`booking_date.gte.${utcStartOfDay.toISO()},booking_date.lt.${utcEndOfDay.toISO()}`);
+    
     const slots: TimeSlot[] = [];
+    
+    // Check all possible UTC hours for this user's day
+    for (let hour = 0; hour < 24; hour++) {
+      const utcSlotDateTime = utcStartOfDay.set({ hour });
+      const userSlotDateTime = utcSlotDateTime.setZone(userTimezone);
+      
+      // Only add slot if it's in allowed hours (1-4 AM and 12-4 PM UTC)
+      const utcHour = utcSlotDateTime.hour;
+      if ((utcHour >= 1 && utcHour <= 4) || (utcHour >= 12 && utcHour <= 16)) {
+        // Verify slot belongs to selected day in user's timezone
+        if (userSlotDateTime.startOf('day').equals(userDateTime.startOf('day'))) {
+          if (userSlotDateTime >= DateTime.now().setZone(userTimezone)) {
+            // Check if slot is already booked
+            const isBooked = existingBookings?.some(booking => {
+              const bookingDateTime = DateTime.fromISO(booking.booking_date)
+                .setZone(userTimezone);
+              
+              // Check for exact time match
+              return bookingDateTime.hasSame(userSlotDateTime, 'hour');
+            });
 
-    // Morning slots (1 AM UTC = 8 AM Asia/Saigon)
-    for (let hour = 1; hour <= 4; hour++) {
-      const slotDateTime = luxonDate.set({ hour, minute: 0 });
-      const localDateTime = slotDateTime.setZone(COACH_TIMEZONE);
-
-      const isBooked = isSlotBooked(slotDateTime);
-
-      slots.push({
-        id: `${userDateTime.toFormat('yyyy-MM-dd')}-${hour}`,
-        date: localDateTime.toJSDate(),
-        available: !isBooked,
-        utcDate: slotDateTime.toJSDate()
-      });
+            slots.push({
+              id: `${userDateTime.toFormat('yyyy-MM-dd')}-${utcHour}`,
+              date: userSlotDateTime.toJSDate(),
+              available: !isBooked,
+              utcDate: utcSlotDateTime.toJSDate()
+            });
+          }
+        }
+      }
     }
 
-    // Evening slots (12 PM UTC = 7 PM Asia/Saigon)
-    for (let hour = 12; hour <= 16; hour++) {
-      const slotDateTime = luxonDate.set({ hour, minute: 0 });
-      const localDateTime = slotDateTime.setZone(COACH_TIMEZONE);
-
-      const isBooked = isSlotBooked(slotDateTime);
-
-      slots.push({
-        id: `${userDateTime.toFormat('yyyy-MM-dd')}-${hour}`,
-        date: localDateTime.toJSDate(),
-        available: !isBooked,
-        utcDate: slotDateTime.toJSDate()
-      });
-    }
-
-    return slots;
+    return [{
+      date: userDateTime.toJSDate(),
+      slots: slots
+    }];
   },
 
   createBooking: async (
@@ -131,8 +118,9 @@ export const bookingService = {
     endDate: Date | null
   ): Promise<BookingDB> => {
     try {
-      const startDateTime = DateTime.fromJSDate(startDate).toUTC();
-      const endDateTime = endDate ? DateTime.fromJSDate(endDate).toUTC() : null;
+      // Guardamos la fecha directamente sin convertir a UTC
+      const startDateTime = DateTime.fromJSDate(startDate);
+      const endDateTime = endDate ? DateTime.fromJSDate(endDate) : null;
       
       // Crear un solo link de Zoom para todas las recurrencias
       const meetLink = await zoomService.createMeeting(startDate);
@@ -285,5 +273,31 @@ export const bookingService = {
 
     if (error) throw error
     return data
+  },
+
+  formatSlotTime: (date: Date, selectedTimezone: string) => {
+    const slotDateTime = DateTime.fromJSDate(date).setZone(selectedTimezone);
+    const today = DateTime.now().setZone(selectedTimezone).startOf('day');
+    const slotDate = slotDateTime.startOf('day');
+    
+    let prefix = '';
+    if (slotDate < today) {
+      prefix = 'Previous day - ';
+    } else if (slotDate > today) {
+      prefix = 'Next day - ';
+    }
+    
+    return `${prefix}${slotDateTime.toFormat('hh:mm a')}`;
+  },
+
+  getTimezoneInfo: (userTimezone: string, coachTimezone: string) => {
+    const userTZ = DateTime.local().setZone(userTimezone);
+    const coachTZ = DateTime.local().setZone(coachTimezone);
+    const hoursDiff = Math.abs(userTZ.offset - coachTZ.offset) / 60;
+    
+    return {
+      hoursDiff,
+      hasSignificantDifference: hoursDiff >= 6
+    };
   }
 } 
