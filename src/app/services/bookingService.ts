@@ -15,7 +15,7 @@ export const bookingService = {
   saveUserProfile: async (profile: UserProfile) => {
     const profileData = {
       value: profile,
-      expiry: new Date().getTime() + 24 * 60 * 60 * 1000
+      expiry: new Date().getTime() + (30 * 24 * 60 * 60 * 1000)
     }
     localStorage.setItem('userProfile', JSON.stringify(profileData))
 
@@ -41,31 +41,44 @@ export const bookingService = {
   },
 
   getUserProfile: (): UserProfile | null => {
-    const profileStr = localStorage.getItem('userProfile')
-    if (!profileStr) return null
+    // Check if we're running on the client side
+    if (typeof window === 'undefined') return null;
+    
+    try {
+      const profileStr = localStorage.getItem('userProfile')
+      if (!profileStr) return null
 
-    const profileData = JSON.parse(profileStr)
-    const now = new Date().getTime()
+      const profileData = JSON.parse(profileStr)
+      const now = new Date().getTime()
 
-    // Check if data has expired
-    if (now > profileData.expiry) {
-      localStorage.removeItem('userProfile')
+      // Si los datos han expirado, intentar recuperarlos de la base de datos
+      if (now > profileData.expiry) {
+        // En lugar de eliminar inmediatamente, podemos extender la expiración
+        const newProfileData = {
+          value: profileData.value,
+          expiry: new Date().getTime() + (30 * 24 * 60 * 60 * 1000)
+        }
+        localStorage.setItem('userProfile', JSON.stringify(newProfileData))
+      }
+
+      return profileData.value
+    } catch (error) {
+      console.error('Error getting user profile from localStorage:', error)
       return null
     }
-
-    return profileData.value
   },
 
   getAvailableSlots: async (date: Date, userTimezone: string): Promise<GroupedTimeSlots[]> => {
+    // Convertir la fecha seleccionada a la timezone del usuario
     const userDateTime = DateTime.fromJSDate(date)
       .setZone(userTimezone)
       .startOf('day');
     
-    // Get UTC range we need to check
-    const utcStartOfDay = userDateTime.toUTC();
-    const utcEndOfDay = userDateTime.plus({ days: 1 }).toUTC();
+    // Obtener el rango UTC que necesitamos revisar (24 horas completas)
+    const utcStartOfDay = userDateTime.minus({ days: 1 }).toUTC();
+    const utcEndOfDay = userDateTime.plus({ days: 2 }).toUTC();
     
-    // First, get all bookings for this day
+    // Obtener las reservas existentes
     const { data: existingBookings } = await supabase
       .from('meetings_bookings')
       .select('booking_date, recurring_day, recurring_time')
@@ -74,28 +87,27 @@ export const bookingService = {
     
     const slots: TimeSlot[] = [];
     
-    // Check all possible UTC hours for this user's day
-    for (let hour = 0; hour < 24; hour++) {
-      const utcSlotDateTime = utcStartOfDay.set({ hour });
+    // Revisar 72 horas para cubrir todas las zonas horarias
+    for (let hour = 0; hour < 72; hour++) {
+      const utcSlotDateTime = utcStartOfDay.plus({ hours: hour });
       const userSlotDateTime = utcSlotDateTime.setZone(userTimezone);
+      const coachSlotDateTime = utcSlotDateTime.setZone(COACH_TIMEZONE);
       
-      // Only add slot if it's in allowed hours (1-4 AM and 12-4 PM UTC)
-      const utcHour = utcSlotDateTime.hour;
-      if ((utcHour >= 1 && utcHour <= 4) || (utcHour >= 12 && utcHour <= 16)) {
-        // Verify slot belongs to selected day in user's timezone
+      // Solo agregar slot si está en las horas permitidas del coach (1-4 AM y 12-4 PM UTC)
+      const coachHour = coachSlotDateTime.hour;
+      if ((coachHour >= 1 && coachHour <= 4) || (coachHour >= 12 && coachHour <= 16)) {
+        // Verificar si el slot pertenece al día seleccionado en la timezone del usuario
         if (userSlotDateTime.startOf('day').equals(userDateTime.startOf('day'))) {
           if (userSlotDateTime >= DateTime.now().setZone(userTimezone)) {
-            // Check if slot is already booked
+            // Verificar si el slot ya está reservado
             const isBooked = existingBookings?.some(booking => {
               const bookingDateTime = DateTime.fromISO(booking.booking_date)
                 .setZone(userTimezone);
-              
-              // Check for exact time match
               return bookingDateTime.hasSame(userSlotDateTime, 'hour');
             });
 
             slots.push({
-              id: `${userDateTime.toFormat('yyyy-MM-dd')}-${utcHour}`,
+              id: `${userDateTime.toFormat('yyyy-MM-dd')}-${coachHour}`,
               date: userSlotDateTime.toJSDate(),
               available: !isBooked,
               utcDate: utcSlotDateTime.toJSDate()
@@ -105,10 +117,36 @@ export const bookingService = {
       }
     }
 
-    return [{
-      date: userDateTime.toJSDate(),
-      slots: slots
-    }];
+    // Agrupar slots por día en la timezone del usuario
+    const groupedSlots = slots.reduce((groups: GroupedTimeSlots[], slot) => {
+      const slotDate = DateTime.fromJSDate(slot.date)
+        .setZone(userTimezone)
+        .startOf('day')
+        .toJSDate()
+        .getTime();
+
+      const existingGroup = groups.find(g => 
+        g.date.getTime() === slotDate
+      );
+
+      if (existingGroup) {
+        existingGroup.slots.push(slot);
+      } else {
+        groups.push({
+          date: new Date(slotDate),
+          slots: [slot]
+        });
+      }
+
+      return groups;
+    }, []);
+
+    // Ordenar slots dentro de cada grupo por hora
+    groupedSlots.forEach(group => {
+      group.slots.sort((a, b) => a.date.getTime() - b.date.getTime());
+    });
+
+    return groupedSlots;
   },
 
   createBooking: async (

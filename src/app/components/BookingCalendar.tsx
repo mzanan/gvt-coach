@@ -15,8 +15,8 @@ import { DateTime } from 'luxon'
 import { FrequencySelector } from './FrequencySelector'
 import { getBookingSummary } from '@/lib/utils'
 import { TwiceWeeklySelector } from './TwiceWeeklySelector'
-import { TimezoneInfo } from './TimezoneInfo'
 import { cn } from '@/lib/utils'
+import { paymentService } from '../services/paymentService'
 
 const COACH_TIMEZONE = process.env.COACH_TIMEZONE || 'UTC'
 
@@ -62,15 +62,16 @@ export function BookingCalendar() {
   const router = useRouter()
 
   useEffect(() => {
-    const profile = bookingService.getUserProfile()
+    // Only fetch profile on client side
+    const profile = bookingService.getUserProfile();
     if (profile) {
-      setUserProfile(profile)
-      if (profile.timezone !== selectedTimezone) {
-        setSelectedTimezone(profile.timezone)
-      }
-      setShowInitialForm(false)
+      setUserProfile(profile);
+      setSelectedTimezone(profile.timezone);
+      setShowInitialForm(false);
+    } else {
+      setShowInitialForm(true);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
     const loadBookedDates = async () => {
@@ -242,8 +243,6 @@ export function BookingCalendar() {
     const slotDateTime = DateTime.fromJSDate(slot.date)
       .setZone(selectedTimezone);
     
-    console.log('Selected slot datetime:', slotDateTime.toFormat('yyyy-MM-dd HH:mm ZZ'));
-    
     const correctedSlot = {
       ...slot,
       date: slotDateTime.toJSDate(),
@@ -252,7 +251,7 @@ export function BookingCalendar() {
     
     if (bookingPlan?.frequency === 'twice-weekly') {
       setSelectedSlot(correctedSlot);
-      setBookingPlan(prev => prev ? { ...prev, firstSlot: correctedSlot } : prev);
+      setBookingPlan(prev => prev ? { ...prev, firstSlot: correctedSlot as TimeSlot } : prev);
       setSections(prev => prev.map(s => 
         s.id === 'time' ? { ...s, completed: true } : s
       ));
@@ -396,30 +395,10 @@ export function BookingCalendar() {
   }
 
   const formatSlotTime = (date: Date) => {
-    // Convertir el slot a UTC primero
-    const slotUTC = DateTime.fromJSDate(date).toUTC();
+    const slotDateTime = DateTime.fromJSDate(date)
+      .setZone(selectedTimezone);
     
-    // Convertir a la timezone del usuario para mostrar
-    const slotInUserTZ = slotUTC.setZone(selectedTimezone);
-    
-    // Obtener la fecha seleccionada en la timezone del usuario
-    const selectedDateInUserTZ = DateTime.fromJSDate(selectedDate!)
-      .setZone(selectedTimezone)
-      .startOf('day');
-    
-    let prefix = '';
-    
-    // Comparar los días en la timezone del usuario
-    const slotDay = slotInUserTZ.startOf('day');
-    const selectedDay = selectedDateInUserTZ.startOf('day');
-    
-    if (slotDay.toMillis() < selectedDay.toMillis()) {
-      prefix = 'Previous day - ';
-    } else if (slotDay.toMillis() > selectedDay.toMillis()) {
-      prefix = 'Next day - ';
-    }
-    
-    return `${prefix}${slotInUserTZ.toFormat('hh:mm a')}`;
+    return slotDateTime.toFormat('hh:mm a');
   }
 
   const handleBookingConfirm = async () => {
@@ -427,47 +406,22 @@ export function BookingCalendar() {
     
     setIsBookingLoading(true);
     try {
-      if (bookingPlan.frequency === 'twice-weekly' && bookingPlan.firstSlot && bookingPlan.secondSlot) {
-        // Crear primera reserva
-        const firstBooking = await bookingService.createBooking(
-          userProfile.email,
-          bookingPlan.firstSlot.date,
-          bookingPlan.frequency,
-          DateTime.fromJSDate(bookingPlan.firstSlot.date)
-            .plus({ months: bookingPlan.duration })
-            .toJSDate()
-        );
-
-        // Crear segunda reserva
-        const secondBooking = await bookingService.createBooking(
-          userProfile.email,
-          bookingPlan.secondSlot.date,
-          bookingPlan.frequency,
-          DateTime.fromJSDate(bookingPlan.secondSlot.date)
-            .plus({ months: bookingPlan.duration })
-            .toJSDate()
-        );
-
-        // Redirigir a la página de confirmación
-        router.push(`/booking-confirmation/${firstBooking.id}`);
-      } else if (selectedSlot) {
-        const booking = await bookingService.createBooking(
-          userProfile.email,
-          selectedSlot.date,
-          bookingPlan.frequency,
-          bookingPlan.frequency !== 'once' 
-            ? DateTime.fromJSDate(selectedSlot.date)
-                .plus({ months: bookingPlan.duration })
-                .toJSDate()
-            : null
-        );
-        router.push(`/booking-confirmation/${booking.id}`);
-      }
-    } catch (error) {
-      console.error('Error creating booking:', error);
+      const checkoutUrl = await paymentService.createCheckout(bookingPlan, userProfile);
+      
+      const bookingData = {
+        userEmail: userProfile.email,
+        bookingPlan,
+        selectedSlot,
+        selectedTimezone
+      };
+      localStorage.setItem('pendingBooking', JSON.stringify(bookingData));
+      
+      window.location.href = checkoutUrl;
+    } catch (error: any) {
+      console.error('Booking confirmation error:', error);
       toast({
         title: "Error",
-        description: "Failed to create booking. Please try again.",
+        description: error.message || "Failed to process payment. Please try again.",
         variant: "destructive"
       });
       setIsBookingLoading(false);
@@ -582,14 +536,12 @@ export function BookingCalendar() {
         
         return (
           <>
-            <TimezoneInfo 
-              userTimezone={selectedTimezone} 
-              coachTimezone={COACH_TIMEZONE} 
-            />
             {availableSlots.map((dayGroup) => (
               <div key={dayGroup.date.toString()} className="mb-6">
                 <h3 className="text-sm font-medium mb-2">
-                  {DateTime.fromJSDate(dayGroup.date).toFormat('cccc, MMMM d')}
+                  {DateTime.fromJSDate(dayGroup.date)
+                    .setZone(selectedTimezone)
+                    .toFormat('cccc, MMMM d')}
                 </h3>
                 <div className="grid grid-cols-3 gap-2">
                   {dayGroup.slots.map((slot, index) => (
@@ -603,9 +555,7 @@ export function BookingCalendar() {
                         !slot.available && "opacity-60 cursor-not-allowed dark:bg-gray-800 bg-gray-100 dark:text-gray-400 text-gray-500"
                       )}
                     >
-                      {DateTime.fromJSDate(slot.date)
-                        .setZone(selectedTimezone)
-                        .toFormat('hh:mm a')}
+                      {formatSlotTime(slot.date)}
                     </Button>
                   ))}
                 </div>

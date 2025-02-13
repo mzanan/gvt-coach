@@ -13,13 +13,14 @@ export interface TimeSlot {
   utcDate: Date
 }
 
-export type BookingFrequency = 'once' | 'weekly' | 'twice-weekly'
+export type BookingFrequency = 'weekly' | 'twice-weekly' | 'once';
 
 export interface BookingPlan {
-  frequency: BookingFrequency
-  duration?: number // number of months for recurring bookings
-  firstSlot?: TimeSlot
-  secondSlot?: TimeSlot
+  frequency: BookingFrequency;
+  duration: number;
+  firstSlot?: TimeSlot;
+  secondSlot?: TimeSlot;
+  variantId?: string;
 }
 
 export interface CreateBookingParams {
@@ -32,4 +33,6 @@ export interface CreateBookingParams {
 export interface GroupedTimeSlots {
   date: Date;
   slots: TimeSlot[];
-} 
+}
+
+export type PaymentStatus = 'pending' | 'completed' | 'failed'; 
