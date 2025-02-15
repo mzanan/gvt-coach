@@ -56,8 +56,6 @@ export const paymentService = {
         }
       };
 
-      console.log('Checkout payload:', payload);
-
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: {
@@ -74,6 +72,7 @@ export const paymentService = {
           const errorJson = JSON.parse(errorText);
           throw new Error(errorJson.error || 'Failed to create checkout');
         } catch (e) {
+          console.error('Error parsing error response:', e);
           throw new Error('Failed to create checkout');
         }
       }

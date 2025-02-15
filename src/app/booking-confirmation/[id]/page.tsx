@@ -33,6 +33,11 @@ export default function BookingConfirmationPage({ params }: { params: Promise<{ 
         .eq('id', resolvedParams.id)
         .single();
 
+      if (error) {
+        console.error('Error fetching booking:', error);
+        return;
+      }
+
       if (mainBooking) {
         if (mainBooking.frequency === 'twice-weekly') {
           const { data: secondBooking } = await supabase
@@ -123,4 +128,4 @@ export default function BookingConfirmationPage({ params }: { params: Promise<{ 
       </Card>
     </div>
   )
-} 
+}

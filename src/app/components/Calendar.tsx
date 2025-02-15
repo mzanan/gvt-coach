@@ -33,8 +33,6 @@ export function Calendar({
   const getDaysInMonth = (date: Date) => {
     // Convert to DateTime in user's timezone
     const dt = DateTime.fromJSDate(date).setZone(selectedTimezone)
-    const year = dt.year
-    const month = dt.month
 
     // Get start and end of month in user's timezone
     const startOfMonth = dt.startOf('month')
@@ -163,7 +161,7 @@ export function Calendar({
       </div>
 
       <div className="grid grid-cols-7 gap-1">
-        {days.map((date, index) => (
+        {days.map((date) => (
           <button
             key={date.toISO()}
             onClick={() => handleDateSelect(date)}

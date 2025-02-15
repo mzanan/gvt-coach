@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { DateTime } from 'luxon'
 import { TimeSlot } from '../types/booking'
 import { bookingService } from '../services/bookingService'
@@ -19,10 +19,12 @@ export function TwiceWeeklySelector({ firstDate, onComplete, duration = 1, timez
   const [secondDaySlots, setSecondDaySlots] = useState<TimeSlot[]>([])
   const [selectedFirstSlot, setSelectedFirstSlot] = useState<TimeSlot | null>(null)
   const [selectedSecondSlot, setSelectedSecondSlot] = useState<TimeSlot | null>(null)
-  const [secondDate, setSecondDate] = useState<Date>(() => {
-    const dt = DateTime.fromJSDate(firstDate).plus({ days: 3 })
-    return dt.toJSDate()
-  })
+  const secondDate = useMemo(() => 
+    DateTime.fromJSDate(firstDate)
+      .plus({ days: 3 })
+      .toJSDate(),
+    [firstDate]
+  )
 
   useEffect(() => {
     const loadSlots = async () => {
@@ -127,4 +129,4 @@ export function TwiceWeeklySelector({ firstDate, onComplete, duration = 1, timez
       </Button>
     </div>
   )
-} 
+}

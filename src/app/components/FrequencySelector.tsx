@@ -1,6 +1,5 @@
 'use client'
 
-import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { BookingFrequency } from "../types/booking"
 import { useState } from "react"

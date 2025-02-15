@@ -41,7 +41,6 @@ export const bookingService = {
   },
 
   getUserProfile: (): UserProfile | null => {
-    // Check if we're running on the client side
     if (typeof window === 'undefined') return null;
     
     try {
@@ -51,9 +50,7 @@ export const bookingService = {
       const profileData = JSON.parse(profileStr)
       const now = new Date().getTime()
 
-      // Si los datos han expirado, intentar recuperarlos de la base de datos
       if (now > profileData.expiry) {
-        // En lugar de eliminar inmediatamente, podemos extender la expiración
         const newProfileData = {
           value: profileData.value,
           expiry: new Date().getTime() + (30 * 24 * 60 * 60 * 1000)
@@ -141,7 +138,6 @@ export const bookingService = {
       return groups;
     }, []);
 
-    // Ordenar slots dentro de cada grupo por hora
     groupedSlots.forEach(group => {
       group.slots.sort((a, b) => a.date.getTime() - b.date.getTime());
     });
@@ -149,20 +145,12 @@ export const bookingService = {
     return groupedSlots;
   },
 
-  createBooking: async (
-    email: string,
-    startDate: Date,
-    frequency: BookingFrequency,
-    endDate: Date | null
-  ): Promise<BookingDB> => {
+  createBooking: async (email: string, startDate: Date, frequency: string, endDate: Date | null) => {
     try {
-      // Guardamos la fecha directamente sin convertir a UTC
+      const meetLink = await zoomService.createMeeting(startDate); 
       const startDateTime = DateTime.fromJSDate(startDate);
       const endDateTime = endDate ? DateTime.fromJSDate(endDate) : null;
       
-      // Crear un solo link de Zoom para todas las recurrencias
-      const meetLink = await zoomService.createMeeting(startDate);
-
       const booking = {
         user_email: email,
         booking_date: startDateTime.toISO(),
@@ -228,7 +216,6 @@ export const bookingService = {
     const startOfMonth = DateTime.fromJSDate(new Date(month.getFullYear(), month.getMonth(), 1)).startOf('day');
     const endOfMonth = DateTime.fromJSDate(new Date(month.getFullYear(), month.getMonth() + 1, 0)).endOf('day');
     
-    // Primero obtenemos las reservas únicas
     const { data: singleBookings, error: singleError } = await supabase
       .from('meetings_bookings')
       .select('booking_date')
@@ -239,7 +226,6 @@ export const bookingService = {
 
     if (singleError) throw singleError;
 
-    // Luego obtenemos las reservas recurrentes
     const { data: recurringBookings, error: recurringError } = await supabase
       .from('meetings_bookings')
       .select('booking_date, recurring_day, recurring_time, end_date')
@@ -251,13 +237,11 @@ export const bookingService = {
     const bookingsByDate = new Map<string, number>();
     const TOTAL_SLOTS_PER_DAY = 9;
 
-    // Procesar reservas únicas
     singleBookings.forEach(booking => {
       const dateStr = DateTime.fromISO(booking.booking_date).toFormat('yyyy-MM-dd');
       bookingsByDate.set(dateStr, (bookingsByDate.get(dateStr) || 0) + 1);
     });
 
-    // Procesar reservas recurrentes
     for (let d = startOfMonth; d <= endOfMonth; d = d.plus({ days: 1 })) {
       const dateStr = d.toFormat('yyyy-MM-dd');
       let currentCount = bookingsByDate.get(dateStr) || 0;
@@ -278,12 +262,14 @@ export const bookingService = {
       }
     }
 
+    /* eslint-disable @typescript-eslint/no-unused-vars */
     return Array.from(bookingsByDate.entries())
       .filter(([_, count]) => count >= TOTAL_SLOTS_PER_DAY)
       .map(([dateStr, _]) => ({
         date: DateTime.fromFormat(dateStr, 'yyyy-MM-dd').toJSDate(),
         fullyBooked: true
       }));
+    /* eslint-enable @typescript-eslint/no-unused-vars */
   },
 
   createRecurringBookings: async (
@@ -338,4 +324,4 @@ export const bookingService = {
       hasSignificantDifference: hoursDiff >= 6
     };
   }
-} 
+}

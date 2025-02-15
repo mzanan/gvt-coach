@@ -8,10 +8,11 @@ import { ChevronLeft, Check, Video } from "lucide-react"
 import { Loader2 } from "lucide-react"
 import { BookingSummaryDisplay } from '@/app/components/BookingSummaryDisplay'
 import { useRouter } from 'next/navigation'
+import { BookingDB } from '@/lib/supabase/types'
 
 export default function PaymentSuccessPage() {
   const [isLoading, setIsLoading] = useState(true)
-  const [booking, setBooking] = useState<any>(null)
+  const [booking, setBooking] = useState<BookingDB | null>(null)
   const [userTimezone, setUserTimezone] = useState('')
   const router = useRouter()
 
@@ -27,6 +28,7 @@ export default function PaymentSuccessPage() {
     
     const fetchBookingDetails = async () => {
       try {
+        console.log('bookingData.bookingId:', bookingData)
         const response = await fetch(`/api/bookings/${bookingData.bookingId}`)
         const data = await response.json()
         setBooking(data)
@@ -48,6 +50,24 @@ export default function PaymentSuccessPage() {
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
           <h1 className="text-2xl font-bold mb-2">Processing your booking...</h1>
           <p className="text-muted-foreground">Please wait while we confirm your payment</p>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!booking) {
+    return (
+      <div className="container mx-auto py-8 max-w-2xl">
+        <Card className="p-8 text-center">
+          <h1 className="text-2xl font-bold mb-2">Booking Not Found</h1>
+          <p className="text-muted-foreground">Unable to load booking details</p>
+          <div className="mt-8">
+            <Button variant="outline" asChild>
+              <Link href="/">
+                Return to Calendar
+              </Link>
+            </Button>
+          </div>
         </Card>
       </div>
     )
@@ -109,4 +129,4 @@ export default function PaymentSuccessPage() {
       </Card>
     </div>
   )
-} 
+}

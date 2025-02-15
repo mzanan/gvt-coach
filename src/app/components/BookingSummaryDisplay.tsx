@@ -6,6 +6,7 @@ import { getBookingSummary } from '@/lib/utils'
 
 interface BookingSummaryDisplayProps {
   booking: {
+    id?: string
     frequency: BookingFrequency
     duration?: number
     firstSlot?: { date: Date }
@@ -15,11 +16,16 @@ interface BookingSummaryDisplayProps {
     recurring_day?: string
     recurring_time?: string
     end_date?: string
-  }
+    meet_link?: string
+    status?: string
+    user_email?: string
+  } | null
   timezone: string
 }
 
 export function BookingSummaryDisplay({ booking, timezone }: BookingSummaryDisplayProps) {
+  if (!booking) return null;
+
   const date = booking.booking_date 
     ? DateTime.fromISO(booking.booking_date).setZone(timezone).toJSDate()
     : booking.firstSlot?.date;
@@ -50,4 +56,4 @@ export function BookingSummaryDisplay({ booking, timezone }: BookingSummaryDispl
       {getBookingSummary(date, booking.frequency, booking.duration, true, timezone)}
     </div>
   );
-} 
+}

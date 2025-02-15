@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { UserProfile } from '@/lib/supabase/types'
 import { bookingService } from '../services/bookingService'
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -18,7 +17,6 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Loader2 } from "lucide-react"
-import { TimezoneDropdown } from "@/app/components/TimezoneDropdown"
 import {
   Select,
   SelectContent,
@@ -50,7 +48,6 @@ export function UserProfileForm({
   initialData,
   showCard = true,
   showTitle = true,
-  selectedTimezone,
   onTimezoneChange
 }: UserProfileFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
@@ -82,6 +79,7 @@ export function UserProfileForm({
       }
       onComplete()
     } catch (error) {
+      console.error('Error saving user profile:', error)
       form.setError("root", { 
         message: "Error saving data. Please try again." 
       })
@@ -221,4 +219,4 @@ export function UserProfileForm({
       </CardContent>
     </Card>
   )
-} 
+}

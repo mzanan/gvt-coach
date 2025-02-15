@@ -18,8 +18,6 @@ import { TwiceWeeklySelector } from './TwiceWeeklySelector'
 import { cn } from '@/lib/utils'
 import { paymentService } from '../services/paymentService'
 
-const COACH_TIMEZONE = process.env.COACH_TIMEZONE || 'UTC'
-
 interface Section {
   id: 'date' | 'time' | 'summary' | 'frequency'
   title: string
@@ -194,48 +192,6 @@ export function BookingCalendar() {
     }
   }
 
-  const handleSecondDateSelect = async (date: Date) => {
-    if (!selectedDate || !suggestedDate) return;
-    
-    // Verificar que la fecha seleccionada sea la sugerida
-    const suggestedDateTime = DateTime.fromJSDate(suggestedDate)
-    const selectedDateTime = DateTime.fromJSDate(date)
-    
-    if (suggestedDateTime.hasSame(selectedDateTime, 'day')) {
-      try {
-        const groupedSlots = await bookingService.getAvailableSlots(date, selectedTimezone)
-        const transformedSlots = [{
-          date: date,
-          slots: groupedSlots.flatMap(group => 
-            group.slots.map(slot => ({
-              date: slot.date,
-              available: slot.available,
-              slot: slot
-            }))
-          )
-        }];
-        setAvailableSlots(transformedSlots)
-        setSections(prev => prev.map(s => 
-          s.id === 'date' ? { ...s, completed: true } : s
-        ))
-        setActiveSection('time')
-      } catch (error) {
-        console.error('Error loading slots:', error)
-        toast({
-          title: "Error",
-          description: "Failed to load available time slots. Please try again.",
-          variant: "destructive"
-        })
-      }
-    } else {
-      toast({
-        title: "Invalid Selection",
-        description: "Please select the suggested date (highlighted in green) for your second weekly session.",
-        variant: "destructive"
-      })
-    }
-  }
-
   const handleSlotSelect = (slot: TimeSlot) => {
     if (!slot.available) return;
     
@@ -277,51 +233,16 @@ export function BookingCalendar() {
     }
   }
 
-  const handleBookingSubmit = async () => {
-    if (!selectedSlot || !userProfile || !bookingPlan) return;
-    
-    setIsBookingLoading(true);
-    try {
-      const startDate = selectedSlot.date;
-      const endDate = bookingPlan.frequency !== 'once' 
-        ? DateTime.fromJSDate(startDate)
-            .plus({ months: bookingPlan.duration || 0 })
-            .toJSDate()
-        : null;
-
-        const booking = await bookingService.createBooking(
-          userProfile.email,
-          startDate,
-          bookingPlan.frequency,
-          endDate
-        );
-      
-        router.push(`/booking-confirmation/${booking.id}`);
-    } catch (error) {
-      console.error('Error creating booking:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create meeting. Please try again later.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsBookingLoading(false);
-    }
-  }
-
   const handleTimezoneChange = async (timezone: string) => {
     setSelectedTimezone(timezone)
 
-    // Si estamos en el último paso (summary), necesitamos actualizar todos los datos
     if (activeSection === 'summary' && selectedDate) {
       try {
-        // Actualizar la fecha seleccionada a la nueva timezone
         const newSelectedDate = DateTime.fromJSDate(selectedDate)
           .setZone(timezone, { keepLocalTime: true })
           .toJSDate()
         setSelectedDate(newSelectedDate)
 
-        // Si es twice-weekly, actualizar también la fecha sugerida
         if (suggestedDate && bookingPlan?.frequency === 'twice-weekly') {
           const newSuggestedDate = DateTime.fromJSDate(suggestedDate)
             .setZone(timezone, { keepLocalTime: true })
@@ -329,7 +250,6 @@ export function BookingCalendar() {
           setSuggestedDate(newSuggestedDate)
         }
 
-        // Recargar los slots disponibles con la nueva timezone
         const groupedSlots = await bookingService.getAvailableSlots(newSelectedDate, timezone)
         const transformedSlots = [{
           date: newSelectedDate,
@@ -343,7 +263,6 @@ export function BookingCalendar() {
         }];
         setAvailableSlots(transformedSlots);
 
-        // Actualizar el slot seleccionado si existe
         if (selectedSlot) {
           const newSlotDateTime = DateTime.fromJSDate(selectedSlot.date)
             .setZone(timezone, { keepLocalTime: true })
@@ -375,19 +294,16 @@ export function BookingCalendar() {
   }
 
   const handleFrequencySelect = (frequency: BookingFrequency, duration?: number) => {
-    // Limpiar estados previos
     setSelectedDate(null)
     setSuggestedDate(null)
     setSelectedSlot(null)
     setAvailableSlots([])
     
-    // Establecer nuevo plan
     setBookingPlan({ 
       frequency, 
       duration: duration || 1 
     })
     
-    // Marcar sección como completada
     setSections(prev => prev.map(s => 
       s.id === 'frequency' ? { ...s, completed: true } : s
     ))
@@ -402,45 +318,74 @@ export function BookingCalendar() {
   }
 
   const handleBookingConfirm = async () => {
-    if (!bookingPlan || !userProfile?.email) return;
-    
     setIsBookingLoading(true);
     try {
+      if (!bookingPlan) {
+        throw new Error('Booking plan is not set');
+      }
+      if (!userProfile) {
+        throw new Error('User profile is not set');
+      }
+  
+      const endDate = bookingPlan.frequency !== 'once' 
+        ? DateTime.fromJSDate(selectedSlot!.date)
+            .plus({ months: bookingPlan.duration || 0 })
+            .toJSDate()
+        : null;
+  
       const checkoutUrl = await paymentService.createCheckout(bookingPlan, userProfile);
+      
+      const booking = await bookingService.createBooking(
+        userProfile.email, 
+        selectedSlot!.date,
+        bookingPlan.frequency,
+        endDate 
+      );
       
       const bookingData = {
         userEmail: userProfile.email,
         bookingPlan,
         selectedSlot,
-        selectedTimezone
+        selectedTimezone,
+        bookingId: booking.id
       };
+
+      console.log('Booking created:', bookingData);
+
       localStorage.setItem('pendingBooking', JSON.stringify(bookingData));
-      
+  
       window.location.href = checkoutUrl;
-    } catch (error: any) {
+    } catch (error) {
       console.error('Booking confirmation error:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to process payment. Please try again.",
+        description: "Failed to confirm booking. Please try again later.",
         variant: "destructive"
       });
+      
+      localStorage.removeItem('pendingBooking');
+      
+      router.push('/');
+    } finally {
       setIsBookingLoading(false);
     }
   };
 
   const renderSummary = () => {
     if (bookingPlan?.frequency === 'twice-weekly') {
+      const firstSlotDate = bookingPlan?.firstSlot?.date ?? new Date()
+
       return (
         <div className="flex justify-center">
           <div className="space-y-4 text-left">
             <div className="space-y-2">
               <p>{getBookingSummary(
-                bookingPlan.firstSlot?.date!, 
-                'twice-weekly', 
-                null, 
-                true, 
+                firstSlotDate,
+                'twice-weekly',
+                null,
+                true,
                 selectedTimezone,
-                bookingPlan.secondSlot?.date
+                bookingPlan?.secondSlot?.date
               )}</p>
               <p>Duration: {bookingPlan.duration} {bookingPlan.duration === 1 ? 'month' : 'months'}</p>
               <p className="mt-4">Starting from {DateTime.fromJSDate(selectedDate!).toFormat('MMMM d, yyyy')}</p>
