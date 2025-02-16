@@ -28,17 +28,22 @@ export default function PaymentSuccessPage() {
     
     const fetchBookingDetails = async () => {
       try {
-        console.log('bookingData.bookingId:', bookingData)
-        const response = await fetch(`/api/bookings/${bookingData.bookingId}`)
-        const data = await response.json()
-        setBooking(data)
-        setIsLoading(false)
-        localStorage.removeItem('pendingBooking')
+        console.log('bookingData:', bookingData);
+        const response = await fetch(`/api/bookings/${bookingData.bookingId}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch booking details');
+        }
+        
+        const data = await response.json();
+        setBooking(data);
+        setIsLoading(false);
+        localStorage.removeItem('pendingBooking');
       } catch (error) {
-        console.error('Error fetching booking details:', error)
-        router.push('/')
+        console.error('Error fetching booking details:', error);
+        router.push('/');
       }
-    }
+    };
 
     fetchBookingDetails()
   }, [router])

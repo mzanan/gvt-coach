@@ -1,8 +1,10 @@
+export type BookingStatus = 'pending-payment' | 'pending' | 'confirmed' | 'cancelled';
+
 export interface Booking {
   id: string
   userId: string
   date: Date
-  status: 'pending' | 'confirmed' | 'cancelled'
+  status: BookingStatus
   meetLink: string
 }
 
@@ -35,4 +37,4 @@ export interface GroupedTimeSlots {
   slots: TimeSlot[];
 }
 
-export type PaymentStatus = 'pending' | 'completed' | 'failed'; 
+export type PaymentStatus = 'pending' | 'completed' | 'failed';

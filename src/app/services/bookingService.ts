@@ -2,7 +2,6 @@ import { DateTime } from 'luxon'
 import { supabase } from '@/lib/supabase/client'
 import { BookingDB, UserProfile } from '@/lib/supabase/types'
 import { Booking, BookingFrequency, TimeSlot } from '../types/booking'
-import { zoomService } from './zoomService'
 
 const COACH_TIMEZONE = process.env.COACH_TIMEZONE || 'UTC'; // Default to UTC if not set
 
@@ -79,7 +78,7 @@ export const bookingService = {
     const { data: existingBookings } = await supabase
       .from('meetings_bookings')
       .select('booking_date, recurring_day, recurring_time')
-      .eq('status', 'confirmed')
+      .in('status', ['confirmed', 'pending-payment'])
       .or(`booking_date.gte.${utcStartOfDay.toISO()},booking_date.lt.${utcEndOfDay.toISO()}`);
     
     const slots: TimeSlot[] = [];
@@ -145,9 +144,14 @@ export const bookingService = {
     return groupedSlots;
   },
 
-  createBooking: async (email: string, startDate: Date, frequency: string, endDate: Date | null) => {
+  createBooking: async (
+    email: string, 
+    startDate: Date, 
+    frequency: BookingFrequency,
+    endDate: Date | null,
+    meetLink?: string
+  ) => {
     try {
-      const meetLink = await zoomService.createMeeting(startDate); 
       const startDateTime = DateTime.fromJSDate(startDate);
       const endDateTime = endDate ? DateTime.fromJSDate(endDate) : null;
       
@@ -156,8 +160,8 @@ export const bookingService = {
         booking_date: startDateTime.toISO(),
         end_date: endDateTime?.toISO() || null,
         frequency,
-        status: 'confirmed',
-        meet_link: meetLink,
+        status: 'pending-payment',
+        meet_link: meetLink, 
         recurring_day: frequency !== 'once' ? startDateTime.weekdayLong : null,
         recurring_time: frequency !== 'once' ? startDateTime.toFormat('HH:mm') : null
       };
@@ -323,5 +327,20 @@ export const bookingService = {
       hoursDiff,
       hasSignificantDifference: hoursDiff >= 6
     };
+  },
+
+  cleanupExpiredBookings: async () => {
+    const expiryTime = DateTime.now().minus({ minutes: 30 }).toISO(); // 30 minutes expiry
+    
+    const { error } = await supabase
+      .from('meetings_bookings')
+      .delete()
+      .eq('status', 'pending-payment')
+      .lt('created_at', expiryTime);
+  
+    if (error) {
+      console.error('Error cleaning up expired bookings:', error);
+      throw error;
+    }
   }
 }

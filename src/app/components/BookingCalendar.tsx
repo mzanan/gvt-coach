@@ -350,8 +350,6 @@ export function BookingCalendar() {
         bookingId: booking.id
       };
 
-      console.log('Booking created:', bookingData);
-
       localStorage.setItem('pendingBooking', JSON.stringify(bookingData));
   
       window.location.href = checkoutUrl;
