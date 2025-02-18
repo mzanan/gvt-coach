@@ -36,7 +36,6 @@ interface DayGroup {
 }
 
 export function BookingCalendar() {
-  const [showInitialForm, setShowInitialForm] = useState(true)
   const [sections, setSections] = useState<Section[]>([
     { id: 'frequency', title: 'Select Frequency', completed: false },
     { id: 'date', title: 'Select Date', completed: false },
@@ -65,9 +64,6 @@ export function BookingCalendar() {
     if (profile) {
       setUserProfile(profile);
       setSelectedTimezone(profile.timezone);
-      setShowInitialForm(false);
-    } else {
-      setShowInitialForm(true);
     }
   }, []);
 
@@ -143,7 +139,6 @@ export function BookingCalendar() {
     if (profile) {
       setUserProfile(profile)
       setSelectedTimezone(profile.timezone)
-      setShowInitialForm(false)
     }
   }
 
@@ -515,10 +510,6 @@ export function BookingCalendar() {
       default:
         return null
     }
-  }
-
-  if (showInitialForm) {
-    return <UserProfileForm onComplete={handleProfileComplete} />
   }
 
   return (

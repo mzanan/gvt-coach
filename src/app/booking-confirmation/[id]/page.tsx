@@ -4,12 +4,12 @@ import { useEffect, useState } from 'react'
 import { Card } from "@/components/ui/card"
 import Link from 'next/link'
 import { BookingDB } from '@/lib/supabase/types'
-import { supabase } from '@/lib/supabase/client'
 import { DateTime } from 'luxon'
 import { use } from 'react'
 import { BookingSummaryDisplay } from '@/app/components/BookingSummaryDisplay'
 import { ChevronLeft, Check, Video } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { fetchBookingById } from '@/lib/services/bookings'
 
 export default function BookingConfirmationPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
@@ -26,48 +26,17 @@ export default function BookingConfirmationPage({ params }: { params: Promise<{ 
   })()
 
   useEffect(() => {
-    const fetchBooking = async () => {
-      const { data: mainBooking, error } = await supabase
-        .from('meetings_bookings')
-        .select('*')
-        .eq('id', resolvedParams.id)
-        .single();
-
-      if (error) {
-        console.error('Error fetching booking:', error);
-        return;
-      }
-
-      if (mainBooking) {
-        if (mainBooking.frequency === 'twice-weekly') {
-          const { data: secondBooking } = await supabase
-            .from('meetings_bookings')
-            .select('*')
-            .eq('user_email', mainBooking.user_email)
-            .eq('frequency', 'twice-weekly')
-            .gt('booking_date', mainBooking.booking_date)
-            .limit(1)
-            .single();
-
-          if (secondBooking) {
-            // Calcular la duración en meses basada en las fechas
-            const startDate = DateTime.fromISO(mainBooking.booking_date);
-            const endDate = DateTime.fromISO(mainBooking.end_date);
-            const durationInMonths = endDate.diff(startDate, 'months').months;
-
-            setBooking({
-              ...mainBooking,
-              second_booking_date: secondBooking.booking_date,
-              duration: Math.round(durationInMonths)
-            });
-          }
-        } else {
-          setBooking(mainBooking);
-        }
+    async function loadBooking() {
+      try {
+        const bookingData = await fetchBookingById(resolvedParams.id)
+        setBooking(bookingData)
+      } catch (error) {
+        console.error('Error fetching booking:', error)
+        // Manejar el error apropiadamente (ej: redireccionar a login)
       }
     }
 
-    fetchBooking()
+    loadBooking()
   }, [resolvedParams.id])
 
   if (!booking) return null

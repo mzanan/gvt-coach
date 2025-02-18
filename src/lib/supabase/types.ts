@@ -1,9 +1,11 @@
 export interface UserProfile {
-  email: string
+  id: string;
+  email: string;
   first_name: string
   last_name: string
   phone: string
-  timezone: string
+  timezone?: string;
+  full_name?: string;
 }
 
 export interface BookingDB {
@@ -18,4 +20,4 @@ export interface BookingDB {
   recurring_time?: string // Time for recurring bookings
   second_booking_date?: string | null;
   duration?: number
-} 
+}

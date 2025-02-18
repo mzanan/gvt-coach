@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GVTNomad - Crypto Trading",
-  description: "Book your crypto trading consultation",
+  title: "Trading Coach Booking",
+  description: "Book your trading consultation",
   icons: {
     icon: '/favicon.svg',
   }
@@ -31,17 +31,19 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
+      <ThemeProvider 
+          attribute="class" 
+          defaultTheme="system" 
+          enableSystem 
           disableTransitionOnChange
         >
-          <Header />
-          <main className="flex-1 py-8">
-            {children}
-          </main>
-          <Footer />
+          <div className="min-h-screen flex flex-col">
+            <Header />
+            <main className="flex-1">
+              {children}
+            </main>
+            <Footer />
+          </div>
         </ThemeProvider>
       </body>
     </html>

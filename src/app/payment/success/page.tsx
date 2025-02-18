@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react"
 import { BookingSummaryDisplay } from '@/app/components/BookingSummaryDisplay'
 import { useRouter } from 'next/navigation'
 import { BookingDB } from '@/lib/supabase/types'
+import { supabase } from '@/lib/supabase/client'
 
 export default function PaymentSuccessPage() {
   const [isLoading, setIsLoading] = useState(true)
@@ -28,22 +29,21 @@ export default function PaymentSuccessPage() {
     
     const fetchBookingDetails = async () => {
       try {
-        console.log('bookingData:', bookingData);
-        const response = await fetch(`/api/bookings/${bookingData.bookingId}`);
+        const { data, error } = await supabase
+          .from('meetings_bookings')
+          .select('*')
+          .eq('id', bookingData.bookingId)
+          .single()
         
-        if (!response.ok) {
-          throw new Error('Failed to fetch booking details');
-        }
-        
-        const data = await response.json();
-        setBooking(data);
-        setIsLoading(false);
-        localStorage.removeItem('pendingBooking');
+        if (error) throw error
+        setBooking(data)
+        setIsLoading(false)
+        localStorage.removeItem('pendingBooking')
       } catch (error) {
-        console.error('Error fetching booking details:', error);
-        router.push('/');
+        console.error('Error fetching booking details:', error)
+        router.push('/')
       }
-    };
+    }
 
     fetchBookingDetails()
   }, [router])
