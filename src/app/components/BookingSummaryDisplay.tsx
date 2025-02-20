@@ -7,15 +7,15 @@ import { getBookingSummary } from '@/lib/utils'
 interface BookingSummaryDisplayProps {
   booking: {
     id?: string
+    booking_date: string
     frequency: BookingFrequency
+    end_date?: string
     duration?: number
     firstSlot?: { date: Date }
     secondSlot?: { date: Date }
-    booking_date?: string
     second_booking_date?: string | null
     recurring_day?: string
     recurring_time?: string
-    end_date?: string
     meet_link?: string
     status?: string
     user_email?: string
@@ -33,19 +33,24 @@ export function BookingSummaryDisplay({ booking, timezone }: BookingSummaryDispl
   if (!date) return null;
 
   if (booking.frequency === 'twice-weekly') {
-    const secondDate = booking.second_booking_date 
-      ? DateTime.fromISO(booking.second_booking_date).setZone(timezone).toJSDate()
-      : booking.secondSlot?.date;
-
-    if (!secondDate) return null;
+    const firstDateTime = DateTime.fromISO(booking.booking_date).setZone(timezone);
+    const secondDate = firstDateTime.plus({ days: 3 }).toJSDate();
+    const endDate = DateTime.fromISO(booking.end_date!).setZone(timezone);
 
     return (
       <div className="space-y-4">
         <div className="space-y-2">
-          <p>{getBookingSummary(date, 'weekly', booking.duration, true, timezone, secondDate)}</p>
+          <p>{getBookingSummary(
+            firstDateTime.toJSDate(), 
+            'twice-weekly', 
+            booking.duration, 
+            true, 
+            timezone, 
+            secondDate
+          )}</p>
           <p>Duration: {booking.duration} {booking.duration === 1 ? 'month' : 'months'}</p>
-          <p>Starting from {DateTime.fromJSDate(date).toFormat('MMMM d, yyyy')}</p>
-          <p>Ending on {DateTime.fromJSDate(date).plus({ months: booking.duration || 0 }).toFormat('MMMM d, yyyy')}</p>
+          <p>Starting from {firstDateTime.toFormat('MMMM d, yyyy')}</p>
+          <p>Ending on {endDate.plus({ days: 3 }).toFormat('MMMM d, yyyy')}</p>
         </div>
       </div>
     );

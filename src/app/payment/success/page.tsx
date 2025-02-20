@@ -23,29 +23,14 @@ export default function PaymentSuccessPage() {
       router.push('/')
       return
     }
-
+    
     const bookingData = JSON.parse(pendingBooking)
     setUserTimezone(bookingData.selectedTimezone)
     
-    const fetchBookingDetails = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('meetings_bookings')
-          .select('*')
-          .eq('id', bookingData.bookingId)
-          .single()
-        
-        if (error) throw error
-        setBooking(data)
-        setIsLoading(false)
-        localStorage.removeItem('pendingBooking')
-      } catch (error) {
-        console.error('Error fetching booking details:', error)
-        router.push('/')
-      }
-    }
-
-    fetchBookingDetails()
+    // Usar el booking guardado en lugar de hacer una nueva consulta
+    setBooking(bookingData.booking)
+    setIsLoading(false)
+    localStorage.removeItem('pendingBooking')
   }, [router])
 
   if (isLoading) {

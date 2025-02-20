@@ -343,21 +343,23 @@ export function BookingCalendar() {
   
       const checkoutUrl = await paymentService.createCheckout(bookingPlan, userProfile);
       
-      await bookingService.createBooking(
+      const savedBookings = await bookingService.createBooking(
         userProfile.email, 
         startDate,
         bookingPlan.frequency,
         endDate,
+        bookingPlan.duration,
         bookingPlan.secondSlot?.date,
         undefined
       );
-      
 
       const bookingData = {
         userEmail: userProfile.email,
         selectedTimezone,
+        bookingId: savedBookings[0].id,
+        booking: savedBookings[0] 
       };
-  
+
       localStorage.setItem('pendingBooking', JSON.stringify(bookingData));
   
       window.location.href = checkoutUrl;

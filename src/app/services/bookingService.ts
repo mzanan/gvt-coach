@@ -144,45 +144,55 @@ export const bookingService = {
     startDate: Date, 
     frequency: BookingFrequency,
     endDate: Date | null,
+    duration: number,
     secondDate?: Date,
     meetLink?: string
   ) => {
     try {
-      const startDateTime = DateTime.fromJSDate(startDate);
-      const endDateTime = endDate ? DateTime.fromJSDate(endDate) : null;
-      
-      const bookings = [{
+      // Convertir las fechas a UTC
+      const startDateTime = DateTime.fromJSDate(startDate).toUTC();
+      const endDateTime = endDate ? DateTime.fromJSDate(endDate).toUTC() : null;
+
+      // Crear la reserva principal
+      const mainBooking = {
         user_email: email,
-        booking_date: startDateTime.toISO(),
-        end_date: endDateTime?.toISO() || null,
         frequency,
         status: BookingStatus.PENDING_PAYMENT,
-        meet_link: meetLink, 
-        recurring_day: frequency !== 'once' ? startDateTime.weekdayLong : null,
-        recurring_time: frequency !== 'once' ? startDateTime.toFormat('HH:mm') : null
-      }];
+        booking_date: startDateTime.toJSDate(),
+        end_date: endDateTime?.toJSDate() || null,
+        duration,
+        recurring_day: frequency !== 'once' ? DateTime.fromJSDate(startDate).weekdayLong : null,
+        recurring_time: frequency !== 'once' ? startDateTime.toFormat('HH:mm') : null,
+        meet_link: meetLink
+      };
 
-      if (frequency === 'twice-weekly' && secondDate) {
-        const secondDateTime = DateTime.fromJSDate(secondDate);
-        bookings.push({
-          user_email: email,
-          booking_date: secondDateTime.toISO(),
-          end_date: endDateTime?.toISO() || null,
-          frequency,
-          status: BookingStatus.PENDING_PAYMENT,
-          meet_link: meetLink, 
-          recurring_day: secondDateTime.weekdayLong,
-          recurring_time: secondDateTime.toFormat('HH:mm')
-        });
-      }
-
-      const { data: savedBookings, error } = await supabase
+      const { data: savedBooking, error } = await supabase
         .from('meetings_bookings')
-        .insert(bookings)
-        .select();
+        .insert([mainBooking])
+        .select()
+        .single();
 
       if (error) throw error;
-      return savedBookings;
+
+      // Si es twice-weekly, crear la segunda sesión en UTC
+      if (frequency === 'twice-weekly' && secondDate) {
+        const secondDateTime = DateTime.fromJSDate(secondDate).toUTC();
+        const secondSession = {
+          booking_id: savedBooking.id,
+          booking_date: secondDateTime.toJSDate(),
+          end_date: endDateTime?.toJSDate() || null,
+          recurring_day: DateTime.fromJSDate(secondDate).weekdayLong,
+          recurring_time: secondDateTime.toFormat('HH:mm')
+        };
+
+        const { error: secondError } = await supabase
+          .from('multiple_bookings')
+          .insert([secondSession]);
+
+        if (secondError) throw secondError;
+      }
+
+      return [savedBooking];
     } catch (error) {
       console.error('Create booking error:', error);
       throw error;
