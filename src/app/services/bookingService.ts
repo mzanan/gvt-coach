@@ -1,14 +1,9 @@
 import { DateTime } from 'luxon'
 import { supabase } from '@/lib/supabase/client'
-import { BookingDB, UserProfile } from '@/lib/supabase/types'
-import { Booking, BookingFrequency, TimeSlot } from '../types/booking'
+import { UserProfile } from '@/lib/supabase/types'
+import { BookingFrequency, BookingStatus, GroupedTimeSlots, TimeSlot } from '../types/booking'
 
-const COACH_TIMEZONE = process.env.COACH_TIMEZONE || 'UTC'; // Default to UTC if not set
-
-interface GroupedTimeSlots {
-  date: Date;
-  slots: TimeSlot[];
-}
+const COACH_TIMEZONE = process.env.COACH_TIMEZONE || 'UTC';
 
 export const bookingService = {
   saveUserProfile: async (profile: UserProfile) => {
@@ -149,70 +144,48 @@ export const bookingService = {
     startDate: Date, 
     frequency: BookingFrequency,
     endDate: Date | null,
+    secondDate?: Date,
     meetLink?: string
   ) => {
     try {
       const startDateTime = DateTime.fromJSDate(startDate);
       const endDateTime = endDate ? DateTime.fromJSDate(endDate) : null;
       
-      const booking = {
+      const bookings = [{
         user_email: email,
         booking_date: startDateTime.toISO(),
         end_date: endDateTime?.toISO() || null,
         frequency,
-        status: 'pending-payment',
+        status: BookingStatus.PENDING_PAYMENT,
         meet_link: meetLink, 
         recurring_day: frequency !== 'once' ? startDateTime.weekdayLong : null,
         recurring_time: frequency !== 'once' ? startDateTime.toFormat('HH:mm') : null
-      };
+      }];
 
-      const { data: savedBooking, error } = await supabase
+      if (frequency === 'twice-weekly' && secondDate) {
+        const secondDateTime = DateTime.fromJSDate(secondDate);
+        bookings.push({
+          user_email: email,
+          booking_date: secondDateTime.toISO(),
+          end_date: endDateTime?.toISO() || null,
+          frequency,
+          status: BookingStatus.PENDING_PAYMENT,
+          meet_link: meetLink, 
+          recurring_day: secondDateTime.weekdayLong,
+          recurring_time: secondDateTime.toFormat('HH:mm')
+        });
+      }
+
+      const { data: savedBookings, error } = await supabase
         .from('meetings_bookings')
-        .insert(booking)
-        .select()
-        .single();
+        .insert(bookings)
+        .select();
 
       if (error) throw error;
-      return savedBooking;
+      return savedBookings;
     } catch (error) {
       console.error('Create booking error:', error);
       throw error;
-    }
-  },
-
-  getUserBookings: async (userEmail: string): Promise<Booking[]> => {
-    const { data, error } = await supabase
-      .from('meetings_bookings')
-      .select('*')
-      .eq('user_email', userEmail)
-      .order('booking_date', { ascending: true })
-
-    if (error) throw error
-
-    return data.map((booking: BookingDB) => ({
-      id: booking.id,
-      userId: booking.user_email,
-      date: new Date(booking.booking_date),
-      status: booking.status,
-      meetLink: booking.meet_link
-    }))
-  },
-
-  getBooking: async (id: string): Promise<Booking> => {
-    const { data, error } = await supabase
-      .from('meetings_bookings')
-      .select('*')
-      .eq('id', id)
-      .single()
-
-    if (error) throw error
-
-    return {
-      id: data.id,
-      userId: data.user_email,
-      date: new Date(data.booking_date),
-      status: data.status,
-      meetLink: data.meet_link
     }
   },
 
@@ -220,23 +193,19 @@ export const bookingService = {
     const startOfMonth = DateTime.fromJSDate(new Date(month.getFullYear(), month.getMonth(), 1)).startOf('day');
     const endOfMonth = DateTime.fromJSDate(new Date(month.getFullYear(), month.getMonth() + 1, 0)).endOf('day');
     
-    const { data: singleBookings, error: singleError } = await supabase
+    const { data: bookings } = await supabase
       .from('meetings_bookings')
-      .select('booking_date')
+      .select('booking_date, frequency, recurring_day, recurring_time, end_date')
       .eq('status', 'confirmed')
-      .eq('frequency', 'once')
+      .or(`frequency.eq.once,frequency.neq.once`)
       .gte('booking_date', startOfMonth.toISO())
       .lte('booking_date', endOfMonth.toISO());
 
-    if (singleError) throw singleError;
-
-    const { data: recurringBookings, error: recurringError } = await supabase
-      .from('meetings_bookings')
-      .select('booking_date, recurring_day, recurring_time, end_date')
-      .eq('status', 'confirmed')
-      .neq('frequency', 'once');
-
-    if (recurringError) throw recurringError;
+    if (!bookings) {
+      throw new Error('Failed to fetch bookings');
+    }
+    const singleBookings = bookings.filter(b => b.frequency === 'once');
+    const recurringBookings = bookings.filter(b => b.frequency !== 'once');
 
     const bookingsByDate = new Map<string, number>();
     const TOTAL_SLOTS_PER_DAY = 9;
@@ -274,73 +243,5 @@ export const bookingService = {
         fullyBooked: true
       }));
     /* eslint-enable @typescript-eslint/no-unused-vars */
-  },
-
-  createRecurringBookings: async (
-    startDate: Date,
-    frequency: BookingFrequency,
-    duration: number,
-    userEmail: string,
-    meetLink: string
-  ) => {
-    const start = DateTime.fromJSDate(startDate)
-    const end = start.plus({ months: duration })
-
-    const { data, error } = await supabase
-      .from('meetings_bookings')
-      .insert({
-        user_email: userEmail,
-        booking_date: startDate.toISOString(),
-        end_date: end.toJSON(),
-        frequency: frequency,
-        status: 'confirmed',
-        meet_link: meetLink,
-        recurring_day: start.toFormat('cccc'),
-        recurring_time: start.toFormat('HH:mm')
-      })
-
-    if (error) throw error
-    return data
-  },
-
-  formatSlotTime: (date: Date, selectedTimezone: string) => {
-    const slotDateTime = DateTime.fromJSDate(date).setZone(selectedTimezone);
-    const today = DateTime.now().setZone(selectedTimezone).startOf('day');
-    const slotDate = slotDateTime.startOf('day');
-    
-    let prefix = '';
-    if (slotDate < today) {
-      prefix = 'Previous day - ';
-    } else if (slotDate > today) {
-      prefix = 'Next day - ';
-    }
-    
-    return `${prefix}${slotDateTime.toFormat('hh:mm a')}`;
-  },
-
-  getTimezoneInfo: (userTimezone: string, coachTimezone: string) => {
-    const userTZ = DateTime.local().setZone(userTimezone);
-    const coachTZ = DateTime.local().setZone(coachTimezone);
-    const hoursDiff = Math.abs(userTZ.offset - coachTZ.offset) / 60;
-    
-    return {
-      hoursDiff,
-      hasSignificantDifference: hoursDiff >= 6
-    };
-  },
-
-  cleanupExpiredBookings: async () => {
-    const expiryTime = DateTime.now().minus({ minutes: 30 }).toISO(); // 30 minutes expiry
-    
-    const { error } = await supabase
-      .from('meetings_bookings')
-      .delete()
-      .eq('status', 'pending-payment')
-      .lt('created_at', expiryTime);
-  
-    if (error) {
-      console.error('Error cleaning up expired bookings:', error);
-      throw error;
-    }
   }
 }

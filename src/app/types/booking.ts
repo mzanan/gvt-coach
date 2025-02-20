@@ -1,4 +1,9 @@
-export type BookingStatus = 'pending-payment' | 'pending' | 'confirmed' | 'cancelled';
+export enum BookingStatus {
+  PENDING_PAYMENT = 'pending-payment',
+  PAYMENT_FAILED = 'payment-failed',
+  CONFIRMED = 'confirmed',
+  CANCELLED = 'cancelled'
+}
 
 export interface Booking {
   id: string
@@ -15,6 +20,11 @@ export interface TimeSlot {
   utcDate: Date
 }
 
+export interface GroupedTimeSlots {
+  date: Date;
+  slots: TimeSlot[];
+}
+
 export type BookingFrequency = 'weekly' | 'twice-weekly' | 'once';
 
 export interface BookingPlan {
@@ -24,17 +34,3 @@ export interface BookingPlan {
   secondSlot?: TimeSlot;
   variantId?: string;
 }
-
-export interface CreateBookingParams {
-  email: string;
-  startDate: Date;
-  frequency: BookingFrequency;
-  endDate?: Date | null;
-}
-
-export interface GroupedTimeSlots {
-  date: Date;
-  slots: TimeSlot[];
-}
-
-export type PaymentStatus = 'pending' | 'completed' | 'failed';

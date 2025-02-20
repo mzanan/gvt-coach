@@ -42,7 +42,7 @@ export function BookingSummaryDisplay({ booking, timezone }: BookingSummaryDispl
     return (
       <div className="space-y-4">
         <div className="space-y-2">
-          <p>{getBookingSummary(date, 'twice-weekly', null, true, timezone, secondDate)}</p>
+          <p>{getBookingSummary(date, 'weekly', booking.duration, true, timezone, secondDate)}</p>
           <p>Duration: {booking.duration} {booking.duration === 1 ? 'month' : 'months'}</p>
           <p>Starting from {DateTime.fromJSDate(date).toFormat('MMMM d, yyyy')}</p>
           <p>Ending on {DateTime.fromJSDate(date).plus({ months: booking.duration || 0 }).toFormat('MMMM d, yyyy')}</p>
