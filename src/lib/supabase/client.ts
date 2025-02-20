@@ -11,14 +11,12 @@ export const supabase = createClient()
 
 export async function getToken() {
   const { data: { session }, error } = await supabase.auth.getSession()
-  console.log('Session:', session)
   if (error) {
     console.error('Session error:', error)
     return null
   }
 
   if (!session) {
-    console.log('No active session')
     return null 
   }
 
