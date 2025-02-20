@@ -63,7 +63,7 @@ export function BookingCalendar() {
     const profile = bookingService.getUserProfile();
     if (profile) {
       setUserProfile(profile);
-      setSelectedTimezone(profile.timezone);
+      setSelectedTimezone(profile.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
     }
   }, []);
 
@@ -135,10 +135,10 @@ export function BookingCalendar() {
   }, [selectedTimezone, selectedDate])
 
   const handleProfileComplete = () => {
-    const profile = bookingService.getUserProfile()
+    const profile = bookingService.getUserProfile();
     if (profile) {
-      setUserProfile(profile)
-      setSelectedTimezone(profile.timezone)
+      setUserProfile(profile);
+      setSelectedTimezone(profile.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
     }
   }
 
@@ -322,29 +322,42 @@ export function BookingCalendar() {
         throw new Error('User profile is not set');
       }
   
+      let startDate: Date;
+      if (bookingPlan.frequency === 'twice-weekly') {
+        if (!bookingPlan.firstSlot) {
+          throw new Error('First booking slot is not set');
+        }
+        startDate = bookingPlan.firstSlot.date;
+      } else {
+        if (!selectedSlot) {
+          throw new Error('No time slot selected');
+        }
+        startDate = selectedSlot.date;
+      }
+  
       const endDate = bookingPlan.frequency !== 'once' 
-        ? DateTime.fromJSDate(selectedSlot!.date)
+        ? DateTime.fromJSDate(startDate)
             .plus({ months: bookingPlan.duration || 0 })
             .toJSDate()
         : null;
   
       const checkoutUrl = await paymentService.createCheckout(bookingPlan, userProfile);
       
-      const booking = await bookingService.createBooking(
+      await bookingService.createBooking(
         userProfile.email, 
-        selectedSlot!.date,
+        startDate,
         bookingPlan.frequency,
-        endDate 
+        endDate,
+        bookingPlan.secondSlot?.date,
+        undefined
       );
       
+
       const bookingData = {
         userEmail: userProfile.email,
-        bookingPlan,
-        selectedSlot,
         selectedTimezone,
-        bookingId: booking.id
       };
-
+  
       localStorage.setItem('pendingBooking', JSON.stringify(bookingData));
   
       window.location.href = checkoutUrl;
@@ -352,7 +365,7 @@ export function BookingCalendar() {
       console.error('Booking confirmation error:', error);
       toast({
         title: "Error",
-        description: "Failed to confirm booking. Please try again later.",
+        description: error instanceof Error ? error.message : "Failed to confirm booking. Please try again later.",
         variant: "destructive"
       });
       
@@ -366,8 +379,11 @@ export function BookingCalendar() {
 
   const renderSummary = () => {
     if (bookingPlan?.frequency === 'twice-weekly') {
-      const firstSlotDate = bookingPlan?.firstSlot?.date ?? new Date()
-
+      const firstSlotDate = bookingPlan?.firstSlot?.date
+      const secondSlotDate = bookingPlan?.secondSlot?.date
+  
+      if (!firstSlotDate || !secondSlotDate) return null
+  
       return (
         <div className="flex justify-center">
           <div className="space-y-4 text-left">
@@ -375,14 +391,16 @@ export function BookingCalendar() {
               <p>{getBookingSummary(
                 firstSlotDate,
                 'twice-weekly',
-                null,
+                bookingPlan.duration,
                 true,
                 selectedTimezone,
-                bookingPlan?.secondSlot?.date
+                secondSlotDate
               )}</p>
               <p>Duration: {bookingPlan.duration} {bookingPlan.duration === 1 ? 'month' : 'months'}</p>
-              <p className="mt-4">Starting from {DateTime.fromJSDate(selectedDate!).toFormat('MMMM d, yyyy')}</p>
-              <p>Ending on {DateTime.fromJSDate(selectedDate!).plus({ months: bookingPlan.duration }).toFormat('MMMM d, yyyy')}</p>
+              <p className="mt-4">Starting from {DateTime.fromJSDate(firstSlotDate).toFormat('MMMM d, yyyy')}</p>
+              <p>Ending on {DateTime.fromJSDate(secondSlotDate)
+                .plus({ months: bookingPlan.duration })
+                .toFormat('MMMM d, yyyy')}</p>
             </div>
             <div className="flex justify-center mt-6">
               <Button 
@@ -393,14 +411,14 @@ export function BookingCalendar() {
                 {isBookingLoading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
-                Confirm Booking
+                Proceed to Payment
               </Button>
             </div>
           </div>
         </div>
       )
     }
-
+  
     return (
       <div className="space-y-4 text-center">
         <p className="text-xl">
@@ -415,7 +433,7 @@ export function BookingCalendar() {
             {isBookingLoading ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : null}
-            Confirm Booking
+            Proceed to Payment
           </Button>
         </div>
       </div>
@@ -462,14 +480,14 @@ export function BookingCalendar() {
                   ...prev,
                   firstSlot,
                   secondSlot
-                } : prev)
+                } : prev);
                 setSections(prev => prev.map(s => 
                   s.id === 'time' ? { ...s, completed: true } : s
-                ))
-                setActiveSection('summary')
+                ));
+                setActiveSection('summary');
               }}
             />
-          )
+          );
         }
         
         return (

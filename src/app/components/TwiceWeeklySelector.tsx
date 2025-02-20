@@ -52,7 +52,7 @@ export function TwiceWeeklySelector({ firstDate, onComplete, duration = 1, timez
   }
 
   const getEndDate = () => {
-    return DateTime.fromJSDate(firstDate).plus({ months: duration }).toFormat('MMMM d, yyyy')
+    return DateTime.fromJSDate(secondDate).plus({ months: duration }).toFormat('MMMM d, yyyy')
   }
 
   return (
