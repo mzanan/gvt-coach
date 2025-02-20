@@ -60,37 +60,45 @@ export const bookingService = {
   },
 
   getAvailableSlots: async (date: Date, userTimezone: string): Promise<GroupedTimeSlots[]> => {
-    // Convertir la fecha seleccionada a la timezone del usuario
     const userDateTime = DateTime.fromJSDate(date)
       .setZone(userTimezone)
       .startOf('day');
     
-    // Obtener el rango UTC que necesitamos revisar (24 horas completas)
     const utcStartOfDay = userDateTime.minus({ days: 1 }).toUTC();
     const utcEndOfDay = userDateTime.plus({ days: 2 }).toUTC();
     
-    // Obtener las reservas existentes
-    const { data: existingBookings } = await supabase
+    // Obtener las reservas de ambas tablas
+    const { data: mainBookings } = await supabase
       .from('meetings_bookings')
       .select('booking_date, recurring_day, recurring_time')
       .in('status', ['confirmed', 'pending-payment'])
       .or(`booking_date.gte.${utcStartOfDay.toISO()},booking_date.lt.${utcEndOfDay.toISO()}`);
-    
+
+    // Obtener las reservas de la tabla multiple_bookings
+    const { data: secondaryBookings } = await supabase
+      .from('multiple_bookings')
+      .select('booking_date, recurring_day, recurring_time')
+      .or(`booking_date.gte.${utcStartOfDay.toISO()},booking_date.lt.${utcEndOfDay.toISO()}`);
+
+    // Combinar todas las reservas
+    const existingBookings = [
+      ...(mainBookings || []),
+      ...(secondaryBookings || [])
+    ];
+
     const slots: TimeSlot[] = [];
-    
-    // Revisar 72 horas para cubrir todas las zonas horarias
+
+    // El resto del código sigue igual, pero ahora verifica contra todas las reservas
     for (let hour = 0; hour < 72; hour++) {
       const utcSlotDateTime = utcStartOfDay.plus({ hours: hour });
       const userSlotDateTime = utcSlotDateTime.setZone(userTimezone);
       const coachSlotDateTime = utcSlotDateTime.setZone(COACH_TIMEZONE);
       
-      // Solo agregar slot si está en las horas permitidas del coach (1-4 AM y 12-4 PM UTC)
       const coachHour = coachSlotDateTime.hour;
       if ((coachHour >= 1 && coachHour <= 4) || (coachHour >= 12 && coachHour <= 16)) {
-        // Verificar si el slot pertenece al día seleccionado en la timezone del usuario
         if (userSlotDateTime.startOf('day').equals(userDateTime.startOf('day'))) {
           if (userSlotDateTime >= DateTime.now().setZone(userTimezone)) {
-            // Verificar si el slot ya está reservado
+            // Verificar si el slot ya está reservado en cualquiera de las tablas
             const isBooked = existingBookings?.some(booking => {
               const bookingDateTime = DateTime.fromISO(booking.booking_date)
                 .setZone(userTimezone);
