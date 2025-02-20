@@ -200,20 +200,26 @@ export function BookingCalendar() {
       utcDate: slotDateTime.toUTC().toJSDate()
     };
     
-    if (bookingPlan?.frequency === 'twice-weekly') {
-      setSelectedSlot(correctedSlot);
-      setBookingPlan(prev => prev ? { ...prev, firstSlot: correctedSlot as TimeSlot } : prev);
-      setSections(prev => prev.map(s => 
-        s.id === 'time' ? { ...s, completed: true } : s
-      ));
-      setActiveSection('summary');
-    } else {
-      setSelectedSlot(correctedSlot);
-      setSections(prev => prev.map(s => 
-        s.id === 'time' ? { ...s, completed: true } : s
-      ));
-      setActiveSection('summary');
-    }
+    const commonBookingData = {
+      firstSlot: correctedSlot,
+      duration: bookingPlan?.duration || 1,
+      frequency: bookingPlan?.frequency || 'once'
+    };
+
+    setBookingPlan(prev => {
+      if (bookingPlan?.frequency === 'twice-weekly') {
+        return prev ? { ...prev, ...commonBookingData } : null;
+      } else {
+        return prev ? { ...prev, ...commonBookingData } : commonBookingData;
+      }
+    });
+
+    setSelectedSlot(correctedSlot);
+    
+    setSections(prev => prev.map(s => 
+      s.id === 'time' ? { ...s, completed: true } : s
+    ));
+    setActiveSection('summary');
   }
 
   const handleSectionClick = (sectionId: string) => {
@@ -315,15 +321,8 @@ export function BookingCalendar() {
   const handleBookingConfirm = async () => {
     setIsBookingLoading(true);
     try {
-      if (!bookingPlan) {
-        throw new Error('Booking plan is not set');
-      }
-      if (!userProfile) {
-        throw new Error('User profile is not set');
-      }
-  
       let startDate: Date;
-      if (bookingPlan.frequency === 'twice-weekly') {
+      if (bookingPlan?.frequency === 'twice-weekly') {
         if (!bookingPlan.firstSlot) {
           throw new Error('First booking slot is not set');
         }
@@ -341,10 +340,8 @@ export function BookingCalendar() {
             .toJSDate()
         : null;
   
-      const checkoutUrl = await paymentService.createCheckout(bookingPlan, userProfile);
-      
       const savedBookings = await bookingService.createBooking(
-        userProfile.email, 
+        userProfile.email,
         startDate,
         bookingPlan.frequency,
         endDate,
@@ -352,28 +349,29 @@ export function BookingCalendar() {
         bookingPlan.secondSlot?.date,
         undefined
       );
-
+  
+      const updatedBookingPlan = {
+        ...bookingPlan,
+        bookingId: savedBookings[0].id
+      };
+  
+      const checkoutUrl = await paymentService.createCheckout(
+        updatedBookingPlan, 
+        userProfile
+      );
+  
       const bookingData = {
         userEmail: userProfile.email,
         selectedTimezone,
         bookingId: savedBookings[0].id,
-        booking: savedBookings[0] 
+        booking: savedBookings[0]
       };
-
+  
       localStorage.setItem('pendingBooking', JSON.stringify(bookingData));
   
       window.location.href = checkoutUrl;
     } catch (error) {
-      console.error('Booking confirmation error:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to confirm booking. Please try again later.",
-        variant: "destructive"
-      });
-      
-      localStorage.removeItem('pendingBooking');
-      
-      router.push('/');
+      console.error('Error creating booking:', error);
     } finally {
       setIsBookingLoading(false);
     }

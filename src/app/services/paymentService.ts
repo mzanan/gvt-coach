@@ -15,6 +15,7 @@ interface CheckoutPayload {
     duration: string;
     firstSlot: { date: string } | null;
     secondSlot: { date: string } | null;
+    bookingId?: string;
   };
 }
 
@@ -52,7 +53,8 @@ export const paymentService = {
           } : null,
           secondSlot: bookingPlan.secondSlot ? {
             date: bookingPlan.secondSlot.date.toISOString()
-          } : null
+          } : null,
+          bookingId: bookingPlan.bookingId
         }
       };
 
@@ -86,6 +88,17 @@ export const paymentService = {
       console.error('Checkout error:', error);
       throw error;
     }
+  },
+
+  getOrderStatus: async (orderId: string): Promise<PaymentOrderStatus> => {
+    const { data, error } = await supabase
+      .from('meetings_bookings')
+      .select('status')
+      .eq('id', orderId)
+      .single();
+
+    if (error) throw error;
+    return data.status;
   }
 };
 
