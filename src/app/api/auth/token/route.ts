@@ -11,7 +11,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/token`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_PAYMENT_URL}/auth/token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

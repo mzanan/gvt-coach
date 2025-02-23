@@ -42,7 +42,7 @@ export async function middleware(request: NextRequest) {
       !request.nextUrl.pathname.startsWith('/api/zoom')) {
     const backendUrl = new URL(
       request.nextUrl.pathname, 
-      process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      process.env.NEXT_PUBLIC_PAYMENT_URL || 'http://localhost:3001'
     )
 
     const headers = new Headers(request.headers)
