@@ -33,4 +33,5 @@ export interface BookingPlan {
   firstSlot?: TimeSlot;
   secondSlot?: TimeSlot;
   variantId?: string;
+  bookingId?: string;
 }

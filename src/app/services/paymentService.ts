@@ -1,4 +1,6 @@
+import { supabase } from '@/lib/supabase/client';
 import { BookingFrequency, BookingPlan } from '../types/booking';
+import { PaymentOrderStatus } from '../types/payments';
 
 interface UserProfile {
   email: string;
