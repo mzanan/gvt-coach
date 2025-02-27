@@ -27,15 +27,16 @@ export async function POST(request: Request) {
       const errorText = await response.text();
       console.error('Auth service error:', errorText);
       return NextResponse.json(
-        { error: 'Authentication failed' },
+        { error: `Authentication failed: ${response.status}` },
         { status: response.status }
       );
     }
 
     const data = await response.json();
     return NextResponse.json({ token: data.access_token });
+
   } catch (error) {
-    console.error('Token error:', error);
+    console.error('Token generation error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

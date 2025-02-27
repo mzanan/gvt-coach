@@ -1,12 +1,12 @@
 import { BookingFrequency } from "./booking";
 
-export type PaymentOrderStatus = 
-  | 'pending' 
-  | 'processing'
-  | 'completed'
-  | 'failed'
-  | 'refunded'
-  | 'cancelled';
+export enum PaymentOrderStatus {
+  Active = 'active',
+  PastDue = 'past_due',
+  Cancelled = 'cancelled',
+  Pending = 'pending',
+  Paid = 'paid'
+}
 
 export interface CheckoutPayload {
   variantId: string;
@@ -19,4 +19,15 @@ export interface CheckoutPayload {
     secondSlot: { date: string } | null;
     bookingId?: string;
   };
+}
+
+export interface PaymentStatusResponse {
+  success: boolean;
+  data: {
+    orderId: string | null;
+    subscriptionId: string | null;
+    status: PaymentOrderStatus;
+    lastUpdated?: Date;
+    nextRenewalDate?: string | null;
+  }
 }

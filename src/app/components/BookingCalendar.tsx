@@ -334,41 +334,47 @@ export function BookingCalendar() {
         startDate = selectedSlot.date;
       }
   
-      const endDate = bookingPlan.frequency !== 'once' 
+      const endDate = bookingPlan?.frequency !== 'once' 
         ? DateTime.fromJSDate(startDate)
-            .plus({ months: bookingPlan.duration || 0 })
+            .plus({ months: bookingPlan?.duration || 0 })
             .toJSDate()
         : null;
   
-      const savedBookings = await bookingService.createBooking(
-        userProfile.email,
-        startDate,
-        bookingPlan.frequency,
-        endDate,
-        bookingPlan.duration,
-        bookingPlan.secondSlot?.date,
-        undefined
-      );
-  
       const updatedBookingPlan = {
-        ...bookingPlan,
-        bookingId: savedBookings[0].id
-      };
+        ...bookingPlan!,
+        bookingId: undefined // Inicialmente sin ID de reserva
+      } as BookingPlan;
   
-      const checkoutUrl = await paymentService.createCheckout(
+      const { checkoutUrl, orderId } = await paymentService.createCheckout(
         updatedBookingPlan, 
-        userProfile
+        userProfile as UserProfile
       );
+  
+      const savedBookings = await bookingService.createBooking(
+        (userProfile as UserProfile).email,
+        startDate,
+        (bookingPlan as BookingPlan).frequency,
+        endDate,
+        (bookingPlan as BookingPlan).duration,
+        orderId,
+        bookingPlan?.secondSlot?.date,
+        undefined  
+      );
+  
+      updatedBookingPlan.bookingId = savedBookings[0].id;
   
       const bookingData = {
-        userEmail: userProfile.email,
+        userEmail: userProfile?.email,
         selectedTimezone,
         bookingId: savedBookings[0].id,
-        booking: savedBookings[0]
+        orderId,
+        booking: {
+          ...savedBookings[0],
+          order_id: orderId
+        }
       };
   
       localStorage.setItem('pendingBooking', JSON.stringify(bookingData));
-  
       window.location.href = checkoutUrl;
     } catch (error) {
       console.error('Error creating booking:', error);

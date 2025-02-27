@@ -3,15 +3,17 @@ import { NextResponse, NextRequest } from 'next/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
+
 ) {
   try {
     const supabase = await createClient();
+    const { id } = (await params)
 
     const { data: booking, error: bookingError } = await supabase
       .from('meetings_bookings')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (bookingError) {

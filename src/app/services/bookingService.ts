@@ -153,6 +153,7 @@ export const bookingService = {
     frequency: BookingFrequency,
     endDate: Date | null,
     duration: number,
+    orderId: string,
     secondDate?: Date,
     meetLink?: string
   ) => {
@@ -171,6 +172,7 @@ export const bookingService = {
         duration,
         recurring_day: frequency !== 'once' ? DateTime.fromJSDate(startDate).weekdayLong : null,
         recurring_time: frequency !== 'once' ? startDateTime.toFormat('HH:mm') : null,
+        order_id: orderId,
         meet_link: meetLink
       };
 

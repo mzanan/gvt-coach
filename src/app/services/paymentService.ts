@@ -1,6 +1,6 @@
-import { supabase } from '@/lib/supabase/client';
+import { getAuthToken } from '../helpers/authHelpers';
 import { BookingFrequency, BookingPlan } from '../types/booking';
-import { PaymentOrderStatus } from '../types/payments';
+import { CheckoutPayload, PaymentOrderStatus } from '../types/payments';
 
 interface UserProfile {
   email: string;
@@ -8,40 +8,10 @@ interface UserProfile {
   last_name: string;
 }
 
-interface CheckoutPayload {
-  variantId: string;
-  customData: {
-    userEmail: string;
-    userName: string;
-    frequency: BookingFrequency;
-    duration: string;
-    firstSlot: { date: string } | null;
-    secondSlot: { date: string } | null;
-    bookingId?: string;
-  };
-}
-
 export const paymentService = {
-  createCheckout: async (bookingPlan: BookingPlan, userProfile: UserProfile): Promise<string> => {
+  createCheckout: async (bookingPlan: BookingPlan, userProfile: UserProfile): Promise<{ checkoutUrl: string; orderId: string }> => {
     try {
-      const tokenResponse = await fetch('/api/auth/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          clientId: process.env.NEXT_PUBLIC_CLIENT_ID,
-          clientSecret: process.env.NEXT_PUBLIC_CLIENT_SECRET
-        })
-      });
-
-      if (!tokenResponse.ok) {
-        const errorText = await tokenResponse.text();
-        console.error('Token error response:', errorText);
-        throw new Error('Failed to get authentication token');
-      }
-
-      const { token }: { token: string } = await tokenResponse.json();
+      const token = await getAuthToken();
 
       const payload: CheckoutPayload = {
         variantId: bookingPlan.variantId || getVariantIdForPlan(bookingPlan.frequency),
@@ -81,11 +51,31 @@ export const paymentService = {
         }
       }
 
-      const data: { data: { attributes: { url: string } } } = await response.json();
-      if (!data.data.attributes.url) {
+      const { checkoutUrl, orderId } = await response.json();
+
+      if (!checkoutUrl) {
         throw new Error('Invalid checkout URL received from server');
       }
-      return data.data.attributes.url;
+
+      const pendingBooking = localStorage.getItem('pendingBooking');
+      if (pendingBooking) {
+        const bookingData = JSON.parse(pendingBooking);
+
+        const updatedBookingData = {
+          ...bookingData,
+          orderId,
+          booking: {
+            ...bookingData.booking,
+            order_id: orderId
+          }
+        };
+        localStorage.setItem('pendingBooking', JSON.stringify(updatedBookingData));
+      }
+
+      return {
+        checkoutUrl,
+        orderId
+      };
     } catch (error) {
       console.error('Checkout error:', error);
       throw error;
@@ -93,14 +83,37 @@ export const paymentService = {
   },
 
   getOrderStatus: async (orderId: string): Promise<PaymentOrderStatus> => {
-    const { data, error } = await supabase
-      .from('meetings_bookings')
-      .select('status')
-      .eq('id', orderId)
-      .single();
+    try {
+      const token = await getAuthToken();
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_PAYMENT_URL}/api/payments/status?orderId=${orderId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
 
-    if (error) throw error;
-    return data.status;
+      if (!response.ok) {
+        throw new Error('Failed to get payment status');
+      }
+
+      const responseData = await response.json();
+      console.log('Payment status response:', responseData);
+
+      if (!responseData.success || !responseData.data) {
+        throw new Error('Invalid response format');
+      }
+
+      const status = responseData.data.status;
+
+      if (!Object.values(PaymentOrderStatus).includes(status as PaymentOrderStatus)) {
+        throw new Error(`Invalid status value: ${status}`);
+      }
+
+      return status as PaymentOrderStatus;
+    } catch (error) {
+      console.error('Error getting order status:', error);
+      throw error;
+    }
   }
 };
 

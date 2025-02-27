@@ -73,7 +73,18 @@ export function UserProfileForm({
     }
 
     try {
-      await bookingService.saveUserProfile(values)
+      if (initialData?.id) {
+        await bookingService.saveUserProfile({
+          ...values,
+          id: initialData.id
+        })
+      } else {
+        await bookingService.saveUserProfile({
+          ...values,
+          id: crypto.randomUUID()
+        })
+      }
+
       if (onTimezoneChange) {
         onTimezoneChange(values.timezone)
       }

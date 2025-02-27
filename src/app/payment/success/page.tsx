@@ -8,13 +8,15 @@ import { ChevronLeft, Check, Video } from "lucide-react"
 import { Loader2 } from "lucide-react"
 import { BookingSummaryDisplay } from '@/app/components/BookingSummaryDisplay'
 import { useRouter } from 'next/navigation'
-import { BookingDB } from '@/lib/supabase/types'
-import { supabase } from '@/lib/supabase/client'
+import { BookingDB, BookingStatus } from '@/lib/supabase/types'
+import { paymentService } from '@/app/services/paymentService';
+import { PaymentOrderStatus } from '@/app/types/payments';
 
 export default function PaymentSuccessPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [booking, setBooking] = useState<BookingDB | null>(null)
   const [userTimezone, setUserTimezone] = useState('')
+  const [status, setStatus] = useState<BookingStatus>(BookingStatus.Pending);
   const router = useRouter()
 
   useEffect(() => {
@@ -27,11 +29,59 @@ export default function PaymentSuccessPage() {
     const bookingData = JSON.parse(pendingBooking)
     setUserTimezone(bookingData.selectedTimezone)
     
-    // Usar el booking guardado en lugar de hacer una nueva consulta
     setBooking(bookingData.booking)
     setIsLoading(false)
-    localStorage.removeItem('pendingBooking')
   }, [router])
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    
+    const checkStatus = async () => {
+      const pendingBooking = localStorage.getItem('pendingBooking');
+      if (!pendingBooking) return;
+  
+      const data = JSON.parse(pendingBooking);
+      if (!data.orderId) {
+        console.error('No orderId found in pendingBooking');
+        router.push('/payment/cancel');
+        return;
+      }
+  
+      try {
+        const orderStatus = await paymentService.getOrderStatus(data.orderId);
+        console.log('orderStatus:', orderStatus);
+        
+        if ([PaymentOrderStatus.Active, PaymentOrderStatus.Paid].includes(orderStatus)) {
+          if (interval) clearInterval(interval);
+          localStorage.removeItem('pendingBooking');
+          setIsLoading(false);
+          setStatus(BookingStatus.Confirmed);
+        } else if ([PaymentOrderStatus.Cancelled].includes(orderStatus)) {
+          if (interval) clearInterval(interval);
+          router.push('/payment/cancel');
+        } else {
+          setStatus(BookingStatus.Pending);
+        }
+      } catch (error) {
+        console.error('Error checking payment status:', error);
+        if (interval) clearInterval(interval);
+        router.push('/payment/cancel');
+      }
+    };
+  
+    // Solo iniciar el intervalo si estamos en estado pendiente
+    if (status === BookingStatus.Pending) {
+      checkStatus(); // Primera verificación inmediata
+      interval = setInterval(checkStatus, 5000);
+    }
+  
+    // Cleanup function
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [status, router]); // Solo se ejecuta una vez al montar el componente
 
   if (isLoading) {
     return (
