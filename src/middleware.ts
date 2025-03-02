@@ -37,21 +37,26 @@ export async function middleware(request: NextRequest) {
   // Important: refresh the auth session
   await supabase.auth.getSession()
 
-  // Keep your existing API routing logic
-  if ((request.nextUrl.pathname.startsWith('/api/checkout') || 
-       request.nextUrl.pathname.startsWith('/api/payments')) && 
-      !request.nextUrl.pathname.startsWith('/api/zoom')) {
-    const backendUrl = new URL(
-      request.nextUrl.pathname, 
-      process.env.NEXT_PUBLIC_PAYMENT_URL || 'http://localhost:3001'
-    )
+  // Helper function to check if the request should be forwarded to payment service
+  const isPaymentRelatedEndpoint = (pathname: string) => {
+    return (
+      pathname.startsWith('/api/checkout') || 
+      pathname.startsWith('/api/payments') ||
+      pathname.startsWith('/api/auth')
+    );
+  };
 
-    const headers = new Headers(request.headers)
-    headers.set('Content-Type', 'application/json')
+  // Forward only payment-related endpoints to external payment service
+  if (isPaymentRelatedEndpoint(request.nextUrl.pathname)) {
+    const paymentServiceUrl = process.env.NEXT_PUBLIC_PAYMENT_URL || 'http://localhost:3001';
+    const backendUrl = new URL(request.nextUrl.pathname, paymentServiceUrl);
+
+    const headers = new Headers(request.headers);
+    headers.set('Content-Type', 'application/json');
 
     return NextResponse.rewrite(backendUrl, {
       headers: headers
-    })
+    });
   }
 
   return response
