@@ -14,12 +14,41 @@ import { PaymentOrderStatus } from '@/app/types/payments';
 import { zoomService } from '@/app/services/zoomService';
 import { supabase } from '@/lib/supabase/client'
 import { getAuthToken } from '@/app/helpers/authHelpers';
+import { useEmailNotifications } from '@/hooks/useEmailNotifications';
+import { useToast } from '@/hooks/use-toast';
 
 export default function PaymentSuccessPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [booking, setBooking] = useState<BookingDB | null>(null)
   const [userTimezone, setUserTimezone] = useState('')
+  const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [userName, setUserName] = useState<string | null>(null)
+  const [emailSent, setEmailSent] = useState(false)
   const router = useRouter()
+  const { sendBookingConfirmation, isSending, error } = useEmailNotifications()
+  const { toast } = useToast()
+
+  // Obtener datos del usuario actual
+  useEffect(() => {
+    const getUserData = async () => {
+      const { data } = await supabase.auth.getSession()
+      if (data.session) {
+        setUserEmail(data.session.user.email || null)
+        // Intentamos obtener el nombre del usuario si existe
+        const { data: userData } = await supabase
+          .from('profiles')
+          .select('full_name, first_name')
+          .eq('id', data.session.user.id)
+          .single()
+        
+        if (userData) {
+          setUserName(userData.full_name || userData.first_name || null)
+        }
+      }
+    }
+    
+    getUserData()
+  }, [])
 
   useEffect(() => {
     const pendingBooking = localStorage.getItem('pendingBooking')
@@ -33,6 +62,40 @@ export default function PaymentSuccessPage() {
     setBooking(bookingData.booking)
     setIsLoading(false)
   }, [router])
+
+  // Enviar correo de confirmación cuando tengamos los datos necesarios
+  useEffect(() => {
+    const sendConfirmationEmail = async () => {
+      if (booking && userEmail && !emailSent && !isLoading) {
+        console.log('Sending booking confirmation email to:', userEmail);
+        
+        try {
+          // Aseguramos que userEmail no sea null
+          const success = await sendBookingConfirmation(booking, userEmail, userName || undefined);
+          
+          if (success) {
+            console.log('Booking confirmation email sent successfully');
+            setEmailSent(true);
+            toast({
+              title: "Email enviado",
+              description: "Se ha enviado la confirmación a tu correo electrónico",
+            });
+          } else {
+            console.error('Failed to send booking confirmation email');
+            toast({
+              title: "Error al enviar email",
+              description: "No se pudo enviar la confirmación a tu correo. Intenta más tarde.",
+              variant: "destructive"
+            });
+          }
+        } catch (error) {
+          console.error('Error sending booking confirmation email:', error);
+        }
+      }
+    };
+    
+    sendConfirmationEmail();
+  }, [booking, userEmail, emailSent, isLoading, sendBookingConfirmation, userName, toast]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -238,7 +301,19 @@ export default function PaymentSuccessPage() {
             <Check className="h-6 w-6 text-green-600" />
           </div>
           <h1 className="text-2xl font-bold mb-2">Booking Confirmed!</h1>
-          <p className="text-muted-foreground">You will receive this information in your email</p>
+          <p className="text-muted-foreground">
+            {emailSent 
+              ? "Hemos enviado los detalles a tu correo electrónico" 
+              : isSending 
+                ? "Enviando confirmación a tu correo..." 
+                : "Confirma los detalles de tu reserva"
+            }
+          </p>
+          {error && (
+            <p className="text-red-500 text-sm mt-2">
+              No pudimos enviar el correo de confirmación. Por favor, guarda esta información.
+            </p>
+          )}
         </div>
 
         <div className="space-y-6">
