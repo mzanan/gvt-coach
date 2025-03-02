@@ -320,6 +320,7 @@ export function BookingCalendar() {
 
   const handleBookingConfirm = async () => {
     setIsBookingLoading(true);
+
     try {
       let startDate: Date;
       if (bookingPlan?.frequency === 'twice-weekly') {
@@ -339,41 +340,33 @@ export function BookingCalendar() {
             .plus({ months: bookingPlan?.duration || 0 })
             .toJSDate()
         : null;
-  
-      const updatedBookingPlan = {
-        ...bookingPlan!,
-        bookingId: undefined // Inicialmente sin ID de reserva
-      } as BookingPlan;
-  
+
+      // Primero obtenemos el orderId del checkout
       const { checkoutUrl, orderId } = await paymentService.createCheckout(
-        updatedBookingPlan, 
+        bookingPlan as BookingPlan, 
         userProfile as UserProfile
       );
-  
+      
+      // Luego creamos el booking con el orderId
       const savedBookings = await bookingService.createBooking(
         (userProfile as UserProfile).email,
         startDate,
         (bookingPlan as BookingPlan).frequency,
         endDate,
         (bookingPlan as BookingPlan).duration,
-        orderId,
+        orderId, // Usamos el orderId obtenido
         bookingPlan?.secondSlot?.date,
-        undefined  
+        undefined
       );
-  
-      updatedBookingPlan.bookingId = savedBookings[0].id;
-  
+
       const bookingData = {
         userEmail: userProfile?.email,
         selectedTimezone,
         bookingId: savedBookings[0].id,
         orderId,
-        booking: {
-          ...savedBookings[0],
-          order_id: orderId
-        }
+        booking: savedBookings[0]
       };
-  
+
       localStorage.setItem('pendingBooking', JSON.stringify(bookingData));
       window.location.href = checkoutUrl;
     } catch (error) {

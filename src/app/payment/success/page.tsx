@@ -11,12 +11,14 @@ import { useRouter } from 'next/navigation'
 import { BookingDB, BookingStatus } from '@/lib/supabase/types'
 import { paymentService } from '@/app/services/paymentService';
 import { PaymentOrderStatus } from '@/app/types/payments';
+import { zoomService } from '@/app/services/zoomService';
+import { supabase } from '@/lib/supabase/client'
+import { getAuthToken } from '@/app/helpers/authHelpers';
 
 export default function PaymentSuccessPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [booking, setBooking] = useState<BookingDB | null>(null)
   const [userTimezone, setUserTimezone] = useState('')
-  const [status, setStatus] = useState<BookingStatus>(BookingStatus.Pending);
   const router = useRouter()
 
   useEffect(() => {
@@ -28,7 +30,6 @@ export default function PaymentSuccessPage() {
     
     const bookingData = JSON.parse(pendingBooking)
     setUserTimezone(bookingData.selectedTimezone)
-    
     setBooking(bookingData.booking)
     setIsLoading(false)
   }, [router])
@@ -53,14 +54,129 @@ export default function PaymentSuccessPage() {
         
         if ([PaymentOrderStatus.Active, PaymentOrderStatus.Paid].includes(orderStatus)) {
           if (interval) clearInterval(interval);
-          localStorage.removeItem('pendingBooking');
-          setIsLoading(false);
-          setStatus(BookingStatus.Confirmed);
+
+          try {
+            console.log('About to create Zoom meeting for booking:', {
+              bookingId: data.booking.id,
+              bookingDate: data.booking.booking_date,
+              fullBookingObject: data.booking
+            });
+            
+            const meetLink = await zoomService.createMeeting(new Date(data.booking.booking_date));
+            console.log('Zoom meeting created:', meetLink);
+            
+            const token = await getAuthToken();
+            
+            // Log the full URL being used for the API call
+            const apiUrl = `/api/bookings/${data.booking.id}`;
+            console.log('Making API call to:', apiUrl);
+            console.log('Booking ID being used:', data.booking.id);
+            console.log('Token length:', token ? token.length : 'No token');
+            
+            try {
+              const response = await fetch(apiUrl, {
+                method: 'PATCH',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                  meet_link: meetLink
+                })
+              });
+
+              console.log('API response status:', response.status);
+              
+              if (!response.ok) {
+                console.error('Failed API response:', {
+                  status: response.status,
+                  statusText: response.statusText
+                });
+                
+                // Try to get the error message from the response
+                try {
+                  const errorData = await response.json();
+                  console.error('API error details:', errorData);
+                } catch (e) {
+                  console.error('Could not parse error response');
+                }
+                
+                // If response is 404 (Not Found), try to find the booking by order_id instead
+                if (response.status === 404 && data.orderId) {
+                  console.log('Booking not found by ID, attempting to find by order_id:', data.orderId);
+                  
+                  // Make a request to fetch the booking by order_id
+                  const orderResponse = await fetch(`/api/bookings/by-order/${data.orderId}`, {
+                    method: 'GET',
+                    headers: {
+                      'Authorization': `Bearer ${token}`
+                    }
+                  });
+                  
+                  if (orderResponse.ok) {
+                    const bookingByOrder = await orderResponse.json();
+                    console.log('Found booking by order_id:', bookingByOrder);
+                    
+                    if (bookingByOrder?.id) {
+                      // Now try to update this booking with the Zoom link
+                      const updateResponse = await fetch(`/api/bookings/${bookingByOrder.id}`, {
+                        method: 'PATCH',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                          meet_link: meetLink
+                        })
+                      });
+                      
+                      if (updateResponse.ok) {
+                        const updatedBooking = await updateResponse.json();
+                        console.log('Successfully updated booking using order_id lookup:', updatedBooking);
+                        setBooking(updatedBooking);
+                        setIsLoading(false);
+                        localStorage.removeItem('pendingBooking');
+                        return; // Exit the function early
+                      } else {
+                        console.error('Failed to update booking even after finding by order_id');
+                      }
+                    }
+                  } else {
+                    console.error('Failed to find booking by order_id:', data.orderId);
+                  }
+                }
+                
+                throw new Error('Failed to update booking with Zoom link');
+              }
+
+              const updatedBooking = await response.json();
+              console.log('Booking updated with Zoom link:', updatedBooking);
+
+              setBooking(updatedBooking);
+              setIsLoading(false);
+
+              localStorage.removeItem('pendingBooking');
+            } catch (fetchError) {
+              console.error('Fetch error:', fetchError);
+              // Still show the booking information even if the update failed
+              setBooking({
+                ...data.booking,
+                meet_link: meetLink // Add the meet link anyway so user has access
+              });
+              setIsLoading(false);
+              
+              // Show error but don't remove pendingBooking
+              // so we can try again later if needed
+              throw fetchError;
+            }
+          } catch (error) {
+            console.error('Error creating/updating Zoom meeting:', error);
+            setBooking(data.booking);
+            setIsLoading(false);
+          }
         } else if ([PaymentOrderStatus.Cancelled].includes(orderStatus)) {
           if (interval) clearInterval(interval);
           router.push('/payment/cancel');
-        } else {
-          setStatus(BookingStatus.Pending);
         }
       } catch (error) {
         console.error('Error checking payment status:', error);
@@ -69,19 +185,15 @@ export default function PaymentSuccessPage() {
       }
     };
   
-    // Solo iniciar el intervalo si estamos en estado pendiente
-    if (status === BookingStatus.Pending) {
-      checkStatus(); // Primera verificación inmediata
-      interval = setInterval(checkStatus, 5000);
-    }
+    checkStatus();
+    interval = setInterval(checkStatus, 5000);
   
-    // Cleanup function
     return () => {
       if (interval) {
         clearInterval(interval);
       }
     };
-  }, [status, router]); // Solo se ejecuta una vez al montar el componente
+  }, [router]);
 
   if (isLoading) {
     return (

@@ -67,18 +67,38 @@ export const bookingService = {
     const utcStartOfDay = userDateTime.minus({ days: 1 }).toUTC();
     const utcEndOfDay = userDateTime.plus({ days: 2 }).toUTC();
     
-    // Obtener las reservas de ambas tablas
+    // Obtener las reservas con pagos confirmados o pendientes
     const { data: mainBookings } = await supabase
       .from('meetings_bookings')
-      .select('booking_date, recurring_day, recurring_time')
-      .in('status', ['confirmed', 'pending-payment'])
-      .or(`booking_date.gte.${utcStartOfDay.toISO()},booking_date.lt.${utcEndOfDay.toISO()}`);
+      .select(`
+        booking_date, 
+        recurring_day, 
+        recurring_time,
+        order_id,
+        payments_status!inner (
+          status
+        )
+      `)
+      .or(`booking_date.gte.${utcStartOfDay.toISO()},booking_date.lt.${utcEndOfDay.toISO()}`)
+      .in('payments_status.status', ['PAID', 'ACTIVE', 'PENDING']); // Solo estados activos
 
-    // Obtener las reservas de la tabla multiple_bookings
+    // Similar para multiple_bookings
     const { data: secondaryBookings } = await supabase
       .from('multiple_bookings')
-      .select('booking_date, recurring_day, recurring_time')
-      .or(`booking_date.gte.${utcStartOfDay.toISO()},booking_date.lt.${utcEndOfDay.toISO()}`);
+      .select(`
+        booking_date, 
+        recurring_day, 
+        recurring_time,
+        booking_id,
+        meetings_bookings!inner (
+          order_id,
+          payments_status!inner (
+            status
+          )
+        )
+      `)
+      .or(`booking_date.gte.${utcStartOfDay.toISO()},booking_date.lt.${utcEndOfDay.toISO()}`)
+      .in('meetings_bookings.payments_status.status', ['PAID', 'ACTIVE', 'PENDING']);
 
     // Combinar todas las reservas
     const existingBookings = [
@@ -153,26 +173,30 @@ export const bookingService = {
     frequency: BookingFrequency,
     endDate: Date | null,
     duration: number,
-    orderId: string,
+    orderId?: string,
     secondDate?: Date,
     meetLink?: string
   ) => {
     try {
       // Convertir las fechas a UTC
       const startDateTime = DateTime.fromJSDate(startDate).toUTC();
-      const endDateTime = endDate ? DateTime.fromJSDate(endDate).toUTC() : null;
+      
+      // Si es una reunión de tipo 'once', end_date es igual a booking_date
+      const endDateTime = frequency === 'once' 
+        ? startDateTime 
+        : endDate ? DateTime.fromJSDate(endDate).toUTC() : null;
 
-      // Crear la reserva principal
+      // Crear la reserva principal sin order_id inicialmente
       const mainBooking = {
         user_email: email,
         frequency,
-        status: BookingStatus.PENDING_PAYMENT,
         booking_date: startDateTime.toJSDate(),
         end_date: endDateTime?.toJSDate() || null,
         duration,
         recurring_day: frequency !== 'once' ? DateTime.fromJSDate(startDate).weekdayLong : null,
         recurring_time: frequency !== 'once' ? startDateTime.toFormat('HH:mm') : null,
-        order_id: orderId,
+        // Solo incluimos order_id si se proporciona
+        ...orderId ? { order_id: orderId } : {},  
         meet_link: meetLink
       };
 
@@ -209,21 +233,49 @@ export const bookingService = {
     }
   },
 
+  updateBookingWithOrderId: async (bookingId: string, orderId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('meetings_bookings')
+        .update({ order_id: orderId })
+        .eq('id', bookingId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Update booking with orderId error:', error);
+      throw error;
+    }
+  },
+
   getFullyBookedDates: async (month: Date): Promise<Array<{ date: Date, fullyBooked: boolean }>> => {
     const startOfMonth = DateTime.fromJSDate(new Date(month.getFullYear(), month.getMonth(), 1)).startOf('day');
     const endOfMonth = DateTime.fromJSDate(new Date(month.getFullYear(), month.getMonth() + 1, 0)).endOf('day');
     
     const { data: bookings } = await supabase
       .from('meetings_bookings')
-      .select('booking_date, frequency, recurring_day, recurring_time, end_date')
-      .eq('status', 'confirmed')
+      .select(`
+        booking_date, 
+        frequency, 
+        recurring_day, 
+        recurring_time, 
+        end_date,
+        order_id,
+        payments_status!inner (
+          status
+        )
+      `)
       .or(`frequency.eq.once,frequency.neq.once`)
       .gte('booking_date', startOfMonth.toISO())
-      .lte('booking_date', endOfMonth.toISO());
+      .lte('booking_date', endOfMonth.toISO())
+      .in('payments_status.status', ['PAID', 'ACTIVE', 'PENDING']);
 
     if (!bookings) {
       throw new Error('Failed to fetch bookings');
     }
+
     const singleBookings = bookings.filter(b => b.frequency === 'once');
     const recurringBookings = bookings.filter(b => b.frequency !== 'once');
 

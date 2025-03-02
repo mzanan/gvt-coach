@@ -38,7 +38,8 @@ export async function middleware(request: NextRequest) {
   await supabase.auth.getSession()
 
   // Keep your existing API routing logic
-  if (request.nextUrl.pathname.startsWith('/api/') && 
+  if ((request.nextUrl.pathname.startsWith('/api/checkout') || 
+       request.nextUrl.pathname.startsWith('/api/payments')) && 
       !request.nextUrl.pathname.startsWith('/api/zoom')) {
     const backendUrl = new URL(
       request.nextUrl.pathname, 

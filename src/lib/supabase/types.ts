@@ -1,13 +1,13 @@
 export enum BookingStatus {
-  Confirmed = 'confirmed',
-  Pending = 'pending',
-  Cancelled = 'cancelled'
+  Confirmed = 'CONFIRMED',
+  Pending = 'PENDING',
+  Cancelled = 'CANCELLED'
 }
 
 export enum BookingFrequency {
-  Once = 'once',
-  Weekly = 'weekly',
-  TwiceWeekly = 'twice-weekly'
+  Once = 'ONCE',
+  Weekly = 'WEEKLY',
+  TwiceWeekly = 'TWICE_WEEKLY'
 }
 
 export interface UserProfile {
