@@ -84,7 +84,7 @@ export function getBookingConfirmationTemplate(
         <p>If you need to reschedule or cancel your session, please contact us at least 24 hours in advance.</p>
         <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
         <p style="font-size: 14px; color: #666;">Looking forward to seeing you soon!</p>
-        <p style="font-size: 14px; color: #666;">The GVT Coach Team</p>
+        <p style="font-size: 14px; color: #666;">The GVT Nomad Team</p>
       </div>
     `
     // FUTURE IMPLEMENTATION: Re-enable iCalendar attachment
@@ -146,7 +146,7 @@ export function getSessionReminderTemplate(
         </ul>
         <p>See you tomorrow!</p>
         <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-        <p style="font-size: 14px; color: #666;">The GVT Coach Team</p>
+        <p style="font-size: 14px; color: #666;">The GVT Nomad Team</p>
       </div>
     `,
 
@@ -177,7 +177,7 @@ export function getCancellationTemplate(
       <p>If you would like to reschedule, you can do so through our platform at any time.</p>
       <p>If you have any questions or need assistance, please don't hesitate to contact us.</p>
       <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-      <p style="font-size: 14px; color: #666;">The GVT Coach Team</p>
+      <p style="font-size: 14px; color: #666;">The GVT Nomad Team</p>
     </div>
   `;
 }
@@ -232,7 +232,7 @@ export function getSessionSummaryTemplate(
       <p>If you have any questions about these points or need clarification, please don't hesitate to contact us.</p>
       <p>Looking forward to seeing you again soon!</p>
       <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-      <p style="font-size: 14px; color: #666;">The GVT Coach Team</p>
+      <p style="font-size: 14px; color: #666;">The GVT Nomad Team</p>
     </div>
   `;
 } 
