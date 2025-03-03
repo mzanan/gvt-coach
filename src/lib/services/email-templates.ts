@@ -16,7 +16,7 @@
 //   zoomLink?: string
 // ) {
 //   const eventUID = uuidv4();
-//   const organizerEmail = process.env.GMAIL_USER || 'noreply@gvtcoach.com';
+//   const organizerEmail = process.env.FROM_EMAIL || 'noreply@gvtcoach.com';
   
 //   return `BEGIN:VCALENDAR
 // VERSION:2.0

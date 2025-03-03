@@ -6,19 +6,15 @@ import {
   getSessionSummaryTemplate 
 } from './email-templates';
 
-// Nodemailer transporter configuration for Gmail
+// Nodemailer transporter configuration for Resend SMTP
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
+  host: 'smtp.resend.com',
   port: 465,
-  secure: true, // true for 465, false for other ports
+  secure: true, // true for 465 (SSL/TLS)
   auth: {
-    user: process.env.GMAIL_USER, // Your Gmail email
-    pass: process.env.GMAIL_PASSWORD, // Password or App Password
+    user: 'resend', // Fixed username for Resend
+    pass: process.env.RESEND_API_KEY, // Your Resend API key
   },
-  tls: {
-    // Do not fail on self-signed certificates
-    rejectUnauthorized: false
-  }
 });
 
 // Verify transporter configuration (optional but recommended)
@@ -26,10 +22,10 @@ if (process.env.NODE_ENV !== 'production') {
   transporter.verify(function(error, success) {
     if (error) {
       console.error('Error in SMTP server configuration:', error);
-      console.error('Make sure to properly configure GMAIL_USER and GMAIL_PASSWORD in .env.local');
+      console.error('Make sure to properly configure RESEND_API_KEY and FROM_EMAIL in .env.local');
       console.error('Current values:', {
-        GMAIL_USER: process.env.GMAIL_USER || 'not configured',
-        GMAIL_PASSWORD: process.env.GMAIL_PASSWORD ? '******' : 'not configured'
+        RESEND_API_KEY: process.env.RESEND_API_KEY ? '******' : 'not configured',
+        FROM_EMAIL: process.env.FROM_EMAIL || 'not configured'
       });
     } else {
       console.log('✅ SMTP server is ready to send messages');
@@ -37,8 +33,10 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
-// Email address from which emails will be sent
-const defaultFromEmail = process.env.GMAIL_USER || process.env.COACH_EMAIL || 'matiaszanan@gmail.com';
+// Email address configuration
+const FROM_NAME = 'GVT Coach';
+const defaultFromEmail = process.env.FROM_EMAIL || 'onboarding@resend.dev';
+const formattedFromEmail = `${FROM_NAME} <${defaultFromEmail}>`;
 
 // Interface for email data
 export interface EmailData {
@@ -58,14 +56,16 @@ export interface EmailData {
 
 // Generic email sending function
 async function sendEmail(data: EmailData) {
+  console.log('Sending email:', data);
+
   try {
     const mailOptions = {
-      from: data.from || defaultFromEmail,
+      from: formattedFromEmail,
       to: data.to,
       subject: data.subject,
       html: data.html,
       text: data.text,
-      replyTo: data.replyTo,
+      replyTo: data.replyTo || formattedFromEmail,
       cc: data.cc,
       bcc: data.bcc,
       icalEvent: data.icalEvent
@@ -104,7 +104,7 @@ export async function sendBookingConfirmation(
     to,
     subject,
     html: emailContent.html,
-    icalEvent: emailContent.icalEvent
+    // icalEvent: emailContent.icalEvent // FUTURE IMPLEMENTATION
   });
 }
 
@@ -133,7 +133,7 @@ export async function sendSessionReminder(
     to,
     subject,
     html: emailContent.html,
-    icalEvent: emailContent.icalEvent
+    // icalEvent: emailContent.icalEvent // FUTURE IMPLEMENTATION
   });
 }
 

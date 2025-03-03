@@ -11,7 +11,7 @@ console.log('===============================');
 const envPath = path.resolve(process.cwd(), '.env.local');
 if (!fs.existsSync(envPath)) {
   console.error('❌ ERROR: .env.local file not found');
-  console.error('Please create this file with GMAIL_USER and GMAIL_PASSWORD variables');
+  console.error('Please create this file with FROM_EMAIL and GMAIL_PASSWORD variables');
   process.exit(1);
 }
 
@@ -20,8 +20,8 @@ dotenv.config({ path: envPath });
 console.log('✅ Variables de entorno cargadas desde:', envPath);
 
 // Check required variables
-if (!process.env.GMAIL_USER) {
-  console.error('❌ ERROR: Missing GMAIL_USER variable in .env.local');
+if (!process.env.FROM_EMAIL) {
+  console.error('❌ ERROR: Missing FROM_EMAIL variable in .env.local');
   process.exit(1);
 }
 
@@ -35,7 +35,7 @@ if (!process.env.GMAIL_PASSWORD) {
 // Main test function
 async function testEmail() {
   console.log('🔄 Starting email sending test...');
-  console.log('📧 Using account:', process.env.GMAIL_USER);
+  console.log('📧 Using account:', process.env.FROM_EMAIL);
   
   try {
     // Import mail service - using require to avoid ESM vs CommonJS issues
@@ -47,7 +47,7 @@ async function testEmail() {
       port: 465,
       secure: true,
       auth: {
-        user: process.env.GMAIL_USER,
+        user: process.env.FROM_EMAIL,
         pass: process.env.GMAIL_PASSWORD,
       },
       tls: {
@@ -65,12 +65,12 @@ async function testEmail() {
       }
       
       console.log('✅ SMTP configuration verified successfully');
-      console.log('🔄 Sending test email to:', process.env.GMAIL_USER);
+      console.log('🔄 Sending test email to:', process.env.FROM_EMAIL);
       
       // Configure message
       const mailOptions = {
-        from: `"GVT Coach Test" <${process.env.GMAIL_USER}>`,
-        to: process.env.GMAIL_USER,
+        from: `"GVT Coach Test" <${process.env.FROM_EMAIL}>`,
+        to: process.env.FROM_EMAIL,
         subject: 'Test email from GVT Coach',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
@@ -79,7 +79,7 @@ async function testEmail() {
             <p>Test details:</p>
             <ul>
               <li><strong>Date and time:</strong> ${new Date().toLocaleString()}</li>
-              <li><strong>Sent from:</strong> ${process.env.GMAIL_USER}</li>
+              <li><strong>Sent from:</strong> ${process.env.FROM_EMAIL}</li>
               <li><strong>Environment:</strong> ${process.env.NODE_ENV || 'development'}</li>
             </ul>
             <p>If you're receiving this email, it means the configuration is correct and you can start using the email notification system.</p>
@@ -108,7 +108,7 @@ async function testEmail() {
         console.log('✅ EMAIL SENT SUCCESSFULLY!');
         console.log('📧 Message ID:', info.messageId);
         console.log('');
-        console.log('👉 Check your inbox (or spam) at', process.env.GMAIL_USER);
+        console.log('👉 Check your inbox (or spam) at', process.env.FROM_EMAIL);
         console.log('   to confirm you received the test email.');
       });
     });

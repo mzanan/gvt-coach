@@ -118,7 +118,10 @@ export default function PaymentSuccessPage() {
       }
 
       // Determinar qué email usar (prioridad: userEmail, luego booking.user_email)
-      const emailToUse = userEmail || (booking?.user_email);
+      const emailToUse = process.env.NODE_ENV === 'development' 
+        ? process.env.NEXT_PUBLIC_COACH_EMAIL 
+        : (userEmail || booking?.user_email);
+
       
       if (!booking || !emailToUse || isLoading) {
         const reason = !booking 
@@ -351,79 +354,6 @@ export default function PaymentSuccessPage() {
     };
   }, [router]);
 
-  // Añadir esta función para el botón de prueba
-  const handleTestEmailSend = async () => {
-    // El booking debería tener el email, ya que viene de la base de datos
-    if (!booking) {
-      toast({
-        title: "Data error",
-        description: "No booking information available to send test email.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    // Verificar todas las posibles fuentes del email
-    console.log('TestButton: Checking email sources:');
-    console.log('TestButton: - userEmail state:', userEmail);
-    console.log('TestButton: - booking.user_email:', booking.user_email);
-    
-    // Usar el email del booking como primera opción, luego el userEmail como respaldo
-    const emailToUse = userEmail || booking.user_email;
-    
-    if (!emailToUse) {
-      console.log('TestButton: No email found in any source');
-      toast({
-        title: "Data error",
-        description: "Could not determine recipient email.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsTestSending(true);
-    setEmailError(null); // Resetear errores previos
-    console.log('TestButton: Sending email manually to:', emailToUse, '(source:', userEmail ? 'userEmail state' : 'booking.user_email', ')');
-    
-    try {
-      const success = await sendBookingConfirmation(booking, emailToUse, userName || undefined);
-      
-      if (success) {
-        console.log('TestButton: Email sent successfully');
-        setEmailSent(true);
-        toast({
-          title: "Email sent",
-          description: `We've sent the email to ${emailToUse}`,
-        });
-      } else {
-        console.error('TestButton: Error sending email');
-        console.error('TestButton: Reported error:', error);
-        setEmailError(`Error sending email: ${error || "Unknown error"}. Check your connection and session.`);
-        toast({
-          title: "Error sending email",
-          description: error || "Could not send the email. Check your connection and try again.",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error('TestButton: Exception sending email:', error);
-      
-      // Mensaje de error detallado
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : "Unexpected error sending the email";
-        
-      setEmailError(`Error: ${errorMessage}`);
-      
-      toast({
-        title: "Unexpected error",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    } finally {
-      setIsTestSending(false);
-    }
-  };
 
   // Actualizar el mensaje en la interfaz
   function getStatusMessage() {
@@ -493,25 +423,7 @@ export default function PaymentSuccessPage() {
               {emailError}
             </p>
           )}
-          
-          {(!emailSent && !isSending) && (
-            <Button 
-              onClick={handleTestEmailSend} 
-              variant="outline" 
-              size="sm"
-              disabled={isTestSending || !booking}
-              className="mt-4"
-            >
-              {isTestSending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                emailError ? "Retry sending email" : "Send details by email"
-              )}
-            </Button>
-          )}
+       
         </div>
               
         <div className="space-y-6">
@@ -530,39 +442,6 @@ export default function PaymentSuccessPage() {
               <p className="text-muted-foreground">
                 📩 We've sent your session details to <span className="font-medium text-foreground">{userEmail || booking.user_email}</span>.
               </p>
-              {emailError && !emailSent && (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Can't find the email? You can try sending it again:
-                  </p>
-                  <Button 
-                    onClick={handleTestEmailSend} 
-                    variant="outline" 
-                    size="sm"
-                    disabled={isTestSending || emailSent}
-                    className="w-full"
-                  >
-                    {isTestSending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Sending email...
-                      </>
-                    ) : emailSent ? (
-                      <>
-                        <Check className="mr-2 h-4 w-4" />
-                        Email sent
-                      </>
-                    ) : (
-                      "Resend confirmation email"
-                    )}
-                  </Button>
-                  {emailSent && (
-                    <p className="text-sm text-muted-foreground">
-                      If you still haven't received the email, please check your spam folder or contact support.
-                    </p>
-                  )}
-                </div>
-              )}
             </div>
           </div>
           
