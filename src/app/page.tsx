@@ -8,7 +8,8 @@ import { bookingService } from "./services/bookingService"
 export default function Home() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
-  
+
+
   useEffect(() => {
     const checkAuth = () => {
       const userProfile = bookingService.getUserProfile()

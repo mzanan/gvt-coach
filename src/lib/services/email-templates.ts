@@ -15,15 +15,24 @@ export function getBookingConfirmationTemplate(
   }
 ) {
   const userName = bookingDetails.user_name || 'User';
-  
+  const startTime = new Date(bookingDetails.start_time);
+  const endTime = new Date(startTime.getTime());
+  endTime.setHours(endTime.getHours() + 1);
+
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
       <h2 style="color: #4CAF50;">Your coaching session is confirmed!</h2>
       <p>Hello ${userName},</p>
       <p>Your session has been successfully scheduled:</p>
       <div style="padding: 15px; border-left: 4px solid #4CAF50; background-color: #F9F9F9; margin: 20px 0;">
-        <p><strong>Date:</strong> ${new Date(bookingDetails.start_time).toLocaleDateString()}</p>
-        <p><strong>Time:</strong> ${new Date(bookingDetails.start_time).toLocaleTimeString()} - ${new Date(bookingDetails.end_time).toLocaleTimeString()}</p>
+        <p><strong>Date:</strong> ${startTime.toLocaleDateString("en-US", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })}
+        </p>
+        <p><strong>Time:</strong> ${startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} - ${endTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
         ${bookingDetails.zoom_link ? `<p><strong>Zoom Link:</strong> <a href="${bookingDetails.zoom_link}" style="color: #4285F4;">${bookingDetails.zoom_link}</a></p>` : ''}
       </div>
       <p>Please join the session 5 minutes early to ensure everything is working properly.</p>
@@ -47,15 +56,24 @@ export function getSessionReminderTemplate(
   }
 ) {
   const userName = bookingDetails.user_name || 'User';
-  
+  const startTime = new Date(bookingDetails.start_time);
+  const endTime = new Date(startTime.getTime());
+  endTime.setHours(endTime.getHours() + 1);
+
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
       <h2 style="color: #FF9800;">Reminder: Your coaching session is tomorrow</h2>
       <p>Hello ${userName},</p>
       <p>This is a reminder that your coaching session is scheduled for tomorrow:</p>
       <div style="padding: 15px; border-left: 4px solid #FF9800; background-color: #F9F9F9; margin: 20px 0;">
-        <p><strong>Date:</strong> ${new Date(bookingDetails.start_time).toLocaleDateString()}</p>
-        <p><strong>Time:</strong> ${new Date(bookingDetails.start_time).toLocaleTimeString()} - ${new Date(bookingDetails.end_time).toLocaleTimeString()}</p>
+        <p><strong>Date:</strong> ${startTime.toLocaleDateString("en-US", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })}
+        </p>
+        <p><strong>Time:</strong> ${startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} - ${endTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
         ${bookingDetails.zoom_link ? `<p><strong>Zoom Link:</strong> <a href="${bookingDetails.zoom_link}" style="color: #4285F4;">${bookingDetails.zoom_link}</a></p>` : ''}
       </div>
       <p>Some tips to make the most of your session:</p>

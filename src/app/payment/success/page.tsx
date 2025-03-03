@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from 'next/link'
-import { ChevronLeft, Check, Video } from "lucide-react"
+import { ChevronLeft, Check } from "lucide-react"
 import { Loader2 } from "lucide-react"
 import { BookingSummaryDisplay } from '@/app/components/BookingSummaryDisplay'
 import { useRouter } from 'next/navigation'
@@ -12,7 +12,6 @@ import { BookingDB, BookingStatus } from '@/lib/supabase/types'
 import { paymentService } from '@/app/services/paymentService';
 import { PaymentOrderStatus } from '@/app/types/payments';
 import { zoomService } from '@/app/services/zoomService';
-import { supabase } from '@/lib/supabase/client'
 import { getAuthToken } from '@/app/helpers/authHelpers';
 import { useEmailNotifications } from '@/hooks/useEmailNotifications';
 import { useToast } from '@/hooks/use-toast';
@@ -527,16 +526,44 @@ export default function PaymentSuccessPage() {
           </div>
           
           <div className="border-b pb-4">
-            <h2 className="font-medium text-lg mb-3">Meeting Link</h2>
-            <a 
-              href={booking.meet_link} 
-              className="inline-flex items-center gap-2 text-primary hover:underline" 
-              target="_blank" 
-              rel="noopener noreferrer"
-            >
-              <Video className="h-4 w-4" />
-              Join Zoom Meeting
-            </a>
+            <div className="space-y-4">
+              <p className="text-muted-foreground">
+                📩 We've sent your session details to <span className="font-medium text-foreground">{userEmail || booking.user_email}</span>.
+              </p>
+              {emailError && !emailSent && (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Can't find the email? You can try sending it again:
+                  </p>
+                  <Button 
+                    onClick={handleTestEmailSend} 
+                    variant="outline" 
+                    size="sm"
+                    disabled={isTestSending || emailSent}
+                    className="w-full"
+                  >
+                    {isTestSending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Sending email...
+                      </>
+                    ) : emailSent ? (
+                      <>
+                        <Check className="mr-2 h-4 w-4" />
+                        Email sent
+                      </>
+                    ) : (
+                      "Resend confirmation email"
+                    )}
+                  </Button>
+                  {emailSent && (
+                    <p className="text-sm text-muted-foreground">
+                      If you still haven't received the email, please check your spam folder or contact support.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           
           <div>
