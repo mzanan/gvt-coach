@@ -81,7 +81,7 @@ export function FrequencySelector({
                 : "bg-background text-white"
             )}
           >
-            <h3 className="font-semibold mb-2">{freq.title}</h3>
+            <h3 className="font-semibold mb-2 text-foreground">{freq.title}</h3>
             <p className="text-sm text-muted-foreground">{freq.description}</p>
           </button>
         ))}

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { 
   sendBookingConfirmation,
   sendSessionReminder,
@@ -9,39 +8,9 @@ import {
 // Tipos de notificaciones disponibles
 type NotificationType = 'confirmation' | 'reminder' | 'cancellation';
 
-// Verificamos que la solicitud viene de una fuente autorizada
-async function validateRequest(req: NextRequest) {
-  const authHeader = req.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return { isValid: false, error: 'Falta token de autorización' };
-  }
-
-  const token = authHeader.substring(7); // Quitar 'Bearer ' del token
-  
-  // Validar sesión con Supabase
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.getUser(token);
-  
-  if (error || !data.user) {
-    return { isValid: false, error: 'Token inválido o usuario no autenticado' };
-  }
-
-  return { isValid: true, user: data.user };
-}
-
 // Endpoint para enviar notificaciones relacionadas con reservas
 export async function POST(req: NextRequest) {
   try {
-    // Validamos la solicitud
-    const validation = await validateRequest(req);
-    if (!validation.isValid) {
-      return NextResponse.json(
-        { error: validation.error },
-        { status: 401 }
-      );
-    }
-
     // Extraemos los datos de la solicitud
     const data = await req.json();
     const { 

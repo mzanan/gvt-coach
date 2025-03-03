@@ -24,26 +24,70 @@ export default function PaymentSuccessPage() {
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
   const [emailSent, setEmailSent] = useState(false)
+  const [emailError, setEmailError] = useState<string | null>(null)
   const router = useRouter()
   const { sendBookingConfirmation, isSending, error } = useEmailNotifications()
   const { toast } = useToast()
+  const [isTestSending, setIsTestSending] = useState(false);
 
   // Obtener datos del usuario actual
   useEffect(() => {
     const getUserData = async () => {
-      const { data } = await supabase.auth.getSession()
-      if (data.session) {
-        setUserEmail(data.session.user.email || null)
-        // Intentamos obtener el nombre del usuario si existe
-        const { data: userData } = await supabase
-          .from('profiles')
-          .select('full_name, first_name')
-          .eq('id', data.session.user.id)
-          .single()
+      try {
+        console.log('PaymentSuccess: Getting user data from localStorage...');
         
-        if (userData) {
-          setUserName(userData.full_name || userData.first_name || null)
+        // Get user data from localStorage
+        if (typeof window !== 'undefined') {
+          // Get user profile from localStorage
+          const userProfileStr = localStorage.getItem('userProfile');
+          if (userProfileStr) {
+            try {
+              const profileData = JSON.parse(userProfileStr);
+              const profile = profileData.value; // Profile is inside .value
+              
+              if (profile && profile.email) {
+                console.log('PaymentSuccess: Email found in localStorage:', profile.email);
+                setUserEmail(profile.email);
+                
+                // Set name if available
+                if (profile.first_name) {
+                  const name = `${profile.first_name} ${profile.last_name || ''}`.trim();
+                  setUserName(name);
+                  console.log('PaymentSuccess: Name found in localStorage:', name);
+                }
+                return;
+              }
+            } catch (e) {
+              console.error('PaymentSuccess: Error parsing user profile:', e);
+            }
+          } else {
+            console.log('PaymentSuccess: No user profile found in localStorage');
+          }
+          
+          // Also check for email in pendingBooking
+          const pendingBookingStr = localStorage.getItem('pendingBooking');
+          if (pendingBookingStr) {
+            try {
+              const pendingData = JSON.parse(pendingBookingStr);
+              if (pendingData.userEmail) {
+                console.log('PaymentSuccess: Email found in pendingBooking.userEmail:', pendingData.userEmail);
+                setUserEmail(pendingData.userEmail);
+                return;
+              }
+              if (pendingData.booking && pendingData.booking.user_email) {
+                console.log('PaymentSuccess: Email found in pendingBooking.booking.user_email:', pendingData.booking.user_email);
+                setUserEmail(pendingData.booking.user_email);
+                return;
+              }
+            } catch (e) {
+              console.error('PaymentSuccess: Error parsing pendingBooking:', e);
+            }
+          }
         }
+        
+        console.log('PaymentSuccess: Could not find email in localStorage');
+      } catch (error) {
+        console.error('PaymentSuccess: Error getting user data:', error);
       }
     }
     
@@ -57,6 +101,8 @@ export default function PaymentSuccessPage() {
       return
     }
     
+    console.log('PaymentSuccess: Complete pendingBooking content:', JSON.parse(pendingBooking));
+    
     const bookingData = JSON.parse(pendingBooking)
     setUserTimezone(bookingData.selectedTimezone)
     setBooking(bookingData.booking)
@@ -66,36 +112,84 @@ export default function PaymentSuccessPage() {
   // Enviar correo de confirmación cuando tengamos los datos necesarios
   useEffect(() => {
     const sendConfirmationEmail = async () => {
-      if (booking && userEmail && !emailSent && !isLoading) {
-        console.log('Sending booking confirmation email to:', userEmail);
+      // Si ya se envió un email o hay un error previo, no hacer nada
+      if (emailSent) {
+        console.log('PaymentSuccess: Email was already sent, skipping');
+        return;
+      }
+
+      // Determinar qué email usar (prioridad: userEmail, luego booking.user_email)
+      const emailToUse = userEmail || (booking?.user_email);
+      
+      if (!booking || !emailToUse || isLoading) {
+        const reason = !booking 
+          ? 'No booking data available' 
+          : !emailToUse 
+            ? 'No user email available' 
+            : 'Page is still loading';
+              
+        console.log(`PaymentSuccess: Not sending email automatically. Reason: ${reason}`);
+        return;
+      }
+
+      // Marcar como enviado antes de intentar enviar para prevenir múltiples intentos
+      setEmailSent(true);
+
+      console.log(`PaymentSuccess: Attempting to send email to:`, emailToUse);
+      console.log('PaymentSuccess: Booking details:', {
+        id: booking.id,
+        date: new Date(booking.booking_date).toLocaleString(),
+        duration: booking.duration || 60,
+        link: booking.meet_link || 'Not available',
+        email_source: userEmail ? 'userEmail state' : 'booking.user_email'
+      });
+      
+      try {
+        const success = await sendBookingConfirmation(booking, emailToUse, userName || undefined);
         
-        try {
-          // Aseguramos que userEmail no sea null
-          const success = await sendBookingConfirmation(booking, userEmail, userName || undefined);
+        if (success) {
+          console.log('PaymentSuccess: Confirmation email sent successfully');
           
-          if (success) {
-            console.log('Booking confirmation email sent successfully');
-            setEmailSent(true);
-            toast({
-              title: "Email enviado",
-              description: "Se ha enviado la confirmación a tu correo electrónico",
-            });
-          } else {
-            console.error('Failed to send booking confirmation email');
-            toast({
-              title: "Error al enviar email",
-              description: "No se pudo enviar la confirmación a tu correo. Intenta más tarde.",
-              variant: "destructive"
-            });
-          }
-        } catch (error) {
-          console.error('Error sending booking confirmation email:', error);
+          toast({
+            title: "Email sent",
+            description: "We've sent the confirmation to your email",
+          });
+        } else {
+          console.error('PaymentSuccess: Error sending confirmation email');
+          console.error('PaymentSuccess: Reported error:', error);
+          
+          setEmailSent(false); // Allow retry if failed
+          setEmailError(`Could not send the email automatically. Please use the button to try manually.`);
+          
+          toast({
+            title: "Error sending email",
+            description: error || "Could not send confirmation automatically. Use the button to try manually.",
+            variant: "destructive"
+          });
         }
+      } catch (error) {
+        console.error('PaymentSuccess: Exception sending confirmation email:', error);
+        
+        setEmailSent(false); // Allow retry if failed
+        const errorMessage = error instanceof Error 
+          ? `Error: ${error.message}` 
+          : "Unexpected error sending the email";
+          
+        setEmailError(`${errorMessage}. Try with the manual button.`);
+        
+        toast({
+          title: "Unexpected error",
+          description: "An error occurred sending the confirmation. Try with the manual button.",
+          variant: "destructive"
+        });
       }
     };
     
-    sendConfirmationEmail();
-  }, [booking, userEmail, emailSent, isLoading, sendBookingConfirmation, userName, toast]);
+    // Solo intentamos enviar el correo si tenemos los datos necesarios y no se ha enviado ya
+    if (booking?.meet_link && !emailSent) {
+      sendConfirmationEmail();
+    }
+  }, [booking?.meet_link]); // Solo depender del meet_link para enviar el email
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -115,26 +209,23 @@ export default function PaymentSuccessPage() {
         const orderStatus = await paymentService.getOrderStatus(data.orderId);
         console.log('orderStatus:', orderStatus);
         
+        // Si hay un email en el booking, guardarlo
+        if (data.booking && data.booking.user_email && !userEmail) {
+          console.log('PaymentSuccess: Email obtained from booking in checkStatus:', data.booking.user_email);
+          setUserEmail(data.booking.user_email);
+        }
+
         if ([PaymentOrderStatus.Active, PaymentOrderStatus.Paid].includes(orderStatus)) {
           if (interval) clearInterval(interval);
 
           try {
-            console.log('About to create Zoom meeting for booking:', {
-              bookingId: data.booking.id,
-              bookingDate: data.booking.booking_date,
-              fullBookingObject: data.booking
-            });
-            
             const meetLink = await zoomService.createMeeting(new Date(data.booking.booking_date));
-            console.log('Zoom meeting created:', meetLink);
-            
             const token = await getAuthToken();
             
             // Log the full URL being used for the API call
             const apiUrl = `/api/bookings/${data.booking.id}`;
             console.log('Making API call to:', apiUrl);
             console.log('Booking ID being used:', data.booking.id);
-            console.log('Token length:', token ? token.length : 'No token');
             
             try {
               const response = await fetch(apiUrl, {
@@ -148,8 +239,6 @@ export default function PaymentSuccessPage() {
                 })
               });
 
-              console.log('API response status:', response.status);
-              
               if (!response.ok) {
                 console.error('Failed API response:', {
                   status: response.status,
@@ -213,7 +302,6 @@ export default function PaymentSuccessPage() {
               }
 
               const updatedBooking = await response.json();
-              console.log('Booking updated with Zoom link:', updatedBooking);
 
               setBooking(updatedBooking);
               setIsLoading(false);
@@ -241,6 +329,12 @@ export default function PaymentSuccessPage() {
           if (interval) clearInterval(interval);
           router.push('/payment/cancel');
         }
+
+        // Verificar si tenemos el email después de obtener el booking actualizado
+        if (booking && booking.user_email && !userEmail) {
+          console.log('PaymentSuccess: Email obtained from updated booking:', booking.user_email);
+          setUserEmail(booking.user_email);
+        }
       } catch (error) {
         console.error('Error checking payment status:', error);
         if (interval) clearInterval(interval);
@@ -257,6 +351,97 @@ export default function PaymentSuccessPage() {
       }
     };
   }, [router]);
+
+  // Añadir esta función para el botón de prueba
+  const handleTestEmailSend = async () => {
+    // El booking debería tener el email, ya que viene de la base de datos
+    if (!booking) {
+      toast({
+        title: "Data error",
+        description: "No booking information available to send test email.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Verificar todas las posibles fuentes del email
+    console.log('TestButton: Checking email sources:');
+    console.log('TestButton: - userEmail state:', userEmail);
+    console.log('TestButton: - booking.user_email:', booking.user_email);
+    
+    // Usar el email del booking como primera opción, luego el userEmail como respaldo
+    const emailToUse = userEmail || booking.user_email;
+    
+    if (!emailToUse) {
+      console.log('TestButton: No email found in any source');
+      toast({
+        title: "Data error",
+        description: "Could not determine recipient email.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsTestSending(true);
+    setEmailError(null); // Resetear errores previos
+    console.log('TestButton: Sending email manually to:', emailToUse, '(source:', userEmail ? 'userEmail state' : 'booking.user_email', ')');
+    
+    try {
+      const success = await sendBookingConfirmation(booking, emailToUse, userName || undefined);
+      
+      if (success) {
+        console.log('TestButton: Email sent successfully');
+        setEmailSent(true);
+        toast({
+          title: "Email sent",
+          description: `We've sent the email to ${emailToUse}`,
+        });
+      } else {
+        console.error('TestButton: Error sending email');
+        console.error('TestButton: Reported error:', error);
+        setEmailError(`Error sending email: ${error || "Unknown error"}. Check your connection and session.`);
+        toast({
+          title: "Error sending email",
+          description: error || "Could not send the email. Check your connection and try again.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('TestButton: Exception sending email:', error);
+      
+      // Mensaje de error detallado
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : "Unexpected error sending the email";
+        
+      setEmailError(`Error: ${errorMessage}`);
+      
+      toast({
+        title: "Unexpected error",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setIsTestSending(false);
+    }
+  };
+
+  // Actualizar el mensaje en la interfaz
+  function getStatusMessage() {
+    if (emailSent) {
+      return "We've sent the details to your email";
+    }
+    
+    if (isSending) {
+      return "Sending confirmation to your email...";
+    }
+    
+    if (emailError) {
+      return "Could not send confirmation automatically";
+    }
+    
+    return "Confirm your booking details";
+  }
 
   if (isLoading) {
     return (
@@ -302,20 +487,34 @@ export default function PaymentSuccessPage() {
           </div>
           <h1 className="text-2xl font-bold mb-2">Booking Confirmed!</h1>
           <p className="text-muted-foreground">
-            {emailSent 
-              ? "Hemos enviado los detalles a tu correo electrónico" 
-              : isSending 
-                ? "Enviando confirmación a tu correo..." 
-                : "Confirma los detalles de tu reserva"
-            }
+            {getStatusMessage()}
           </p>
-          {error && (
+          {emailError && (
             <p className="text-red-500 text-sm mt-2">
-              No pudimos enviar el correo de confirmación. Por favor, guarda esta información.
+              {emailError}
             </p>
           )}
+          
+          {(!emailSent && !isSending) && (
+            <Button 
+              onClick={handleTestEmailSend} 
+              variant="outline" 
+              size="sm"
+              disabled={isTestSending || !booking}
+              className="mt-4"
+            >
+              {isTestSending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                emailError ? "Retry sending email" : "Send details by email"
+              )}
+            </Button>
+          )}
         </div>
-
+              
         <div className="space-y-6">
           <div className="border-b pb-4">
             <h2 className="font-medium text-lg mb-3">Schedule Details</h2>
@@ -326,7 +525,7 @@ export default function PaymentSuccessPage() {
               />
             </div>
           </div>
-
+          
           <div className="border-b pb-4">
             <h2 className="font-medium text-lg mb-3">Meeting Link</h2>
             <a 
@@ -339,7 +538,7 @@ export default function PaymentSuccessPage() {
               Join Zoom Meeting
             </a>
           </div>
-
+          
           <div>
             <h2 className="font-medium text-lg mb-2">Booking Reference</h2>
             <p className="font-mono text-sm text-muted-foreground">{booking.id}</p>
