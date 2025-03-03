@@ -3,39 +3,39 @@
  * Centralizes all HTML templates for application emails
  */
 
-import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Helper function to generate iCalendar content
+ * FUTURE IMPLEMENTATION: Re-enable iCalendar functionality for email calendar integration
  */
-function generateICalendarEvent(
-  startTime: Date,
-  endTime: Date,
-  userName: string,
-  userEmail: string,
-  zoomLink?: string
-) {
-  const eventUID = uuidv4();
-  const organizerEmail = process.env.GMAIL_USER || 'noreply@gvtcoach.com';
+// function generateICalendarEvent(
+//   startTime: Date,
+//   endTime: Date,
+//   userName: string,
+//   userEmail: string,
+//   zoomLink?: string
+// ) {
+//   const eventUID = uuidv4();
+//   const organizerEmail = process.env.GMAIL_USER || 'noreply@gvtcoach.com';
   
-  return `BEGIN:VCALENDAR
-VERSION:2.0
-CALSCALE:GREGORIAN
-METHOD:REQUEST
-BEGIN:VEVENT
-UID:${eventUID}
-DTSTART:${startTime.toISOString().replace(/[-:]/g, "").split(".")[0]}Z
-DTEND:${endTime.toISOString().replace(/[-:]/g, "").split(".")[0]}Z
-SUMMARY:GVT Coaching Session
-DESCRIPTION:Your coaching session is scheduled.${zoomLink ? `\\n\\nZoom Link: ${zoomLink}` : ''}
-LOCATION:${zoomLink || 'Online'}
-ORGANIZER;CN=GVT Coach:mailto:${organizerEmail}
-ATTENDEE;RSVP=TRUE;CN=${userName}:mailto:${userEmail}
-STATUS:CONFIRMED
-SEQUENCE:0
-END:VEVENT
-END:VCALENDAR`;
-}
+//   return `BEGIN:VCALENDAR
+// VERSION:2.0
+// CALSCALE:GREGORIAN
+// METHOD:REQUEST
+// BEGIN:VEVENT
+// UID:${eventUID}
+// DTSTART:${startTime.toISOString().replace(/[-:]/g, "").split(".")[0]}Z
+// DTEND:${endTime.toISOString().replace(/[-:]/g, "").split(".")[0]}Z
+// SUMMARY:GVT Coaching Session
+// DESCRIPTION:Your coaching session is scheduled.${zoomLink ? `\\n\\nZoom Link: ${zoomLink}` : ''}
+// LOCATION:${zoomLink || 'Online'}
+// ORGANIZER;CN=GVT Coach:mailto:${organizerEmail}
+// ATTENDEE;RSVP=TRUE;CN=${userName}:mailto:${userEmail}
+// STATUS:CONFIRMED
+// SEQUENCE:0
+// END:VEVENT
+// END:VCALENDAR`;
+// }
 
 /**
  * Booking confirmation template
@@ -54,14 +54,14 @@ export function getBookingConfirmationTemplate(
   const endTime = new Date(startTime.getTime());
   endTime.setHours(endTime.getHours() + 1);
 
-  // Generate iCalendar content
-  const calendarEvent = generateICalendarEvent(
-    startTime,
-    endTime,
-    userName,
-    bookingDetails.user_email,
-    bookingDetails.zoom_link
-  );
+  // FUTURE IMPLEMENTATION: Re-enable iCalendar event generation
+  // const calendarEvent = generateICalendarEvent(
+  //   startTime,
+  //   endTime,
+  //   userName,
+  //   bookingDetails.user_email,
+  //   bookingDetails.zoom_link
+  // );
 
   return {
     html: `
@@ -86,11 +86,12 @@ export function getBookingConfirmationTemplate(
         <p style="font-size: 14px; color: #666;">Looking forward to seeing you soon!</p>
         <p style="font-size: 14px; color: #666;">The GVT Coach Team</p>
       </div>
-    `,
-    icalEvent: {
-      method: 'REQUEST',
-      content: calendarEvent
-    }
+    `
+    // FUTURE IMPLEMENTATION: Re-enable iCalendar attachment
+    // icalEvent: {
+    //   method: 'REQUEST',
+    //   content: calendarEvent
+    // }
   };
 }
 
@@ -111,14 +112,14 @@ export function getSessionReminderTemplate(
   const endTime = new Date(startTime.getTime());
   endTime.setHours(endTime.getHours() + 1);
 
-  // Generate iCalendar content
-  const calendarEvent = generateICalendarEvent(
-    startTime,
-    endTime,
-    userName,
-    bookingDetails.user_email,
-    bookingDetails.zoom_link
-  );
+  // FUTURE IMPLEMENTATION: Re-enable iCalendar event generation
+  // const calendarEvent = generateICalendarEvent(
+  // startTime,
+  // endTime,
+  // userName,
+  // bookingDetails.user_email,
+  // bookingDetails.zoom_link
+  // );
 
   return {
     html: `
@@ -148,10 +149,12 @@ export function getSessionReminderTemplate(
         <p style="font-size: 14px; color: #666;">The GVT Coach Team</p>
       </div>
     `,
-    icalEvent: {
-      method: 'REQUEST',
-      content: calendarEvent
-    }
+
+    // FUTURE IMPLEMENTATION: Re-enable iCalendar event generation
+    // icalEvent: {
+    //   method: 'REQUEST',
+    //   content: calendarEvent
+    // }
   };
 }
 

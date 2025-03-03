@@ -300,6 +300,12 @@ export function BookingCalendar() {
     setSelectedSlot(null)
     setAvailableSlots([])
     
+    // FUTURE IMPLEMENTATION: Re-enable weekly and twice-weekly booking options
+    // For now, only single sessions are supported
+    if (frequency !== 'once') {
+      return;
+    }
+    
     setBookingPlan({ 
       frequency, 
       duration: duration || 1 
@@ -446,6 +452,8 @@ export function BookingCalendar() {
           <FrequencySelector 
             onFrequencySelect={handleFrequencySelect} 
             selectedFrequency={bookingPlan?.frequency}
+            disableWeekly={true}
+            disableTwiceWeekly={true}
           />
         )
       case 'date':

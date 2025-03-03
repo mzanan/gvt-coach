@@ -12,10 +12,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { Card } from "@/components/ui/card"
 
 interface FrequencySelectorProps {
   onFrequencySelect: (frequency: BookingFrequency, duration?: number) => void
   selectedFrequency?: BookingFrequency
+  disableWeekly?: boolean
+  disableTwiceWeekly?: boolean
 }
 
 interface FrequencyOption {
@@ -44,7 +47,9 @@ const frequencies: FrequencyOption[] = [
 
 export function FrequencySelector({ 
   onFrequencySelect, 
-  selectedFrequency 
+  selectedFrequency,
+  disableWeekly = false,
+  disableTwiceWeekly = false
 }: FrequencySelectorProps) {
   const [selectedFrequencyState, setSelectedFrequency] = useState<BookingFrequency | null>(selectedFrequency || null)
   const [duration, setDuration] = useState<string>("1")
@@ -69,22 +74,46 @@ export function FrequencySelector({
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {frequencies.map((freq) => (
-          <button
-            key={freq.value}
-            onClick={() => handleSelect(freq.value)}
-            className={cn(
-              "flex flex-col items-start p-6 rounded-lg transition-colors text-left",
-              "border border-border hover:border-primary",
-              selectedFrequencyState === freq.value 
-                ? "bg-white text-black" 
-                : "bg-background text-white"
-            )}
-          >
-            <h3 className="font-semibold mb-2 text-foreground">{freq.title}</h3>
-            <p className="text-sm text-muted-foreground">{freq.description}</p>
-          </button>
-        ))}
+        <Card 
+          className={cn(
+            "p-6 cursor-pointer hover:border-primary transition-colors",
+            selectedFrequency === 'once' && "border-primary"
+          )}
+          onClick={() => handleSelect('once')}
+        >
+          <h3 className="text-xl font-semibold mb-2">Single Session</h3>
+          <p className="text-muted-foreground">Book a one-time consultation session</p>
+        </Card>
+
+        <Card 
+          className={cn(
+            "p-6 cursor-pointer hover:border-primary transition-colors",
+            selectedFrequency === 'weekly' && "border-primary",
+            disableWeekly && "opacity-50 cursor-not-allowed hover:border-border"
+          )}
+          onClick={() => !disableWeekly && handleSelect('weekly')}
+        >
+          <h3 className="text-xl font-semibold mb-2">Weekly Sessions</h3>
+          <p className="text-muted-foreground">Schedule recurring weekly sessions</p>
+          {disableWeekly && (
+            <p className="text-sm text-muted-foreground mt-2">(Coming soon)</p>
+          )}
+        </Card>
+
+        <Card 
+          className={cn(
+            "p-6 cursor-pointer hover:border-primary transition-colors",
+            selectedFrequency === 'twice-weekly' && "border-primary",
+            disableTwiceWeekly && "opacity-50 cursor-not-allowed hover:border-border"
+          )}
+          onClick={() => !disableTwiceWeekly && handleSelect('twice-weekly')}
+        >
+          <h3 className="text-xl font-semibold mb-2">Twice Weekly</h3>
+          <p className="text-muted-foreground">Schedule two sessions per week</p>
+          {disableTwiceWeekly && (
+            <p className="text-sm text-muted-foreground mt-2">(Coming soon)</p>
+          )}
+        </Card>
       </div>
 
       {selectedFrequencyState && selectedFrequencyState !== 'once' && (
