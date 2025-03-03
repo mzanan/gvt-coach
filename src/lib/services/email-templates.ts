@@ -1,10 +1,10 @@
 /**
- * Archivo de plantillas de correo electrónico
- * Centraliza todas las plantillas HTML para los correos electrónicos de la aplicación
+ * Email templates file
+ * Centralizes all HTML templates for application emails
  */
 
 /**
- * Plantilla de confirmación de reserva
+ * Booking confirmation template
  */
 export function getBookingConfirmationTemplate(
   bookingDetails: { 
@@ -14,29 +14,29 @@ export function getBookingConfirmationTemplate(
     user_name?: string
   }
 ) {
-  const userName = bookingDetails.user_name || 'Usuario';
+  const userName = bookingDetails.user_name || 'User';
   
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
-      <h2 style="color: #4CAF50;">¡Tu sesión de coaching está confirmada!</h2>
-      <p>Hola ${userName},</p>
-      <p>Tu sesión ha sido programada correctamente:</p>
+      <h2 style="color: #4CAF50;">Your coaching session is confirmed!</h2>
+      <p>Hello ${userName},</p>
+      <p>Your session has been successfully scheduled:</p>
       <div style="padding: 15px; border-left: 4px solid #4CAF50; background-color: #F9F9F9; margin: 20px 0;">
-        <p><strong>Fecha:</strong> ${new Date(bookingDetails.start_time).toLocaleDateString()}</p>
-        <p><strong>Hora:</strong> ${new Date(bookingDetails.start_time).toLocaleTimeString()} - ${new Date(bookingDetails.end_time).toLocaleTimeString()}</p>
-        ${bookingDetails.zoom_link ? `<p><strong>Enlace Zoom:</strong> <a href="${bookingDetails.zoom_link}" style="color: #4285F4;">${bookingDetails.zoom_link}</a></p>` : ''}
+        <p><strong>Date:</strong> ${new Date(bookingDetails.start_time).toLocaleDateString()}</p>
+        <p><strong>Time:</strong> ${new Date(bookingDetails.start_time).toLocaleTimeString()} - ${new Date(bookingDetails.end_time).toLocaleTimeString()}</p>
+        ${bookingDetails.zoom_link ? `<p><strong>Zoom Link:</strong> <a href="${bookingDetails.zoom_link}" style="color: #4285F4;">${bookingDetails.zoom_link}</a></p>` : ''}
       </div>
-      <p>Por favor, conéctate a la sesión 5 minutos antes para asegurarte de que todo funcione correctamente.</p>
-      <p>Si necesitas reprogramar o cancelar tu sesión, por favor contáctanos con al menos 24 horas de anticipación.</p>
+      <p>Please join the session 5 minutes early to ensure everything is working properly.</p>
+      <p>If you need to reschedule or cancel your session, please contact us at least 24 hours in advance.</p>
       <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-      <p style="font-size: 14px; color: #666;">¡Esperamos verte pronto!</p>
-      <p style="font-size: 14px; color: #666;">El equipo de GVT Coach</p>
+      <p style="font-size: 14px; color: #666;">Looking forward to seeing you soon!</p>
+      <p style="font-size: 14px; color: #666;">The GVT Coach Team</p>
     </div>
   `;
 }
 
 /**
- * Plantilla de recordatorio de sesión (24 horas antes)
+ * Session reminder template (24 hours before)
  */
 export function getSessionReminderTemplate(
   bookingDetails: { 
@@ -46,33 +46,33 @@ export function getSessionReminderTemplate(
     user_name?: string
   }
 ) {
-  const userName = bookingDetails.user_name || 'Usuario';
+  const userName = bookingDetails.user_name || 'User';
   
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
-      <h2 style="color: #FF9800;">Recordatorio: Tu sesión de coaching es mañana</h2>
-      <p>Hola ${userName},</p>
-      <p>Te recordamos que tu sesión de coaching está programada para mañana:</p>
+      <h2 style="color: #FF9800;">Reminder: Your coaching session is tomorrow</h2>
+      <p>Hello ${userName},</p>
+      <p>This is a reminder that your coaching session is scheduled for tomorrow:</p>
       <div style="padding: 15px; border-left: 4px solid #FF9800; background-color: #F9F9F9; margin: 20px 0;">
-        <p><strong>Fecha:</strong> ${new Date(bookingDetails.start_time).toLocaleDateString()}</p>
-        <p><strong>Hora:</strong> ${new Date(bookingDetails.start_time).toLocaleTimeString()} - ${new Date(bookingDetails.end_time).toLocaleTimeString()}</p>
-        ${bookingDetails.zoom_link ? `<p><strong>Enlace Zoom:</strong> <a href="${bookingDetails.zoom_link}" style="color: #4285F4;">${bookingDetails.zoom_link}</a></p>` : ''}
+        <p><strong>Date:</strong> ${new Date(bookingDetails.start_time).toLocaleDateString()}</p>
+        <p><strong>Time:</strong> ${new Date(bookingDetails.start_time).toLocaleTimeString()} - ${new Date(bookingDetails.end_time).toLocaleTimeString()}</p>
+        ${bookingDetails.zoom_link ? `<p><strong>Zoom Link:</strong> <a href="${bookingDetails.zoom_link}" style="color: #4285F4;">${bookingDetails.zoom_link}</a></p>` : ''}
       </div>
-      <p>Algunos consejos para aprovechar al máximo tu sesión:</p>
+      <p>Some tips to make the most of your session:</p>
       <ul style="padding-left: 20px;">
-        <li>Conéctate desde un lugar tranquilo y sin interrupciones</li>
-        <li>Prepara cualquier pregunta o tema que quieras tratar</li>
-        <li>Asegúrate de que tu cámara y micrófono funcionen correctamente</li>
+        <li>Connect from a quiet place without interruptions</li>
+        <li>Prepare any questions or topics you want to discuss</li>
+        <li>Make sure your camera and microphone are working properly</li>
       </ul>
-      <p>¡Nos vemos mañana!</p>
+      <p>See you tomorrow!</p>
       <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-      <p style="font-size: 14px; color: #666;">El equipo de GVT Coach</p>
+      <p style="font-size: 14px; color: #666;">The GVT Coach Team</p>
     </div>
   `;
 }
 
 /**
- * Plantilla de sesión cancelada
+ * Session cancellation template
  */
 export function getCancellationTemplate(
   bookingDetails: { 
@@ -80,23 +80,23 @@ export function getCancellationTemplate(
     user_name?: string
   }
 ) {
-  const userName = bookingDetails.user_name || 'Usuario';
+  const userName = bookingDetails.user_name || 'User';
   
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
-      <h2 style="color: #F44336;">Sesión Cancelada</h2>
-      <p>Hola ${userName},</p>
-      <p>Tu sesión de coaching programada para el ${new Date(bookingDetails.start_time).toLocaleString()} ha sido cancelada.</p>
-      <p>Si deseas reprogramar, puedes hacerlo a través de nuestra plataforma en cualquier momento.</p>
-      <p>Si tienes alguna pregunta o necesitas ayuda, no dudes en contactarnos.</p>
+      <h2 style="color: #F44336;">Session Cancelled</h2>
+      <p>Hello ${userName},</p>
+      <p>Your coaching session scheduled for ${new Date(bookingDetails.start_time).toLocaleString()} has been cancelled.</p>
+      <p>If you would like to reschedule, you can do so through our platform at any time.</p>
+      <p>If you have any questions or need assistance, please don't hesitate to contact us.</p>
       <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-      <p style="font-size: 14px; color: #666;">El equipo de GVT Coach</p>
+      <p style="font-size: 14px; color: #666;">The GVT Coach Team</p>
     </div>
   `;
 }
 
 /**
- * Plantilla para envío de resumen de sesión
+ * Session summary template
  */
 export function getSessionSummaryTemplate(
   sessionDetails: {
@@ -107,10 +107,10 @@ export function getSessionSummaryTemplate(
     user_name?: string
   }
 ) {
-  const userName = sessionDetails.user_name || 'Usuario';
+  const userName = sessionDetails.user_name || 'User';
   const nextStepsHtml = sessionDetails.next_steps && sessionDetails.next_steps.length > 0
     ? `
-      <h3 style="color: #4CAF50;">Próximos pasos</h3>
+      <h3 style="color: #4CAF50;">Next Steps</h3>
       <ul style="padding-left: 20px;">
         ${sessionDetails.next_steps.map(step => `<li>${step}</li>`).join('')}
       </ul>
@@ -119,7 +119,7 @@ export function getSessionSummaryTemplate(
   
   const resourcesHtml = sessionDetails.resources && sessionDetails.resources.length > 0
     ? `
-      <h3 style="color: #4CAF50;">Recursos recomendados</h3>
+      <h3 style="color: #4CAF50;">Recommended Resources</h3>
       <ul style="padding-left: 20px;">
         ${sessionDetails.resources.map(resource => 
           `<li><a href="${resource.url}" style="color: #4285F4;">${resource.title}</a></li>`
@@ -130,22 +130,22 @@ export function getSessionSummaryTemplate(
   
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
-      <h2 style="color: #4CAF50;">Resumen de tu sesión de coaching</h2>
-      <p>Hola ${userName},</p>
-      <p>Gracias por asistir a nuestra sesión del ${new Date(sessionDetails.date).toLocaleDateString()}. Aquí tienes un resumen de lo que discutimos:</p>
+      <h2 style="color: #4CAF50;">Your Coaching Session Summary</h2>
+      <p>Hello ${userName},</p>
+      <p>Thank you for attending our session on ${new Date(sessionDetails.date).toLocaleDateString()}. Here's a summary of what we discussed:</p>
       
       <div style="padding: 15px; border-left: 4px solid #4CAF50; background-color: #F9F9F9; margin: 20px 0;">
-        <h3 style="margin-top: 0; color: #4CAF50;">Resumen</h3>
+        <h3 style="margin-top: 0; color: #4CAF50;">Summary</h3>
         <p>${sessionDetails.summary}</p>
       </div>
       
       ${nextStepsHtml}
       ${resourcesHtml}
       
-      <p>Si tienes alguna pregunta sobre estos puntos o necesitas aclaraciones, no dudes en contactarnos.</p>
-      <p>¡Esperamos verte de nuevo pronto!</p>
+      <p>If you have any questions about these points or need clarification, please don't hesitate to contact us.</p>
+      <p>Looking forward to seeing you again soon!</p>
       <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-      <p style="font-size: 14px; color: #666;">El equipo de GVT Coach</p>
+      <p style="font-size: 14px; color: #666;">The GVT Coach Team</p>
     </div>
   `;
 } 

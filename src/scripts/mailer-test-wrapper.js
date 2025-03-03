@@ -7,41 +7,41 @@ console.log('===============================');
 console.log('🧪 TEST DE ENVÍO DE CORREO 🧪');
 console.log('===============================');
 
-// Verificar y cargar variables de entorno
+// Check and load environment variables
 const envPath = path.resolve(process.cwd(), '.env.local');
 if (!fs.existsSync(envPath)) {
-  console.error('❌ ERROR: No se encontró el archivo .env.local');
-  console.error('Por favor, crea este archivo con las variables GMAIL_USER y GMAIL_PASSWORD');
+  console.error('❌ ERROR: .env.local file not found');
+  console.error('Please create this file with GMAIL_USER and GMAIL_PASSWORD variables');
   process.exit(1);
 }
 
-// Cargar variables de entorno desde .env.local
+// Load environment variables from .env.local
 dotenv.config({ path: envPath });
 console.log('✅ Variables de entorno cargadas desde:', envPath);
 
-// Verificar variables requeridas
+// Check required variables
 if (!process.env.GMAIL_USER) {
-  console.error('❌ ERROR: Falta la variable GMAIL_USER en .env.local');
+  console.error('❌ ERROR: Missing GMAIL_USER variable in .env.local');
   process.exit(1);
 }
 
 if (!process.env.GMAIL_PASSWORD) {
-  console.error('❌ ERROR: Falta la variable GMAIL_PASSWORD en .env.local');
-  console.error('Si tienes autenticación de dos factores, debes usar una App Password');
-  console.error('Genera una en: https://myaccount.google.com/apppasswords');
+  console.error('❌ ERROR: Missing GMAIL_PASSWORD variable in .env.local');
+  console.error('If you have two-factor authentication, you must use an App Password');
+  console.error('Generate one at: https://myaccount.google.com/apppasswords');
   process.exit(1);
 }
 
-// Función principal de prueba
+// Main test function
 async function testEmail() {
-  console.log('🔄 Iniciando prueba de envío de correo electrónico...');
-  console.log('📧 Usando cuenta:', process.env.GMAIL_USER);
+  console.log('🔄 Starting email sending test...');
+  console.log('📧 Using account:', process.env.GMAIL_USER);
   
   try {
-    // Importar el servicio de correo - utilizando require para evitar problemas de ESM vs CommonJS
+    // Import mail service - using require to avoid ESM vs CommonJS issues
     const nodemailer = require('nodemailer');
     
-    // Crear un transportador para la prueba
+    // Create a transporter for testing
     const transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
       port: 465,
@@ -55,71 +55,71 @@ async function testEmail() {
       }
     });
     
-    console.log('✅ Transportador creado, verificando configuración...');
+    console.log('✅ Transporter created, verifying configuration...');
     
-    // Verificar la configuración
+    // Verify configuration
     transporter.verify((error, success) => {
       if (error) {
-        console.error('❌ Error al verificar configuración SMTP:', error);
+        console.error('❌ Error verifying SMTP configuration:', error);
         return;
       }
       
-      console.log('✅ Configuración SMTP verificada correctamente');
-      console.log('🔄 Enviando correo de prueba a:', process.env.GMAIL_USER);
+      console.log('✅ SMTP configuration verified successfully');
+      console.log('🔄 Sending test email to:', process.env.GMAIL_USER);
       
-      // Configurar mensaje
+      // Configure message
       const mailOptions = {
         from: `"GVT Coach Test" <${process.env.GMAIL_USER}>`,
         to: process.env.GMAIL_USER,
-        subject: 'Prueba de envío de correo desde GVT Coach',
+        subject: 'Test email from GVT Coach',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
-            <h1 style="color: #4CAF50;">¡La configuración de correos funciona!</h1>
-            <p>Este es un correo de prueba para verificar que la configuración de Nodemailer con Gmail está funcionando correctamente.</p>
-            <p>Detalles de la prueba:</p>
+            <h1 style="color: #4CAF50;">Email configuration is working!</h1>
+            <p>This is a test email to verify that the Nodemailer configuration with Gmail is working correctly.</p>
+            <p>Test details:</p>
             <ul>
-              <li><strong>Fecha y hora:</strong> ${new Date().toLocaleString()}</li>
-              <li><strong>Enviado desde:</strong> ${process.env.GMAIL_USER}</li>
-              <li><strong>Entorno:</strong> ${process.env.NODE_ENV || 'desarrollo'}</li>
+              <li><strong>Date and time:</strong> ${new Date().toLocaleString()}</li>
+              <li><strong>Sent from:</strong> ${process.env.GMAIL_USER}</li>
+              <li><strong>Environment:</strong> ${process.env.NODE_ENV || 'development'}</li>
             </ul>
-            <p>Si estás recibiendo este correo, significa que la configuración es correcta y puedes comenzar a usar el sistema de notificaciones por correo electrónico.</p>
+            <p>If you're receiving this email, it means the configuration is correct and you can start using the email notification system.</p>
             <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-            <p style="font-size: 14px; color: #666;">GVT Coach - Sistema de Notificaciones</p>
+            <p style="font-size: 14px; color: #666;">GVT Coach - Notification System</p>
           </div>
         `,
       };
       
-      // Enviar correo
+      // Send email
       transporter.sendMail(mailOptions, (error, info) => {
         if (error) {
           console.error('');
-          console.error('❌ ERROR AL ENVIAR EL CORREO');
-          console.error('Detalles del error:', error);
+          console.error('❌ ERROR SENDING EMAIL');
+          console.error('Error details:', error);
           console.error('');
-          console.error('Por favor, verifica:');
-          console.error('1. Que las credenciales en .env.local sean correctas');
-          console.error('2. Si usas autenticación de dos factores, debes usar una App Password');
-          console.error('3. Revisa la configuración de seguridad de tu cuenta de Gmail');
-          console.error('4. Visita https://accounts.google.com/DisplayUnlockCaptcha y autoriza el acceso');
+          console.error('Please verify:');
+          console.error('1. That the credentials in .env.local are correct');
+          console.error('2. If you use two-factor authentication, you must use an App Password');
+          console.error('3. Check your Gmail account security settings');
+          console.error('4. Visit https://accounts.google.com/DisplayUnlockCaptcha and authorize access');
           return;
         }
         
         console.log('');
-        console.log('✅ CORREO ENVIADO EXITOSAMENTE!');
-        console.log('📧 ID del mensaje:', info.messageId);
+        console.log('✅ EMAIL SENT SUCCESSFULLY!');
+        console.log('📧 Message ID:', info.messageId);
         console.log('');
-        console.log('👉 Verifica la bandeja de entrada (o spam) de', process.env.GMAIL_USER);
-        console.log('   para confirmar que recibiste el correo de prueba.');
+        console.log('👉 Check your inbox (or spam) at', process.env.GMAIL_USER);
+        console.log('   to confirm you received the test email.');
       });
     });
   } catch (error) {
     console.error('');
-    console.error('❌ ERROR INESPERADO');
+    console.error('❌ UNEXPECTED ERROR');
     console.error(error);
     console.error('');
     process.exit(1);
   }
 }
 
-// Ejecutar la prueba
+// Run the test
 testEmail(); 

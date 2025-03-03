@@ -6,41 +6,41 @@ import {
   getSessionSummaryTemplate 
 } from './email-templates';
 
-// Configuración del transportador de nodemailer para Gmail
+// Nodemailer transporter configuration for Gmail
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 465,
-  secure: true, // true para 465, false para otros puertos
+  secure: true, // true for 465, false for other ports
   auth: {
-    user: process.env.GMAIL_USER, // Tu email de Gmail
-    pass: process.env.GMAIL_PASSWORD, // Contraseña o App Password
+    user: process.env.GMAIL_USER, // Your Gmail email
+    pass: process.env.GMAIL_PASSWORD, // Password or App Password
   },
   tls: {
-    // No falla si el certificado es self-signed
+    // Do not fail on self-signed certificates
     rejectUnauthorized: false
   }
 });
 
-// Verificar la configuración del transportador (opcional pero recomendado)
+// Verify transporter configuration (optional but recommended)
 if (process.env.NODE_ENV !== 'production') {
   transporter.verify(function(error, success) {
     if (error) {
-      console.error('Error en la configuración del servidor SMTP:', error);
-      console.error('Asegúrate de configurar correctamente GMAIL_USER y GMAIL_PASSWORD en .env.local');
-      console.error('Valores actuales:', {
-        GMAIL_USER: process.env.GMAIL_USER || 'no configurado',
-        GMAIL_PASSWORD: process.env.GMAIL_PASSWORD ? '******' : 'no configurado'
+      console.error('Error in SMTP server configuration:', error);
+      console.error('Make sure to properly configure GMAIL_USER and GMAIL_PASSWORD in .env.local');
+      console.error('Current values:', {
+        GMAIL_USER: process.env.GMAIL_USER || 'not configured',
+        GMAIL_PASSWORD: process.env.GMAIL_PASSWORD ? '******' : 'not configured'
       });
     } else {
-      console.log('✅ Servidor SMTP está listo para enviar mensajes');
+      console.log('✅ SMTP server is ready to send messages');
     }
   });
 }
 
-// Dirección de correo desde la que se enviarán los emails
+// Email address from which emails will be sent
 const defaultFromEmail = process.env.GMAIL_USER || process.env.COACH_EMAIL || 'matiaszanan@gmail.com';
 
-// Interfaz para los datos de correo electrónico
+// Interface for email data
 export interface EmailData {
   to: string | string[];
   subject: string;
@@ -53,29 +53,29 @@ export interface EmailData {
 }
 
 /**
- * Envía un correo electrónico usando nodemailer con SMTP de Gmail
- * @param emailData Datos del correo electrónico a enviar
- * @returns Una promesa con el resultado del envío
+ * Sends an email using nodemailer with Gmail SMTP
+ * @param emailData Email data to send
+ * @returns A promise with the sending result
  */
 export async function sendEmail(emailData: EmailData) {
   try {
-    // Verificaciones previas
+    // Pre-checks
     if (!process.env.GMAIL_USER || !process.env.GMAIL_PASSWORD) {
-      throw new Error('Faltan credenciales de Gmail. Verifica las variables GMAIL_USER y GMAIL_PASSWORD.');
+      throw new Error('Missing Gmail credentials. Check GMAIL_USER and GMAIL_PASSWORD variables.');
     }
 
-    // Aseguramos que al menos haya contenido en html o text
+    // Ensure there is content in either html or text
     if (!emailData.html && !emailData.text) {
-      throw new Error('Debes proporcionar contenido HTML o texto plano para el correo electrónico');
+      throw new Error('You must provide HTML or plain text content for the email');
     }
 
-    // Logs para depuración (no en producción)
+    // Debug logs (not in production)
     if (process.env.NODE_ENV !== 'production') {
-      console.log('📧 Intentando enviar correo a:', emailData.to);
-      console.log('📧 Asunto:', emailData.subject);
+      console.log('📧 Attempting to send email to:', emailData.to);
+      console.log('📧 Subject:', emailData.subject);
     }
 
-    // Configurar mensaje
+    // Configure message
     const mailOptions = {
       from: emailData.from || `"GVT Coach" <${defaultFromEmail}>`,
       to: emailData.to,
@@ -87,32 +87,32 @@ export async function sendEmail(emailData: EmailData) {
       bcc: emailData.bcc,
     };
 
-    // Enviar el correo y esperar la respuesta
+    // Send email and wait for response
     const info = await transporter.sendMail(mailOptions);
     
-    // Log del resultado
+    // Log result
     if (process.env.NODE_ENV !== 'production') {
-      console.log('✅ Mensaje enviado: %s', info.messageId);
+      console.log('✅ Message sent: %s', info.messageId);
     }
     
     return { success: true, data: info };
   } catch (error) {
-    // Logueo detallado del error
-    console.error('❌ Error al enviar correo electrónico:', error);
+    // Detailed error logging
+    console.error('❌ Error sending email:', error);
     
     if (error instanceof Error) {
-      // Añadir más información de diagnóstico
-      console.error('Mensaje de error:', error.message);
+      // Add more diagnostic information
+      console.error('Error message:', error.message);
       console.error('Stack:', error.stack);
     }
     
-    // Si es un error de autenticación, dar indicaciones específicas
+    // If it's an authentication error, give specific instructions
     if (error instanceof Error && error.message.includes('Authentication')) {
-      console.error('Error de autenticación. Por favor verifica:');
-      console.error('1. Que las credenciales de Gmail sean correctas');
-      console.error('2. Si usas autenticación de dos factores, debes usar una "App Password"');
-      console.error('3. Si no usas 2FA, habilita "Acceso de apps menos seguras" en tu cuenta de Google');
-      console.error('4. Visita https://accounts.google.com/DisplayUnlockCaptcha y autoriza el acceso');
+      console.error('Authentication error. Please verify:');
+      console.error('1. That Gmail credentials are correct');
+      console.error('2. If using two-factor authentication, you must use an "App Password"');
+      console.error('3. If not using 2FA, enable "Less secure app access" in your Google account');
+      console.error('4. Visit https://accounts.google.com/DisplayUnlockCaptcha and authorize access');
     }
     
     return { success: false, error };
@@ -120,10 +120,10 @@ export async function sendEmail(emailData: EmailData) {
 }
 
 /**
- * Envía un correo electrónico de confirmación de reserva
- * @param to Email del destinatario
- * @param bookingDetails Detalles de la reserva
- * @returns Una promesa con el resultado del envío
+ * Sends a booking confirmation email
+ * @param to Recipient's email
+ * @param bookingDetails Booking details
+ * @returns A promise with the sending result
  */
 export async function sendBookingConfirmation(
   to: string, 
@@ -134,7 +134,7 @@ export async function sendBookingConfirmation(
     user_name?: string
   }
 ) {
-  const subject = `Confirmación de tu sesión de coaching`;
+  const subject = `Confirmation of your coaching session`;
   const html = getBookingConfirmationTemplate(bookingDetails);
 
   return sendEmail({
@@ -145,10 +145,10 @@ export async function sendBookingConfirmation(
 }
 
 /**
- * Envía un recordatorio de sesión 24 horas antes
- * @param to Email del destinatario
- * @param bookingDetails Detalles de la reserva
- * @returns Una promesa con el resultado del envío
+ * Sends a session reminder 24 hours before
+ * @param to Recipient's email
+ * @param bookingDetails Booking details
+ * @returns A promise with the sending result
  */
 export async function sendSessionReminder(
   to: string, 
@@ -159,7 +159,7 @@ export async function sendSessionReminder(
     user_name?: string
   }
 ) {
-  const subject = `Recordatorio: Tu sesión de coaching es mañana`;
+  const subject = `Reminder: Your coaching session is tomorrow`;
   const html = getSessionReminderTemplate(bookingDetails);
 
   return sendEmail({
@@ -170,10 +170,10 @@ export async function sendSessionReminder(
 }
 
 /**
- * Envía una notificación de cancelación de sesión
- * @param to Email del destinatario
- * @param bookingDetails Detalles de la reserva cancelada
- * @returns Una promesa con el resultado del envío
+ * Sends a session cancellation notification
+ * @param to Recipient's email
+ * @param bookingDetails Cancelled booking details
+ * @returns A promise with the sending result
  */
 export async function sendCancellationNotification(
   to: string, 
@@ -182,7 +182,7 @@ export async function sendCancellationNotification(
     user_name?: string
   }
 ) {
-  const subject = `Sesión Cancelada`;
+  const subject = `Session Cancelled`;
   const html = getCancellationTemplate(bookingDetails);
 
   return sendEmail({
@@ -193,10 +193,10 @@ export async function sendCancellationNotification(
 }
 
 /**
- * Envía un resumen de la sesión realizada
- * @param to Email del destinatario
- * @param sessionDetails Detalles de la sesión y su resumen
- * @returns Una promesa con el resultado del envío
+ * Sends a session summary
+ * @param to Recipient's email
+ * @param sessionDetails Session details and summary
+ * @returns A promise with the sending result
  */
 export async function sendSessionSummary(
   to: string, 
@@ -208,7 +208,7 @@ export async function sendSessionSummary(
     user_name?: string
   }
 ) {
-  const subject = `Resumen de tu sesión de coaching`;
+  const subject = `Your coaching session summary`;
   const html = getSessionSummaryTemplate(sessionDetails);
 
   return sendEmail({
@@ -218,4 +218,4 @@ export async function sendSessionSummary(
   });
 }
 
-// Puedes añadir más funciones específicas para diferentes tipos de emails 
+// You can add more specific functions for different types of emails 

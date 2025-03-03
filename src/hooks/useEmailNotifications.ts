@@ -12,20 +12,20 @@ interface EmailNotificationOptions {
   type: 'confirmation' | 'reminder' | 'cancellation';
 }
 
-// Función de ayuda para enviar email directamente en desarrollo
-// Solo para fines de prueba cuando la API falla
+// Helper function to send email directly in development
+// Only for testing purposes when API fails
 const sendDevModeEmail = async (options: EmailNotificationOptions): Promise<boolean> => {
   if (process.env.NODE_ENV !== 'development') {
     return false;
   }
   
-  console.log('===== MODO DE DESARROLLO - SIMULACIÓN DE ENVÍO DE EMAIL =====');
-  console.log(`Destinatario: ${options.to}`);
-  console.log(`Tipo de email: ${options.type}`);
-  console.log('Detalles de la reserva:', options.bookingDetails);
+  console.log('===== DEVELOPMENT MODE - EMAIL SENDING SIMULATION =====');
+  console.log(`Recipient: ${options.to}`);
+  console.log(`Email type: ${options.type}`);
+  console.log('Booking details:', options.bookingDetails);
   console.log('=========================================================');
   
-  // En modo desarrollo, simulamos un envío exitoso
+  // In development mode, simulate successful sending
   return true;
 };
 
@@ -41,10 +41,10 @@ export const useEmailNotifications = () => {
     
     try {
       if (!options.to) {
-        throw new Error('No se especificó el email del destinatario');
+        throw new Error('Recipient email not specified');
       }
       
-      console.log('EmailHook: Enviando notificación a:', options.to);
+      console.log('EmailHook: Sending notification to:', options.to);
       
       const response = await fetch('/api/email/booking-notification', {
         method: 'POST',
@@ -54,50 +54,50 @@ export const useEmailNotifications = () => {
         body: JSON.stringify(options)
       });
       
-      console.log(`EmailHook: Respuesta del servidor - Status: ${response.status}`);
+      console.log(`EmailHook: Server response - Status: ${response.status}`);
       
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('EmailHook: Error del servidor:', errorData);
+        console.error('EmailHook: Server error:', errorData);
         
-        // En desarrollo, intentamos el modo directo si la API falla
+        // In development, try direct mode if API fails
         if (process.env.NODE_ENV === 'development') {
-          console.log('EmailHook: API falló, intentando modo directo de desarrollo');
+          console.log('EmailHook: API failed, trying development direct mode');
           const devSuccess = await sendDevModeEmail(options);
           if (devSuccess) {
-            console.log('EmailHook: Envío simulado en modo desarrollo exitoso');
+            console.log('EmailHook: Development mode simulation successful');
             setSuccess(true);
             return true;
           }
         }
         
-        throw new Error(errorData.error || 'Error al enviar la notificación');
+        throw new Error(errorData.error || 'Error sending notification');
       }
       
       const successData = await response.json();
-      console.log('EmailHook: Respuesta exitosa:', successData);
+      console.log('EmailHook: Successful response:', successData);
       
       setSuccess(true);
       return true;
     } catch (err) {
       console.error('Error sending email notification:', err);
       
-      // Última oportunidad en modo desarrollo
+      // Last chance in development mode
       if (process.env.NODE_ENV === 'development') {
         try {
-          console.log('EmailHook: Intento final con modo directo de desarrollo');
+          console.log('EmailHook: Final attempt with development direct mode');
           const devSuccess = await sendDevModeEmail(options);
           if (devSuccess) {
-            console.log('EmailHook: Envío simulado en modo desarrollo exitoso (última oportunidad)');
+            console.log('EmailHook: Development mode simulation successful (last chance)');
             setSuccess(true);
             return true;
           }
         } catch (devErr) {
-          console.error('Error incluso en modo desarrollo:', devErr);
+          console.error('Error even in development mode:', devErr);
         }
       }
       
-      setError(err instanceof Error ? err.message : 'Error desconocido al enviar la notificación');
+      setError(err instanceof Error ? err.message : 'Unknown error sending notification');
       return false;
     } finally {
       setIsSending(false);
@@ -109,7 +109,7 @@ export const useEmailNotifications = () => {
     const endDate = new Date(startDate.getTime() + (booking.duration || 60) * 60000);
     
     return sendBookingNotification({
-      to: userEmail || booking.user_email, // Usar el email proporcionado o el del booking
+      to: userEmail || booking.user_email, // Use provided email or booking email
       type: 'confirmation',
       bookingDetails: {
         start_time: startDate.toISOString(),
