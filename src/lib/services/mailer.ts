@@ -50,71 +50,31 @@ export interface EmailData {
   replyTo?: string;
   cc?: string | string[];
   bcc?: string | string[];
+  icalEvent?: {
+    method: string;
+    content: string;
+  };
 }
 
-/**
- * Sends an email using nodemailer with Gmail SMTP
- * @param emailData Email data to send
- * @returns A promise with the sending result
- */
-export async function sendEmail(emailData: EmailData) {
+// Generic email sending function
+async function sendEmail(data: EmailData) {
   try {
-    // Pre-checks
-    if (!process.env.GMAIL_USER || !process.env.GMAIL_PASSWORD) {
-      throw new Error('Missing Gmail credentials. Check GMAIL_USER and GMAIL_PASSWORD variables.');
-    }
-
-    // Ensure there is content in either html or text
-    if (!emailData.html && !emailData.text) {
-      throw new Error('You must provide HTML or plain text content for the email');
-    }
-
-    // Debug logs (not in production)
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('📧 Attempting to send email to:', emailData.to);
-      console.log('📧 Subject:', emailData.subject);
-    }
-
-    // Configure message
     const mailOptions = {
-      from: emailData.from || `"GVT Coach" <${defaultFromEmail}>`,
-      to: emailData.to,
-      subject: emailData.subject,
-      html: emailData.html,
-      text: emailData.text,
-      replyTo: emailData.replyTo,
-      cc: emailData.cc,
-      bcc: emailData.bcc,
+      from: data.from || defaultFromEmail,
+      to: data.to,
+      subject: data.subject,
+      html: data.html,
+      text: data.text,
+      replyTo: data.replyTo,
+      cc: data.cc,
+      bcc: data.bcc,
+      icalEvent: data.icalEvent
     };
 
-    // Send email and wait for response
     const info = await transporter.sendMail(mailOptions);
-    
-    // Log result
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('✅ Message sent: %s', info.messageId);
-    }
-    
     return { success: true, data: info };
   } catch (error) {
-    // Detailed error logging
-    console.error('❌ Error sending email:', error);
-    
-    if (error instanceof Error) {
-      // Add more diagnostic information
-      console.error('Error message:', error.message);
-      console.error('Stack:', error.stack);
-    }
-    
-    // If it's an authentication error, give specific instructions
-    if (error instanceof Error && error.message.includes('Authentication')) {
-      console.error('Authentication error. Please verify:');
-      console.error('1. That Gmail credentials are correct');
-      console.error('2. If using two-factor authentication, you must use an "App Password"');
-      console.error('3. If not using 2FA, enable "Less secure app access" in your Google account');
-      console.error('4. Visit https://accounts.google.com/DisplayUnlockCaptcha and authorize access');
-    }
-    
+    console.error('Error sending email:', error);
     return { success: false, error };
   }
 }
@@ -135,12 +95,16 @@ export async function sendBookingConfirmation(
   }
 ) {
   const subject = `Confirmation of your coaching session`;
-  const html = getBookingConfirmationTemplate(bookingDetails);
+  const emailContent = getBookingConfirmationTemplate({
+    ...bookingDetails,
+    user_email: to
+  });
 
   return sendEmail({
     to,
     subject,
-    html,
+    html: emailContent.html,
+    icalEvent: emailContent.icalEvent
   });
 }
 
@@ -160,12 +124,16 @@ export async function sendSessionReminder(
   }
 ) {
   const subject = `Reminder: Your coaching session is tomorrow`;
-  const html = getSessionReminderTemplate(bookingDetails);
+  const emailContent = getSessionReminderTemplate({
+    ...bookingDetails,
+    user_email: to
+  });
 
   return sendEmail({
     to,
     subject,
-    html,
+    html: emailContent.html,
+    icalEvent: emailContent.icalEvent
   });
 }
 
