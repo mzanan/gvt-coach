@@ -5,8 +5,7 @@ export enum PaymentOrderStatus {
   PastDue = 'PAST_DUE',
   Cancelled = 'CANCELLED',
   Pending = 'PENDING',
-  Paid = 'PAID',
-  Timeout = 'TIMEOUT'
+  Paid = 'PAID'
 }
 
 export interface CheckoutPayload {
