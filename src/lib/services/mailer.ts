@@ -55,7 +55,7 @@ export interface EmailData {
 }
 
 // Generic email sending function
-async function sendEmail(data: EmailData) {
+export async function sendEmail(data: EmailData) {
   console.log('Sending email:', data);
 
   try {

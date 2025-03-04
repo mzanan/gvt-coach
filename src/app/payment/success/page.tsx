@@ -8,13 +8,28 @@ import { ChevronLeft, Check } from "lucide-react"
 import { Loader2 } from "lucide-react"
 import { BookingSummaryDisplay } from '@/app/components/BookingSummaryDisplay'
 import { useRouter } from 'next/navigation'
-import { BookingDB, BookingStatus } from '@/lib/supabase/types'
+import { BookingDB, BookingStatus, BookingFrequency as SuperbaseBookingFrequency } from '@/lib/supabase/types'
+import { BookingFrequency as AppBookingFrequency } from '@/app/types/booking'
 import { paymentService } from '@/app/services/paymentService';
 import { PaymentOrderStatus } from '@/app/types/payments';
 import { zoomService } from '@/app/services/zoomService';
 import { getAuthToken } from '@/app/helpers/authHelpers';
 import { useEmailNotifications } from '@/hooks/useEmailNotifications';
 import { useToast } from '@/hooks/use-toast';
+
+// Helper function to convert between BookingFrequency types
+function convertBookingFrequency(frequency: SuperbaseBookingFrequency): AppBookingFrequency {
+  switch (frequency) {
+    case SuperbaseBookingFrequency.Once:
+      return 'once';
+    case SuperbaseBookingFrequency.Weekly:
+      return 'weekly';
+    case SuperbaseBookingFrequency.TwiceWeekly:
+      return 'twice-weekly';
+    default:
+      return 'once'; // Default fallback
+  }
+}
 
 export default function PaymentSuccessPage() {
   const [isLoading, setIsLoading] = useState(true)
@@ -431,7 +446,10 @@ export default function PaymentSuccessPage() {
             <h2 className="font-medium text-lg mb-3">Schedule Details</h2>
             <div className="space-y-2 text-muted-foreground">
               <BookingSummaryDisplay 
-                booking={booking}
+                booking={booking ? {
+                  ...booking,
+                  frequency: convertBookingFrequency(booking.frequency)
+                } : null}
                 timezone={userTimezone}
               />
             </div>
