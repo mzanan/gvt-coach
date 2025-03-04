@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon'
 import { supabase } from '@/lib/supabase/client'
 import { UserProfile } from '@/lib/supabase/types'
-import { BookingFrequency, BookingStatus, GroupedTimeSlots, TimeSlot } from '../types/booking'
+import { BookingFrequency, GroupedTimeSlots, TimeSlot } from '../types/booking'
 
 const COACH_TIMEZONE = process.env.COACH_TIMEZONE || 'UTC';
 
@@ -67,7 +67,7 @@ export const bookingService = {
     const utcStartOfDay = userDateTime.minus({ days: 1 }).toUTC();
     const utcEndOfDay = userDateTime.plus({ days: 2 }).toUTC();
     
-    // Obtener las reservas con pagos confirmados o pendientes
+    // Obtener las reservas con pagos confirmados o activos (excluyendo pendientes)
     const { data: mainBookings } = await supabase
       .from('meetings_bookings')
       .select(`
@@ -80,7 +80,7 @@ export const bookingService = {
         )
       `)
       .or(`booking_date.gte.${utcStartOfDay.toISO()},booking_date.lt.${utcEndOfDay.toISO()}`)
-      .in('payments_status.status', ['PAID', 'ACTIVE', 'PENDING']); // Solo estados activos
+      .in('payments_status.status', ['PAID', 'ACTIVE']); // Solo estados confirmados, quitamos PENDING
 
     // Similar para multiple_bookings
     const { data: secondaryBookings } = await supabase
@@ -98,7 +98,7 @@ export const bookingService = {
         )
       `)
       .or(`booking_date.gte.${utcStartOfDay.toISO()},booking_date.lt.${utcEndOfDay.toISO()}`)
-      .in('meetings_bookings.payments_status.status', ['PAID', 'ACTIVE', 'PENDING']);
+      .in('meetings_bookings.payments_status.status', ['PAID', 'ACTIVE']); // Solo estados confirmados, quitamos PENDING
 
     // Combinar todas las reservas
     const existingBookings = [
@@ -272,7 +272,7 @@ export const bookingService = {
       .or(`frequency.eq.once,frequency.neq.once`)
       .gte('booking_date', startOfMonth.toISO())
       .lte('booking_date', endOfMonth.toISO())
-      .in('payments_status.status', ['PAID', 'ACTIVE', 'PENDING']);
+      .in('payments_status.status', ['PAID', 'ACTIVE']);
 
     if (!bookings) {
       throw new Error('Failed to fetch bookings');

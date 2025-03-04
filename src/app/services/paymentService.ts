@@ -17,7 +17,6 @@ export const paymentService = {
         variantId: bookingPlan.variantId || getVariantIdForPlan(bookingPlan.frequency),
         customData: {
           userEmail: userProfile.email,
-          userName: `${userProfile.first_name} ${userProfile.last_name}`,
           frequency: bookingPlan.frequency,
           duration: String(bookingPlan.duration),
           firstSlot: bookingPlan.firstSlot ? {

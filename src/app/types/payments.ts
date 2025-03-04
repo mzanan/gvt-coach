@@ -12,7 +12,6 @@ export interface CheckoutPayload {
   variantId: string;
   customData: {
     userEmail: string;
-    userName: string;
     frequency: BookingFrequency;
     duration: string;
     firstSlot: { date: string } | null;
