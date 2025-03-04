@@ -137,7 +137,7 @@ export const bookingService = {
     }
 
     // Agrupar slots por día en la timezone del usuario
-    const groupedSlots = slots.reduce((groups: GroupedTimeSlots[], slot) => {
+    const dailyGroups = slots.reduce((groups: {date: Date, slots: TimeSlot[]}[], slot) => {
       const slotDate = DateTime.fromJSDate(slot.date)
         .setZone(userTimezone)
         .startOf('day')
@@ -160,11 +160,13 @@ export const bookingService = {
       return groups;
     }, []);
 
-    groupedSlots.forEach(group => {
+    // Ordenar slots por hora
+    dailyGroups.forEach(group => {
       group.slots.sort((a, b) => a.date.getTime() - b.date.getTime());
     });
 
-    return groupedSlots;
+    // Devolver en formato compatible con DayGroup
+    return dailyGroups;
   },
 
   createBooking: async (

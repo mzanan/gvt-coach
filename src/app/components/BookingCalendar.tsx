@@ -24,7 +24,7 @@ interface Section {
   completed: boolean
 }
 
-interface GroupedTimeSlots {
+interface InternalGroupedTimeSlots {
   date: Date;
   available: boolean;
   slot: TimeSlot | null;
@@ -32,7 +32,7 @@ interface GroupedTimeSlots {
 
 interface DayGroup {
   date: Date;
-  slots: GroupedTimeSlots[];
+  slots: InternalGroupedTimeSlots[];
 }
 
 export function BookingCalendar() {
@@ -90,36 +90,16 @@ export function BookingCalendar() {
         try {
           const groupedSlots = await bookingService.getAvailableSlots(selectedDate, selectedTimezone)
           
-          // Group slots by day
-          const slotsMap = new Map<string, GroupedTimeSlots[]>();
+          // Transformar los slots recibidos al formato DayGroup
+          const transformedSlots: DayGroup[] = groupedSlots.map(group => ({
+            date: group.date,
+            slots: group.slots.map(slot => ({
+              date: slot.date,
+              available: slot.available,
+              slot: slot
+            }))
+          }));
           
-          groupedSlots.flatMap(group => 
-            group.slots.forEach(slot => {
-              const slotDateTime = DateTime.fromJSDate(slot.date)
-                .setZone(selectedTimezone);
-              const dayKey = slotDateTime.toFormat('yyyy-MM-dd');
-              
-              if (!slotsMap.has(dayKey)) {
-                slotsMap.set(dayKey, []);
-              }
-              
-              slotsMap.get(dayKey)?.push({
-                date: slot.date,
-                available: slot.available,
-                slot: slot
-              });
-            })
-          );
-
-          // Convert map to array and sort by date
-          const transformedSlots = Array.from(slotsMap.entries())
-            .sort(([dateA], [dateB]) => DateTime.fromFormat(dateA, 'yyyy-MM-dd').toMillis() - 
-                                      DateTime.fromFormat(dateB, 'yyyy-MM-dd').toMillis())
-            .map(([date, slots]) => ({
-              date: DateTime.fromFormat(date, 'yyyy-MM-dd').toJSDate(),
-              slots
-            }));
-
           setAvailableSlots(transformedSlots);
         } catch (error) {
           console.error('Error loading slots:', error)
@@ -130,9 +110,10 @@ export function BookingCalendar() {
           })
         }
       }
+      
       loadSlots()
     }
-  }, [selectedTimezone, selectedDate])
+  }, [selectedDate, selectedTimezone])
 
   const handleProfileComplete = () => {
     const profile = bookingService.getUserProfile();
@@ -161,16 +142,23 @@ export function BookingCalendar() {
       setSuggestedDate(null);
       try {
         const groupedSlots = await bookingService.getAvailableSlots(selectedLocalDate.toJSDate(), selectedTimezone);
-        const transformedSlots = [{
-          date: selectedLocalDate.toJSDate(),
-          slots: groupedSlots.flatMap(group => 
-            group.slots.map(slot => ({
-              date: slot.date,
-              available: slot.available,
-              slot: slot
-            }))
-          )
-        }];
+        
+        // Si no hay slots, mostrar mensaje vacío
+        if (groupedSlots.length === 0) {
+          setAvailableSlots([]);
+          return;
+        }
+        
+        // Transformar los slots recibidos al formato DayGroup
+        const transformedSlots: DayGroup[] = groupedSlots.map(group => ({
+          date: group.date,
+          slots: group.slots.map(slot => ({
+            date: slot.date,
+            available: slot.available,
+            slot: slot
+          }))
+        }));
+        
         setAvailableSlots(transformedSlots);
         setSections(prev => prev.map(s => 
           s.id === 'date' ? { ...s, completed: true } : s
@@ -193,7 +181,7 @@ export function BookingCalendar() {
     // Create DateTime object in user's timezone
     const slotDateTime = DateTime.fromJSDate(slot.date)
       .setZone(selectedTimezone);
-    
+     
     const correctedSlot = {
       ...slot,
       date: slotDateTime.toJSDate(),
@@ -237,13 +225,18 @@ export function BookingCalendar() {
   const handleTimezoneChange = async (timezone: string) => {
     setSelectedTimezone(timezone)
 
-    if (activeSection === 'summary' && selectedDate) {
+    // Asegurarse de que la fecha seleccionada se mantiene en el mismo día calendario
+    // pero ahora en la nueva zona horaria
+    if (selectedDate) {
       try {
+        // Mantener la misma fecha en la nueva zona horaria
         const newSelectedDate = DateTime.fromJSDate(selectedDate)
           .setZone(timezone, { keepLocalTime: true })
           .toJSDate()
+        
         setSelectedDate(newSelectedDate)
 
+        // También actualizar la fecha sugerida si existe
         if (suggestedDate && bookingPlan?.frequency === 'twice-weekly') {
           const newSuggestedDate = DateTime.fromJSDate(suggestedDate)
             .setZone(timezone, { keepLocalTime: true })
@@ -251,45 +244,62 @@ export function BookingCalendar() {
           setSuggestedDate(newSuggestedDate)
         }
 
+        // Recargar los slots disponibles con la nueva zona horaria
         const groupedSlots = await bookingService.getAvailableSlots(newSelectedDate, timezone)
-        const transformedSlots = [{
-          date: newSelectedDate,
-          slots: groupedSlots.flatMap(group => 
-            group.slots.map(slot => ({
-              date: slot.date,
-              available: slot.available,
-              slot: slot
-            }))
-          )
-        }];
+        
+        // Transformar los slots a la estructura DayGroup
+        const transformedSlots: DayGroup[] = groupedSlots.map(group => ({
+          date: group.date,
+          slots: group.slots.map(slot => ({
+            date: slot.date,
+            available: slot.available,
+            slot: slot
+          }))
+        }));
+        
         setAvailableSlots(transformedSlots);
-
-        if (selectedSlot) {
-          const newSlotDateTime = DateTime.fromJSDate(selectedSlot.date)
-            .setZone(timezone, { keepLocalTime: true })
+        
+        // Si estamos en la sección de resumen, también necesitamos actualizar el slot seleccionado
+        if (selectedSlot && activeSection === 'summary') {
+          // Buscar el slot correspondiente en la nueva zona horaria
+          const slotTime = DateTime.fromJSDate(selectedSlot.date)
+            .setZone(selectedTimezone)
+            .toFormat('HH:mm');
           
-          const matchingSlot = transformedSlots[0].slots.find(slot => 
-            DateTime.fromJSDate(slot.date).toFormat('HH:mm') === 
-            newSlotDateTime.toFormat('HH:mm')
-          )
-
+          // Buscar un slot con la misma hora
+          let matchingSlot = null;
+          for (const group of transformedSlots) {
+            for (const s of group.slots) {
+              const newSlotTime = DateTime.fromJSDate(s.date)
+                .setZone(timezone)
+                .toFormat('HH:mm');
+              
+              if (newSlotTime === slotTime && s.available) {
+                matchingSlot = s.slot;
+                break;
+              }
+            }
+            if (matchingSlot) break;
+          }
+          
           if (matchingSlot) {
-            setSelectedSlot(matchingSlot.slot)
-            if (bookingPlan?.frequency === 'twice-weekly') {
-              setBookingPlan(prev => prev ? {
-                ...prev,
-                firstSlot: matchingSlot.slot
-              } : prev)
+            setSelectedSlot(matchingSlot);
+            
+            if (bookingPlan) {
+              setBookingPlan({
+                ...bookingPlan,
+                firstSlot: matchingSlot
+              });
             }
           }
         }
       } catch (error) {
-        console.error('Error updating timezone:', error)
+        console.error('Error al actualizar zona horaria:', error);
         toast({
           title: "Error",
-          description: "Failed to update timezone. Please try again.",
+          description: "No se pudo actualizar la zona horaria. Por favor, inténtelo de nuevo.",
           variant: "destructive"
-        })
+        });
       }
     }
   }
@@ -321,6 +331,7 @@ export function BookingCalendar() {
     const slotDateTime = DateTime.fromJSDate(date)
       .setZone(selectedTimezone);
     
+    // Retornamos la hora formateada en la zona horaria seleccionada
     return slotDateTime.toFormat('hh:mm a');
   }
 
@@ -499,31 +510,41 @@ export function BookingCalendar() {
         
         return (
           <>
-            {availableSlots.map((dayGroup) => (
-              <div key={dayGroup.date.toString()} className="mb-6">
-                <h3 className="text-sm font-medium mb-2">
-                  {DateTime.fromJSDate(dayGroup.date)
-                    .setZone(selectedTimezone)
-                    .toFormat('cccc, MMMM d')}
-                </h3>
-                <div className="grid grid-cols-3 gap-2">
-                  {dayGroup.slots.map((slot, index) => (
-                    <Button
-                      key={`${slot.date.toString()}-${index}`}
-                      variant={selectedSlot?.date.toString() === slot.date.toString() ? 'default' : 'outline'}
-                      disabled={!slot.available}
-                      onClick={() => handleSlotSelect(slot.slot!)}
-                      className={cn(
-                        "whitespace-nowrap",
-                        !slot.available && "opacity-60 cursor-not-allowed dark:bg-gray-800 bg-gray-100 dark:text-gray-400 text-gray-500"
-                      )}
-                    >
-                      {formatSlotTime(slot.date)}
-                    </Button>
-                  ))}
-                </div>
+            {availableSlots.length === 0 ? (
+              <div className="p-4 text-center">
+                <p className="text-gray-500 dark:text-gray-400">No hay horarios disponibles para la fecha seleccionada.</p>
               </div>
-            ))}
+            ) : (
+              availableSlots.map((dayGroup) => {
+                return (
+                  <div key={dayGroup.date.toString()} className="mb-6">
+                    <h3 className="text-sm font-medium mb-2">
+                      {DateTime.fromJSDate(dayGroup.date)
+                        .setZone(selectedTimezone)
+                        .toFormat('cccc, MMMM d')}
+                    </h3>
+                    <div className="grid grid-cols-3 gap-2">
+                      {dayGroup.slots.map((slot, index) => {
+                        return (
+                          <Button
+                            key={`${slot.date.toString()}-${index}`}
+                            variant={selectedSlot?.date.toString() === slot.date.toString() ? 'default' : 'outline'}
+                            disabled={!slot.available}
+                            onClick={() => handleSlotSelect(slot.slot!)}
+                            className={cn(
+                              "whitespace-nowrap",
+                              !slot.available && "opacity-60 cursor-not-allowed dark:bg-gray-800 bg-gray-100 dark:text-gray-400 text-gray-500"
+                            )}
+                          >
+                            {formatSlotTime(slot.date)}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </>
         )
       case 'summary':
