@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { TimeSlot, BookingFrequency, BookingPlan } from '@/app/types/booking'
 import { UserProfile } from '@/app/types/user'
 import { toast } from '@/app/components/ui-kit/use-toast'
@@ -40,99 +40,123 @@ export function useBookingCalendar() {
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [bookedDates, setBookedDates] = useState<Array<{ date: Date, fullyBooked: boolean }>>([])
   const [isBookingLoading, setIsBookingLoading] = useState(false)
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false)
+
+  // Memoizar el perfil de usuario para evitar lecturas innecesarias de localStorage
+  const cachedUserProfile = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    return bookingService.getUserProfile();
+  }, []);
+
   const [selectedTimezone, setSelectedTimezone] = useState<string>(() => {
-    const profile = bookingService.getUserProfile();
-    return profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return cachedUserProfile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   });
 
   useEffect(() => {
     // Only fetch profile on client side
-    const profile = bookingService.getUserProfile();
-    if (profile) {
-      setUserProfile(profile);
-      setSelectedTimezone(profile.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
+    if (cachedUserProfile) {
+      setUserProfile(cachedUserProfile);
+      setSelectedTimezone(cachedUserProfile.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
+    }
+  }, [cachedUserProfile]);
+
+  // Memoizar loadBookedDates para evitar recrear la función en cada renderizado
+  const loadBookedDates = useCallback(async () => {
+    try {
+      const dates = await bookingService.getFullyBookedDates(new Date());
+      setBookedDates(dates);
+    } catch (error) {
+      console.error('Error loading booked dates:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load calendar availability. Please try again later.",
+        variant: "destructive"
+      });
     }
   }, []);
 
   useEffect(() => {
-    const loadBookedDates = async () => {
-      try {
-        const dates = await bookingService.getFullyBookedDates(new Date());
-        setBookedDates(dates);
-      } catch (error) {
-        console.error('Error loading booked dates:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load calendar availability. Please try again later.",
-          variant: "destructive"
-        });
-      }
-    };
     loadBookedDates();
+  }, [loadBookedDates]);
+
+  // Memoizar loadSlots para evitar recrear la función en cada renderizado
+  const loadSlots = useCallback(async (date: Date, timezone: string) => {
+    try {
+      const groupedSlots = await bookingService.getAvailableSlots(date, timezone)
+      
+      // Transformar los slots recibidos al formato DayGroup
+      const transformedSlots = groupedSlots.map(group => ({
+        date: group.date,
+        slots: group.slots.map(slot => ({
+          date: slot.date,
+          available: slot.available,
+          slot: slot
+        }))
+      }));
+      
+      setAvailableSlots(transformedSlots);
+    } catch (error) {
+      console.error('Error loading slots:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load available time slots. Please try again.",
+        variant: "destructive"
+      })
+    }
   }, []);
 
   useEffect(() => {
     if (selectedDate) {
-      const loadSlots = async () => {
-        try {
-          const groupedSlots = await bookingService.getAvailableSlots(selectedDate, selectedTimezone)
-          
-          // Transformar los slots recibidos al formato DayGroup
-          const transformedSlots: DayGroup[] = groupedSlots.map(group => ({
-            date: group.date,
-            slots: group.slots.map(slot => ({
-              date: slot.date,
-              available: slot.available,
-              slot: slot
-            }))
-          }));
-          
-          setAvailableSlots(transformedSlots);
-        } catch (error) {
-          console.error('Error loading slots:', error)
-          toast({
-            title: "Error",
-            description: "Failed to load available time slots. Please try again.",
-            variant: "destructive"
-          })
-        }
-      }
-      
-      loadSlots()
+      loadSlots(selectedDate, selectedTimezone);
     }
-  }, [selectedDate, selectedTimezone])
+  }, [selectedDate, selectedTimezone, loadSlots]);
 
-  const handleProfileComplete = () => {
+  // Memoizar funciones de manejo para evitar recrearlas en cada renderizado
+  const handleProfileComplete = useCallback(() => {
     const profile = bookingService.getUserProfile();
     if (profile) {
       setUserProfile(profile);
       setSelectedTimezone(profile.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
+      setIsEditingProfile(false);
     }
-  }
+  }, []);
 
-  const handleEditProfile = () => {
-    setIsEditingProfile(true)
-  }
+  const handleEditProfile = useCallback(() => {
+    setIsEditingProfile(true);
+  }, []);
 
-  const handleDateSelect = async (date: Date) => {
+  const handleDateSelect = useCallback(async (date: Date) => {
+    // Mostrar indicador de carga inmediatamente
+    setIsLoadingSlots(true);
+    
     // Mantener la misma fecha que se seleccionó visualmente
     const selectedLocalDate = DateTime.fromJSDate(date)
       .startOf('day')
       .setZone(selectedTimezone, { keepLocalTime: true });
     
+    // Establecer la fecha seleccionada inmediatamente para mejorar la UX
+    setSelectedDate(selectedLocalDate.toJSDate());
+    
     if (bookingPlan?.frequency === 'twice-weekly') {
       const suggested = selectedLocalDate.plus({ days: 3 }).toJSDate();
-      setSelectedDate(selectedLocalDate.toJSDate());
       setSuggestedDate(suggested);
+      setIsLoadingSlots(false); // No cargamos slots para twice-weekly
     } else {
-      setSelectedDate(selectedLocalDate.toJSDate());
       setSuggestedDate(null);
       try {
+        // Avanzar al siguiente paso inmediatamente mientras se cargan los slots
+        setSections(prev => prev.map(s => 
+          s.id === 'date' ? { ...s, completed: true } : s
+        ));
+        setActiveSection('time');
+        
+        // Cargar los slots después de actualizar la UI
         const groupedSlots = await bookingService.getAvailableSlots(selectedLocalDate.toJSDate(), selectedTimezone);
         
         // Si no hay slots, mostrar mensaje vacío
         if (groupedSlots.length === 0) {
           setAvailableSlots([]);
+          setIsLoadingSlots(false);
           return;
         }
         
@@ -147,10 +171,6 @@ export function useBookingCalendar() {
         }));
         
         setAvailableSlots(transformedSlots);
-        setSections(prev => prev.map(s => 
-          s.id === 'date' ? { ...s, completed: true } : s
-        ));
-        setActiveSection('time');
       } catch (error) {
         console.error('Error loading slots:', error);
         toast({
@@ -158,11 +178,13 @@ export function useBookingCalendar() {
           description: "Failed to load available time slots. Please try again.",
           variant: "destructive"
         });
+      } finally {
+        setIsLoadingSlots(false);
       }
     }
-  }
+  }, [bookingPlan, selectedTimezone, setActiveSection, setSections]);
 
-  const handleSlotSelect = (slot: TimeSlot) => {
+  const handleSlotSelect = useCallback((slot: TimeSlot) => {
     if (!slot.available) return;
     
     // Create DateTime object in user's timezone
@@ -195,21 +217,21 @@ export function useBookingCalendar() {
       s.id === 'time' ? { ...s, completed: true } : s
     ));
     setActiveSection('summary');
-  }
+  }, [bookingPlan, selectedTimezone, sections]);
 
-  const handleSectionClick = (sectionId: string) => {
-    const sectionIndex = sections.findIndex(s => s.id === sectionId)
+  const handleSectionClick = useCallback((sectionId: string) => {
+    const sectionIndex = sections.findIndex(s => s.id === sectionId);
     
     const previousSectionsCompleted = sections
       .slice(0, sectionIndex)
-      .every(s => s.completed)
+      .every(s => s.completed);
     
     if (previousSectionsCompleted) {
-      setActiveSection(sectionId)
+      setActiveSection(sectionId);
     }
-  }
+  }, [sections]);
 
-  const handleTimezoneChange = async (timezone: string) => {
+  const handleTimezoneChange = useCallback(async (timezone: string) => {
     setSelectedTimezone(timezone)
 
     // Asegurarse de que la fecha seleccionada se mantiene en el mismo día calendario
@@ -289,9 +311,9 @@ export function useBookingCalendar() {
         });
       }
     }
-  }
+  }, [selectedDate, setSelectedTimezone]);
 
-  const handleFrequencySelect = (frequency: BookingFrequency, duration?: number) => {
+  const handleFrequencySelect = useCallback((frequency: BookingFrequency, duration?: number) => {
     setSelectedDate(null)
     setSuggestedDate(null)
     setSelectedSlot(null)
@@ -312,17 +334,15 @@ export function useBookingCalendar() {
       s.id === 'frequency' ? { ...s, completed: true } : s
     ))
     setActiveSection('date')
-  }
+  }, []);
 
-  const formatSlotTime = (date: Date) => {
-    const slotDateTime = DateTime.fromJSDate(date)
-      .setZone(selectedTimezone);
-    
-    // Retornamos la hora formateada en la zona horaria seleccionada
-    return slotDateTime.toFormat('hh:mm a');
-  }
+  const formatSlotTime = useCallback((date: Date) => {
+    return DateTime.fromJSDate(date)
+      .setZone(selectedTimezone)
+      .toFormat('h:mm a');
+  }, [selectedTimezone]);
 
-  const handleBookingConfirm = async () => {
+  const handleBookingConfirm = useCallback(async () => {
     setIsBookingLoading(true);
 
     try {
@@ -378,7 +398,7 @@ export function useBookingCalendar() {
     } finally {
       setIsBookingLoading(false);
     }
-  };
+  }, [bookingPlan, selectedTimezone, userProfile]);
 
   return {
     sections,
@@ -392,6 +412,7 @@ export function useBookingCalendar() {
     isEditingProfile,
     bookedDates,
     isBookingLoading,
+    isLoadingSlots,
     selectedTimezone,
     handleProfileComplete,
     handleEditProfile,

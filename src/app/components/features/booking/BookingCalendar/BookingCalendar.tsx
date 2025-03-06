@@ -1,5 +1,6 @@
 'use client'
 
+import React, { useMemo } from 'react'
 import { useBookingCalendar } from './useBookingCalendar'
 import { Calendar } from '../Calendar/Calendar'
 import { UserProfileForm } from '../../user/UserProfileForm/UserProfileForm'
@@ -9,8 +10,64 @@ import { Card } from '@/app/components/ui-kit/card'
 import { DateTime } from 'luxon'
 import { FrequencySelector } from '../FrequencySelector/FrequencySelector'
 import { getBookingSummary } from '@/lib/utils'
-import { TwiceWeeklySelector } from '../TwiceWeeklySelector/TwiceWeeklySelector'
 import { cn } from '@/lib/utils'
+
+// Componente para el botón de proceder al pago, memoizado para reducir renderizados
+const PaymentButton = React.memo(({ onClick, isLoading }: { onClick: () => void, isLoading: boolean }) => (
+  <Button 
+    onClick={onClick} 
+    disabled={isLoading}
+    className="w-full max-w-sm"
+  >
+    {isLoading ? (
+      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+    ) : null}
+    Proceed to Payment
+  </Button>
+));
+PaymentButton.displayName = 'PaymentButton';
+
+// Componente para renderizar una sección, memoizado para evitar renderizados innecesarios
+const BookingSection = React.memo(({ 
+  section, 
+  activeSection, 
+  isAvailable, 
+  onSectionClick,
+  renderContent
+}: { 
+  section: { id: string, title: string, completed: boolean }, 
+  activeSection: string,
+  isAvailable: boolean,
+  onSectionClick: (id: string) => void,
+  renderContent: () => React.ReactNode
+}) => (
+  <Card className="overflow-hidden">
+    <button
+      className={`
+        w-full p-4 flex items-center justify-between text-left
+        ${isAvailable ? 'hover:bg-accent/50' : 'opacity-50 cursor-not-allowed'}
+      `}
+      onClick={() => onSectionClick(section.id)}
+      disabled={!isAvailable}
+    >
+      <div className="flex items-center space-x-2">
+        {section.completed && <Check className="w-4 h-4" />}
+        <span className="font-medium">{section.title}</span>
+      </div>
+      {activeSection === section.id ? 
+        <ChevronUp className="w-4 h-4" /> : 
+        <ChevronDown className="w-4 h-4" />
+      }
+    </button>
+    
+    {activeSection === section.id && isAvailable && (
+      <div className="p-4 border-t">
+        {renderContent()}
+      </div>
+    )}
+  </Card>
+));
+BookingSection.displayName = 'BookingSection';
 
 export function BookingCalendar() {
   const {
@@ -25,6 +82,7 @@ export function BookingCalendar() {
     isEditingProfile,
     bookedDates,
     isBookingLoading,
+    isLoadingSlots,
     selectedTimezone,
     handleProfileComplete,
     handleEditProfile,
@@ -37,8 +95,17 @@ export function BookingCalendar() {
     handleBookingConfirm
   } = useBookingCalendar()
 
-  const renderSummary = () => {
-    if (bookingPlan?.frequency === 'twice-weekly') {
+  // Crear una función local para manejar la cancelación de edición
+  const handleCancelEditProfile = React.useCallback(() => {
+    // Simplemente reutilizamos handleProfileComplete para cerrar el formulario
+    handleProfileComplete();
+  }, [handleProfileComplete]);
+
+  // Memoizamos el renderizado del resumen para evitar cálculos repetidos
+  const summaryContent = useMemo(() => {
+    if (!bookingPlan || !selectedSlot) return null;
+    
+    if (bookingPlan.frequency === 'twice-weekly') {
       const firstSlotDate = bookingPlan?.firstSlot?.date
       const secondSlotDate = bookingPlan?.secondSlot?.date
   
@@ -63,16 +130,7 @@ export function BookingCalendar() {
                 .toFormat('MMMM d, yyyy')}</p>
             </div>
             <div className="flex justify-center mt-6">
-              <Button 
-                onClick={handleBookingConfirm} 
-                disabled={isBookingLoading}
-                className="w-full max-w-sm"
-              >
-                {isBookingLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                Proceed to Payment
-              </Button>
+              <PaymentButton onClick={handleBookingConfirm} isLoading={isBookingLoading} />
             </div>
           </div>
         </div>
@@ -82,24 +140,16 @@ export function BookingCalendar() {
     return (
       <div className="space-y-4 text-center">
         <p className="text-xl">
-          {getBookingSummary(selectedSlot!.date, bookingPlan?.frequency || 'once', bookingPlan?.duration, true, selectedTimezone)}
+          {getBookingSummary(selectedSlot.date, bookingPlan.frequency || 'once', bookingPlan.duration, true, selectedTimezone)}
         </p>
         <div className="flex justify-center">
-          <Button 
-            onClick={handleBookingConfirm} 
-            disabled={isBookingLoading}
-            className="w-full max-w-sm"
-          >
-            {isBookingLoading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : null}
-            Proceed to Payment
-          </Button>
+          <PaymentButton onClick={handleBookingConfirm} isLoading={isBookingLoading} />
         </div>
       </div>
     )
-  }
+  }, [bookingPlan, selectedSlot, selectedTimezone, handleBookingConfirm, isBookingLoading]);
 
+  // Función para renderizar el contenido específico de cada sección
   const renderSectionContent = (sectionId: string) => {
     switch (sectionId) {
       case 'frequency':
@@ -115,9 +165,6 @@ export function BookingCalendar() {
         return (
           <Calendar 
             onSelectDate={handleDateSelect}
-            onConfirmDates={(firstDate) => {
-              handleDateSelect(firstDate)
-            }}
             selectedDate={selectedDate}
             bookedDates={bookedDates}
             frequency={bookingPlan?.frequency}
@@ -126,33 +173,28 @@ export function BookingCalendar() {
           />
         )
       case 'time':
-        if (bookingPlan?.frequency === 'twice-weekly') {
+        // Mostrar indicador de carga mientras se cargan los slots
+        if (isLoadingSlots) {
           return (
-            <TwiceWeeklySelector
-              firstDate={selectedDate!}
-              duration={bookingPlan.duration}
-              timezone={selectedTimezone}
-              onComplete={(firstSlot) => {
-                handleSlotSelect(firstSlot)
-              }}
-            />
+            <div className="flex justify-center items-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
           );
         }
         
+        // Memoizamos el renderizado de las ranuras de tiempo disponibles
         return (
           <>
             {availableSlots.length === 0 ? (
-              <div className="p-4 text-center">
-                <p className="text-gray-500 dark:text-gray-400">No hay horarios disponibles para la fecha seleccionada.</p>
+              <div className="text-center py-4">
+                <p>No available slots for this date. Please select another date.</p>
               </div>
             ) : (
               availableSlots.map((dayGroup) => {
                 return (
-                  <div key={dayGroup.date.toString()} className="mb-6">
-                    <h3 className="text-sm font-medium mb-2">
-                      {DateTime.fromJSDate(dayGroup.date)
-                        .setZone(selectedTimezone)
-                        .toFormat('cccc, MMMM d')}
+                  <div key={dayGroup.date.toString()} className="mb-4">
+                    <h3 className="font-medium mb-2">
+                      {DateTime.fromJSDate(dayGroup.date).setZone(selectedTimezone).toFormat('EEEE, MMMM d')}
                     </h3>
                     <div className="grid grid-cols-3 gap-2">
                       {dayGroup.slots.map((slot, index) => {
@@ -180,9 +222,9 @@ export function BookingCalendar() {
         )
       case 'summary':
         return (
-        <div className="space-y-6">
-          {renderSummary()}
-        </div>
+          <div className="space-y-6">
+            {summaryContent}
+          </div>
         )
       default:
         return null
@@ -190,43 +232,46 @@ export function BookingCalendar() {
   }
 
   return (
-    <div className="max-w-[46rem] mx-auto space-y-6">
-      {/* User Profile Section */}
-      <Card className="p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Personal Information</h2>
-          {!isEditingProfile && (
-            <Button variant="ghost" size="sm" onClick={handleEditProfile}>
-              <Edit2 className="h-4 w-4 mr-2" />
-              Edit
+    <div className="space-y-6 max-w-3xl mx-auto">
+      <div className="flex justify-between">
+        <h2 className="text-2xl font-semibold mb-4">Book a Consultation</h2>
+        {userProfile && (
+          <div className="flex items-center space-x-2">
+            <span>Welcome, {userProfile.first_name}!</span>
+            <Button 
+              onClick={handleEditProfile}
+              variant="ghost" 
+              size="sm"
+            >
+              <Edit2 className="h-4 w-4 mr-1" />
+              Edit Profile
             </Button>
-          )}
-        </div>
-        
-        {isEditingProfile ? (
-          <UserProfileForm 
-            onComplete={() => {
-              handleProfileComplete()
-            }}
-            initialData={userProfile}
-            showCard={false}
-            showTitle={false}
-            selectedTimezone={selectedTimezone}
-            onTimezoneChange={handleTimezoneChange}
-          />
-        ) : (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <p><span className="font-medium">Name:</span> {userProfile?.first_name} {userProfile?.last_name}</p>
-              <p><span className="font-medium">Email:</span> {userProfile?.email}</p>
-              <p><span className="font-medium">Phone:</span> {userProfile?.phone}</p>
-              <p><span className="font-medium">Timezone:</span> {selectedTimezone || 'Loading...'}</p>
-            </div>
           </div>
         )}
-      </Card>
-
-      {/* Collapsible Sections */}
+      </div>
+      
+      {isEditingProfile && (
+        <Card className="mb-6">
+          <div className="p-4">
+            <UserProfileForm 
+              initialData={userProfile} 
+              onComplete={handleProfileComplete}
+              showCard={false}
+              showTitle={false}
+            />
+            <div className="mt-2 flex justify-end">
+              <Button 
+                variant="outline" 
+                onClick={handleCancelEditProfile}
+                className="ml-2"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+      
       {sections.map((section) => {
         const sectionIndex = sections.findIndex(s => s.id === section.id)
         const previousSectionsCompleted = sections
@@ -235,36 +280,16 @@ export function BookingCalendar() {
         const isAvailable = previousSectionsCompleted
 
         return (
-          <Card
-            key={section.id}
-            className="overflow-hidden"
-          >
-            <button
-              className={`
-                w-full p-4 flex items-center justify-between text-left
-                ${isAvailable ? 'hover:bg-accent/50' : 'opacity-50 cursor-not-allowed'}
-              `}
-              onClick={() => handleSectionClick(section.id)}
-              disabled={!isAvailable}
-            >
-              <div className="flex items-center space-x-2">
-                {section.completed && <Check className="w-4 h-4" />}
-                <span className="font-medium">{section.title}</span>
-              </div>
-              {activeSection === section.id ? 
-                <ChevronUp className="w-4 h-4" /> : 
-                <ChevronDown className="w-4 h-4" />
-              }
-            </button>
-            
-            {activeSection === section.id && isAvailable && (
-              <div className="p-4 border-t">
-                {renderSectionContent(section.id)}
-              </div>
-            )}
-          </Card>
+          <BookingSection 
+            key={section.id} 
+            section={section}
+            activeSection={activeSection}
+            isAvailable={isAvailable}
+            onSectionClick={handleSectionClick}
+            renderContent={() => renderSectionContent(section.id)}
+          />
         )
       })}
     </div>
   )
-} 
+}

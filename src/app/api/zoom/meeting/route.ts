@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { zoomService } from '@/services/zoomService';
 
 export async function POST(request: Request) {
   try {

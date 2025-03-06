@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState, useMemo, useCallback } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { BookingFrequency } from '@/app/types/booking'
@@ -9,7 +9,6 @@ import { DateTime } from 'luxon'
 
 interface CalendarProps {
   onSelectDate: (date: Date) => void
-  onConfirmDates: (firstDate: Date, secondDate: Date) => void
   selectedDate: Date | null
   bookedDates: Array<{ date: Date, fullyBooked: boolean }>
   frequency?: BookingFrequency
@@ -17,182 +16,179 @@ interface CalendarProps {
   selectedTimezone: string
 }
 
+// Componente de día memoizado para evitar renderizados innecesarios
+const CalendarDay = React.memo(({ 
+  date, 
+  isCurrentMonth, 
+  isSelected, 
+  isSuggestedDate, 
+  isDisabled, 
+  onClick 
+}: { 
+  date: DateTime, 
+  isCurrentMonth: boolean, 
+  isSelected: boolean, 
+  isSuggestedDate: boolean, 
+  isDisabled: boolean, 
+  onClick: () => void 
+}) => (
+  <button
+    className={cn(
+      "h-9 w-9 rounded-md p-0 font-normal flex items-center justify-center mx-auto",
+      !isCurrentMonth && "text-muted-foreground opacity-50",
+      isSelected && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+      isSuggestedDate && "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+      isDisabled && "pointer-events-none opacity-50",
+      !isSelected && !isSuggestedDate && !isDisabled && isCurrentMonth && "hover:bg-accent hover:text-accent-foreground"
+    )}
+    disabled={isDisabled}
+    onClick={onClick}
+    tabIndex={!isCurrentMonth || isDisabled ? -1 : 0}
+  >
+    {date.day}
+  </button>
+));
+CalendarDay.displayName = 'CalendarDay';
+
 export function Calendar({ 
   onSelectDate, 
-  onConfirmDates,
   selectedDate, 
   bookedDates,
-  frequency,
   suggestedDate,
   selectedTimezone
 }: CalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(() => 
-    DateTime.now().setZone(selectedTimezone).startOf('month').toJSDate()
-  )
+    DateTime.now().setZone(selectedTimezone)
+  );
 
-  const getDaysInMonth = (date: Date) => {
-    // Convert to DateTime in user's timezone
-    const dt = DateTime.fromJSDate(date).setZone(selectedTimezone)
+  // Memoizar el cálculo de días del mes para evitar recálculos innecesarios
+  const days = useMemo(() => getDaysInMonth(currentMonth), [currentMonth]);
 
-    // Get start and end of month in user's timezone
-    const startOfMonth = dt.startOf('month')
-    const daysInMonth = dt.daysInMonth || 0
-    const firstDayOfMonth = startOfMonth.weekday % 7 // 0-6, Sunday-Saturday
+  const goToPreviousMonth = useCallback(() => {
+    setCurrentMonth(prev => prev.minus({ months: 1 }));
+  }, []);
 
-    const days: DateTime[] = []
+  const goToNextMonth = useCallback(() => {
+    setCurrentMonth(prev => prev.plus({ months: 1 }));
+  }, []);
 
-    // Add days from previous month
-    const prevMonth = startOfMonth.minus({ months: 1 })
-    const daysInPrevMonth = prevMonth.daysInMonth || 0
-    for (let i = firstDayOfMonth - 1; i >= 0; i--) {
-      days.push(prevMonth.set({ day: daysInPrevMonth - i }))
-    }
-
-    // Add days of current month
-    for (let day = 1; day <= daysInMonth; day++) {
-      days.push(dt.set({ day }))
-    }
-
-    // Add days from next month
-    const remainingDays = (7 - (days.length % 7)) % 7
-    const extraWeek = 7
-    const totalDaysToAdd = remainingDays + extraWeek
-    const nextMonth = startOfMonth.plus({ months: 1 })
-    
-    for (let day = 1; day <= totalDaysToAdd; day++) {
-      days.push(nextMonth.set({ day }))
-    }
-
-    return days
-  }
-
-  const handlePrevMonth = () => {
-    setCurrentMonth(DateTime.fromJSDate(currentMonth)
-      .setZone(selectedTimezone)
-      .minus({ months: 1 })
-      .toJSDate()
-    )
-  }
-
-  const handleNextMonth = () => {
-    setCurrentMonth(DateTime.fromJSDate(currentMonth)
-      .setZone(selectedTimezone)
-      .plus({ months: 1 })
-      .toJSDate()
-    )
-  }
-
-  const isToday = (date: DateTime) => {
-    const today = DateTime.now().setZone(selectedTimezone).startOf('day')
-    return date.hasSame(today, 'day')
-  }
-
-  const isSelected = (date: DateTime) => {
-    if (!selectedDate) return false
+  const isSelected = useCallback((date: DateTime) => {
+    if (!selectedDate) return false;
     const selected = DateTime.fromJSDate(selectedDate)
       .setZone(selectedTimezone)
-      .startOf('day')
-    const compareDate = date.startOf('day')
+      .startOf('day');
+    const compareDate = date.startOf('day');
     
-    return selected.hasSame(compareDate, 'day')
-  }
+    return selected.hasSame(compareDate, 'day');
+  }, [selectedDate, selectedTimezone]);
 
-  const isSuggestedDate = (date: DateTime) => {
-    if (!suggestedDate) return false
-    const suggested = DateTime.fromJSDate(suggestedDate).setZone(selectedTimezone).startOf('day')
-    return date.hasSame(suggested, 'day')
-  }
+  const isSuggestedDate = useCallback((date: DateTime) => {
+    if (!suggestedDate) return false;
+    const suggested = DateTime.fromJSDate(suggestedDate).setZone(selectedTimezone).startOf('day');
+    return date.hasSame(suggested, 'day');
+  }, [suggestedDate, selectedTimezone]);
 
-  const isDisabled = (date: DateTime) => {
-    const today = DateTime.now().setZone(selectedTimezone).startOf('day')
-    return date <= today || isFullyBooked(date)
-  }
-
-  const isFullyBooked = (date: DateTime) => {
+  const isFullyBooked = useCallback((date: DateTime) => {
     return bookedDates.some(bookedDate => {
       const bookedDateTime = DateTime.fromJSDate(bookedDate.date)
         .setZone(selectedTimezone)
-        .startOf('day')
-      return date.hasSame(bookedDateTime, 'day')
-    })
-  }
+        .startOf('day');
+      return date.hasSame(bookedDateTime, 'day');
+    });
+  }, [bookedDates, selectedTimezone]);
 
-  const handleDateSelect = (date: DateTime) => {
+  const isDisabled = useCallback((date: DateTime) => {
+    const today = DateTime.now().setZone(selectedTimezone).startOf('day');
+    return date < today || isFullyBooked(date);
+  }, [selectedTimezone, isFullyBooked]);
+
+  const isCurrentMonth = useCallback((date: DateTime) => {
+    return date.month === currentMonth.month;
+  }, [currentMonth]);
+
+  const handleDateSelect = useCallback((date: DateTime) => {
     if (!isDisabled(date)) {
-      onSelectDate(date.toJSDate())
+      onSelectDate(date.toJSDate());
     }
-  }
+  }, [isDisabled, onSelectDate]);
 
-  const isCurrentMonth = (date: DateTime) => {
-    return date.month === DateTime.fromJSDate(currentMonth).setZone(selectedTimezone).month
+  function getDaysInMonth(date: DateTime) {
+    const year = date.year;
+    const month = date.month;
+    
+    const firstDayOfMonth = DateTime.local(year, month, 1);
+    const lastDayOfMonth = DateTime.local(year, month, 1).endOf('month');
+    
+    const daysInMonth = lastDayOfMonth.day;
+    const dayOfWeek = firstDayOfMonth.weekday % 7;
+    
+    const days: DateTime[] = [];
+    
+    // Añadir días del mes anterior
+    for (let i = 0; i < dayOfWeek; i++) {
+      days.push(firstDayOfMonth.minus({ days: dayOfWeek - i }));
+    }
+    
+    // Añadir días del mes actual
+    for (let i = 0; i < daysInMonth; i++) {
+      days.push(firstDayOfMonth.plus({ days: i }));
+    }
+    
+    // Añadir días del mes siguiente hasta completar la cuadrícula
+    const remainingDays = 42 - days.length;
+    for (let i = 0; i < remainingDays; i++) {
+      days.push(lastDayOfMonth.plus({ days: i + 1 }));
+    }
+    
+    return days;
   }
-
-  const days = getDaysInMonth(currentMonth)
 
   return (
-    <div className="w-full">
-      <div className="flex items-center justify-between mb-4">
-        <button
-          onClick={handlePrevMonth}
-          className="p-2 hover:bg-accent rounded-md text-foreground"
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <Button
+          variant="ghost"
+          onClick={goToPreviousMonth}
+          disabled={currentMonth.startOf('month') <= DateTime.now().startOf('month')}
+          className="h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
         >
           <ChevronLeft className="h-4 w-4" />
-        </button>
-        <h2 className="font-semibold text-foreground">
-          {DateTime.fromJSDate(currentMonth).setZone(selectedTimezone).toFormat('MMMM yyyy')}
-        </h2>
-        <button
-          onClick={handleNextMonth}
-          className="p-2 hover:bg-accent rounded-md text-foreground"
+          <span className="sr-only">Previous month</span>
+        </Button>
+        <h3 className="text-sm font-medium">
+          {currentMonth.toFormat('MMMM yyyy')}
+        </h3>
+        <Button
+          variant="ghost"
+          onClick={goToNextMonth}
+          className="h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
         >
           <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
-
-      <div className="grid grid-cols-7 gap-1 mb-2">
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-          <div
-            key={day}
-            className="text-center text-sm font-medium text-muted-foreground p-2"
-          >
-            {day}
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-7 gap-1">
-        {days.map((date) => (
-          <button
-            key={date.toISO()}
-            onClick={() => handleDateSelect(date)}
-            disabled={isDisabled(date)}
-            className={cn(
-              "p-2 w-full rounded-md text-sm transition-colors",
-              "hover:bg-accent hover:text-accent-foreground",
-              "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-              {
-                "bg-primary text-primary-foreground": isSelected(date),
-                "bg-green-100 text-green-700": isSuggestedDate(date),
-                "bg-accent/50": isToday(date),
-                "text-muted-foreground cursor-not-allowed": isDisabled(date),
-                "text-muted-foreground/50": !isCurrentMonth(date),
-                "text-foreground": !isDisabled(date) && !isSelected(date) && !isSuggestedDate(date) && isCurrentMonth(date),
-              }
-            )}
-          >
-            {date.day}
-          </button>
-        ))}
-      </div>
-
-      {frequency === 'twice-weekly' && selectedDate && suggestedDate && (
-        <Button 
-          className="w-full mt-4"
-          onClick={() => onConfirmDates(selectedDate, suggestedDate)}
-        >
-          Confirm Selected Dates
+          <span className="sr-only">Next month</span>
         </Button>
-      )}
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-center text-xs leading-6 text-muted-foreground">
+        <div className="flex items-center justify-center">Sun</div>
+        <div className="flex items-center justify-center">Mon</div>
+        <div className="flex items-center justify-center">Tue</div>
+        <div className="flex items-center justify-center">Wed</div>
+        <div className="flex items-center justify-center">Thu</div>
+        <div className="flex items-center justify-center">Fri</div>
+        <div className="flex items-center justify-center">Sat</div>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-center text-sm">
+        {days.map((date, index) => (
+          <CalendarDay
+            key={`${date.toFormat('yyyy-MM-dd')}-${index}`}
+            date={date}
+            isCurrentMonth={isCurrentMonth(date)}
+            isSelected={isSelected(date)}
+            isSuggestedDate={isSuggestedDate(date)}
+            isDisabled={isDisabled(date)}
+            onClick={() => handleDateSelect(date)}
+          />
+        ))}
+      </div>
     </div>
   )
 } 

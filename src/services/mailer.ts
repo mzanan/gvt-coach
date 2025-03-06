@@ -19,7 +19,7 @@ const transporter = nodemailer.createTransport({
 
 // Verify transporter configuration (optional but recommended)
 if (process.env.NODE_ENV !== 'production') {
-  transporter.verify(function(error, success) {
+  transporter.verify(function(error) {
     if (error) {
       console.error('Error in SMTP server configuration:', error);
       console.error('Make sure to properly configure RESEND_API_KEY and FROM_EMAIL in .env.local');

@@ -9,7 +9,7 @@ import { Loader2 } from "lucide-react"
 import { BookingSummaryDisplay } from '@/app/components/features/booking/BookingSummaryDisplay'
 import { useRouter } from 'next/navigation'
 import { BookingDB } from '@/app/types/booking'
-import { BookingStatus, BookingFrequency as SuperbaseBookingFrequency } from '@/app/types/enums/booking'
+import { BookingFrequency as SuperbaseBookingFrequency } from '@/app/types/enums/booking'
 import { BookingFrequency as AppBookingFrequency } from '@/app/types/booking'
 import { paymentService } from '@/services/paymentService';
 import { PaymentOrderStatus } from '@/app/types/payments';
@@ -43,7 +43,6 @@ export default function PaymentSuccessPage() {
   const router = useRouter()
   const { sendBookingConfirmation, isSending, error } = useEmailNotifications()
   const { toast } = useToast()
-  const [isTestSending, setIsTestSending] = useState(false);
 
   // Obtener datos del usuario actual
   useEffect(() => {
@@ -268,7 +267,7 @@ export default function PaymentSuccessPage() {
                   const errorData = await response.json();
                   console.error('API error details:', errorData);
                 } catch (e) {
-                  console.error('Could not parse error response');
+                  console.error('Could not parse error response', e);
                 }
                 
                 // If response is 404 (Not Found), try to find the booking by order_id instead
@@ -459,7 +458,7 @@ export default function PaymentSuccessPage() {
           <div className="border-b pb-4">
             <div className="space-y-4">
               <p className="text-muted-foreground">
-                📩 We've sent your session details to <span className="font-medium text-foreground">{userEmail || booking.user_email}</span>.
+                📩 We&apos;ve sent your session details to <span className="font-medium text-foreground">{userEmail || booking.user_email}</span>.
               </p>
             </div>
           </div>

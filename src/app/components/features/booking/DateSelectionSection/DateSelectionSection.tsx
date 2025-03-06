@@ -61,9 +61,6 @@ export function DateSelectionSection({
           </div>
           <Calendar
             onSelectDate={onDateSelect}
-            onConfirmDates={(firstDate) => {
-              onDateSelect(firstDate);
-            }}
             selectedDate={selectedDate}
             bookedDates={bookedDates}
             frequency={bookingPlan?.frequency}

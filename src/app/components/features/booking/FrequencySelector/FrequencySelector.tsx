@@ -21,30 +21,6 @@ interface FrequencySelectorProps {
   disableTwiceWeekly?: boolean
 }
 
-interface FrequencyOption {
-  value: BookingFrequency;
-  title: string;
-  description: string;
-}
-
-const frequencies: FrequencyOption[] = [
-  {
-    value: 'once',
-    title: 'Single Session',
-    description: 'Book a one-time consultation session'
-  },
-  {
-    value: 'weekly',
-    title: 'Weekly Sessions',
-    description: 'Schedule recurring weekly sessions'
-  },
-  {
-    value: 'twice-weekly',
-    title: 'Twice Weekly',
-    description: 'Schedule two sessions per week'
-  }
-];
-
 export function FrequencySelector({ 
   onFrequencySelect, 
   selectedFrequency,
