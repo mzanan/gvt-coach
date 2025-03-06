@@ -1,21 +1,22 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { Card } from "@/app/components/ui-kit/card"
+import { Button } from "@/app/components/ui-kit/button"
 import Link from 'next/link'
 import { ChevronLeft, Check } from "lucide-react"
 import { Loader2 } from "lucide-react"
-import { BookingSummaryDisplay } from '@/app/components/BookingSummaryDisplay'
+import { BookingSummaryDisplay } from '@/app/components/features/booking/BookingSummaryDisplay'
 import { useRouter } from 'next/navigation'
-import { BookingDB, BookingStatus, BookingFrequency as SuperbaseBookingFrequency } from '@/lib/supabase/types'
+import { BookingDB } from '@/app/types/booking'
+import { BookingStatus, BookingFrequency as SuperbaseBookingFrequency } from '@/app/types/enums/booking'
 import { BookingFrequency as AppBookingFrequency } from '@/app/types/booking'
-import { paymentService } from '@/app/services/paymentService';
+import { paymentService } from '@/services/paymentService';
 import { PaymentOrderStatus } from '@/app/types/payments';
-import { zoomService } from '@/app/services/zoomService';
-import { getAuthToken } from '@/app/helpers/authHelpers';
-import { useEmailNotifications } from '@/hooks/useEmailNotifications';
-import { useToast } from '@/hooks/use-toast';
+import { zoomService } from '@/services/zoomService';
+import { getAuthToken } from '@/lib/auth';
+import { useEmailNotifications } from '@/app/components/features/notifications/EmailNotifications';
+import { useToast } from '@/app/components/ui-kit/use-toast';
 
 // Helper function to convert between BookingFrequency types
 function convertBookingFrequency(frequency: SuperbaseBookingFrequency): AppBookingFrequency {

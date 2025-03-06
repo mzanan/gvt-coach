@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { BookingCalendar } from "./components/BookingCalendar"
-import { bookingService } from "./services/bookingService"
+import { bookingService } from "@/services/bookingService"
+import { BookingCalendar } from "./components/features/booking/BookingCalendar"
 
 export default function Home() {
   const router = useRouter()

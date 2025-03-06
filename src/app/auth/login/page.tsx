@@ -1,7 +1,7 @@
 'use client'
 
-import { UserProfileForm } from "@/app/components/UserProfileForm"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { UserProfileForm } from "@/app/components/features/user/UserProfileForm"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui-kit/card"
 
 export default function LoginPage() {
   const handleLoginComplete = () => {

@@ -3,7 +3,7 @@ import {
   sendBookingConfirmation,
   sendSessionReminder,
   sendCancellationNotification
-} from '@/lib/services/mailer';
+} from '@/services/mailer';
 
 // Available notification types
 type NotificationType = 'confirmation' | 'reminder' | 'cancellation';

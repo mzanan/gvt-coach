@@ -29,4 +29,4 @@ export interface PaymentStatusResponse {
     lastUpdated?: Date;
     nextRenewalDate?: string | null;
   }
-}
+} 

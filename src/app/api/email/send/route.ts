@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { sendEmail } from '@/lib/services/mailer';
+import { sendEmail } from '@/services/mailer';
 
 // Verificamos que la solicitud viene de una fuente autorizada
 async function validateRequest(req: NextRequest) {

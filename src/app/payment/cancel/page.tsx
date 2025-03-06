@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect } from 'react'
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { Card } from "@/app/components/ui-kit/card"
+import { Button } from "@/app/components/ui-kit/button"
 import Link from 'next/link'
 import { XCircle } from "lucide-react"
 

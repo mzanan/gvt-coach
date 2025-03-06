@@ -2,7 +2,7 @@
 
 import { useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
-import { bookingService } from "@/app/services/bookingService"
+import { bookingService } from "@/services/bookingService"
 
 export default function AuthLayout({
   children,
