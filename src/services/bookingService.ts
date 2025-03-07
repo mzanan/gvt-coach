@@ -161,7 +161,9 @@ export const bookingService = {
       return cachedSlots.data;
     }
     
-    console.log('Fetching slots for', dateString);
+    // Agregar la hora actual en la timezone seleccionada para debug
+    const now = DateTime.now().setZone(userTimezone);
+    console.log(`Fetching slots for ${dateString} - Current time in ${userTimezone}: ${now.toFormat('yyyy-MM-dd HH:mm:ss')}`);
     
     const userDateTime = DateTime.fromJSDate(date)
       .setZone(userTimezone)
@@ -174,7 +176,7 @@ export const bookingService = {
     const dateCondition = `booking_date.gte.${utcStartOfDay.toISO()},booking_date.lt.${utcEndOfDay.toISO()}`;
     
     // Optimizamos las consultas
-    const [mainBookingsResult, secondaryBookingsResult] = await Promise.all([
+    const [mainBookingsResult] = await Promise.all([
       // Obtener las reservas con pagos confirmados o activos (excluyendo pendientes)
       supabase
         .from('meetings_bookings')
@@ -185,7 +187,8 @@ export const bookingService = {
         .or(dateCondition)
         .in('payments_status.status', ['PAID', 'ACTIVE']),
         
-        // Similar para multiple_bookings
+        // FUTURE IMPLEMENTATION: Re-enable weekly and twice-weekly booking options
+        /*
         supabase
           .from('multiple_bookings')
           .select(`
@@ -194,10 +197,12 @@ export const bookingService = {
           `)
           .or(dateCondition)
           .in('meetings_bookings.payments_status.status', ['PAID', 'ACTIVE'])
+        */
     ]);
     
     const mainBookings = mainBookingsResult.data || [];
-    const secondaryBookings = secondaryBookingsResult.data || [];
+    // Definir el tipo explícitamente para evitar errores de tipo
+    const secondaryBookings: { booking_date: string; recurring_time: string }[] = []; // Lo inicializamos vacío ya que no lo estamos usando por ahora
     
     // Preparar un mapa para búsqueda más rápida de slots ocupados
     const bookedSlotsMap = new Map();
@@ -222,8 +227,13 @@ export const bookingService = {
       
       // Verificar si es horario de trabajo del coach (1-4 AM o 12-4 PM)
       if ((coachHour >= 1 && coachHour <= 4) || (coachHour >= 12 && coachHour <= 16)) {
-        // Solo añadir slots futuros
-        if (userSlotDateTime >= DateTime.now().setZone(userTimezone)) {
+        // Solo añadir slots futuros y nunca del día actual en zona horaria del coach
+        const nowInCoachTimezone = DateTime.now().setZone(COACH_TIMEZONE);
+        const slotCoachDate = coachSlotDateTime.startOf('day');
+        const todayInCoachTimezone = nowInCoachTimezone.startOf('day');
+        
+        // Saltamos slots del día actual en la zona horaria del coach
+        if (slotCoachDate > todayInCoachTimezone && userSlotDateTime >= DateTime.now().setZone(userTimezone)) {
           // Verificar si el slot ya está reservado usando el mapa
           const slotKey = userSlotDateTime.toFormat('yyyy-MM-dd-HH');
           const isBooked = bookedSlotsMap.has(slotKey);

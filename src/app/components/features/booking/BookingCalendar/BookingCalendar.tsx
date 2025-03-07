@@ -12,6 +12,9 @@ import { FrequencySelector } from '../FrequencySelector/FrequencySelector'
 import { getBookingSummary } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
+// Definir la constante COACH_TIMEZONE con el mismo valor que se usa en el servicio
+const COACH_TIMEZONE = process.env.COACH_TIMEZONE || 'UTC';
+
 // Componente para el botón de proceder al pago, memoizado para reducir renderizados
 const PaymentButton = React.memo(({ onClick, isLoading }: { onClick: () => void, isLoading: boolean }) => (
   <Button 
@@ -89,7 +92,6 @@ export function BookingCalendar() {
     handleDateSelect,
     handleSlotSelect,
     handleSectionClick,
-    handleTimezoneChange,
     handleFrequencySelect,
     formatSlotTime,
     handleBookingConfirm
@@ -111,6 +113,9 @@ export function BookingCalendar() {
   
       if (!firstSlotDate || !secondSlotDate) return null
   
+      // Calcular precio total (meses x precio por mes)
+      const totalPrice = bookingPlan.duration * 100;
+  
       return (
         <div className="flex justify-center">
           <div className="space-y-4 text-left">
@@ -128,6 +133,7 @@ export function BookingCalendar() {
               <p>Ending on {DateTime.fromJSDate(secondSlotDate)
                 .plus({ months: bookingPlan.duration })
                 .toFormat('MMMM d, yyyy')}</p>
+              <p className="mt-2 font-medium">Total Price: ${totalPrice}</p>
             </div>
             <div className="flex justify-center mt-6">
               <PaymentButton onClick={handleBookingConfirm} isLoading={isBookingLoading} />
@@ -142,6 +148,7 @@ export function BookingCalendar() {
         <p className="text-xl">
           {getBookingSummary(selectedSlot.date, bookingPlan.frequency || 'once', bookingPlan.duration, true, selectedTimezone)}
         </p>
+        <p className="font-medium">Price: $100</p>
         <div className="flex justify-center">
           <PaymentButton onClick={handleBookingConfirm} isLoading={isBookingLoading} />
         </div>
@@ -170,6 +177,7 @@ export function BookingCalendar() {
             frequency={bookingPlan?.frequency}
             suggestedDate={suggestedDate}
             selectedTimezone={selectedTimezone}
+            COACH_TIMEZONE={COACH_TIMEZONE}
           />
         )
       case 'time':

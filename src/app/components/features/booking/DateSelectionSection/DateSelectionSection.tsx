@@ -32,6 +32,8 @@ interface DateSelectionSectionProps {
   onSlotSelect: (slot: TimeSlot) => void
 }
 
+const COACH_TIMEZONE = process.env.COACH_TIMEZONE || 'UTC';
+
 export function DateSelectionSection({
   selectedDate,
   suggestedDate,
@@ -66,6 +68,7 @@ export function DateSelectionSection({
             frequency={bookingPlan?.frequency}
             suggestedDate={suggestedDate}
             selectedTimezone={selectedTimezone}
+            COACH_TIMEZONE={COACH_TIMEZONE}
           />
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">

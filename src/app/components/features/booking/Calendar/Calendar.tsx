@@ -14,6 +14,7 @@ interface CalendarProps {
   frequency?: BookingFrequency
   suggestedDate?: Date | null
   selectedTimezone: string
+  COACH_TIMEZONE: string
 }
 
 // Componente de día memoizado para evitar renderizados innecesarios
@@ -55,7 +56,8 @@ export function Calendar({
   selectedDate, 
   bookedDates,
   suggestedDate,
-  selectedTimezone
+  selectedTimezone,
+  COACH_TIMEZONE
 }: CalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(() => 
     DateTime.now().setZone(selectedTimezone)
@@ -98,9 +100,20 @@ export function Calendar({
   }, [bookedDates, selectedTimezone]);
 
   const isDisabled = useCallback((date: DateTime) => {
-    const today = DateTime.now().setZone(selectedTimezone).startOf('day');
-    return date < today || isFullyBooked(date);
-  }, [selectedTimezone, isFullyBooked]);
+    // Usar la zona horaria del COACH para determinar si la fecha es hoy
+    const todayInCoachTimezone = DateTime.now()
+      .setZone(COACH_TIMEZONE)
+      .startOf('day');
+    
+    // La fecha del calendario en la zona horaria del coach
+    const dateInCoachTimezone = date
+      .setZone(selectedTimezone)
+      .startOf('day')
+      .setZone(COACH_TIMEZONE);
+    
+    // Deshabilitar si la fecha es hoy o en el pasado, o si está completamente reservada
+    return dateInCoachTimezone <= todayInCoachTimezone || isFullyBooked(date);
+  }, [selectedTimezone, isFullyBooked, COACH_TIMEZONE]);
 
   const isCurrentMonth = useCallback((date: DateTime) => {
     return date.month === currentMonth.month;

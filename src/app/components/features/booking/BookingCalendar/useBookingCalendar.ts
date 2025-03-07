@@ -229,7 +229,7 @@ export function useBookingCalendar() {
     if (previousSectionsCompleted) {
       setActiveSection(sectionId);
     }
-  }, [sections]);
+  }, [sections, setActiveSection]);
 
   const handleTimezoneChange = useCallback(async (timezone: string) => {
     setSelectedTimezone(timezone)
@@ -388,17 +388,20 @@ export function useBookingCalendar() {
         selectedTimezone,
         bookingId: savedBookings[0].id,
         orderId,
-        booking: savedBookings[0]
+        booking: savedBookings[0] 
       };
 
       localStorage.setItem('pendingBooking', JSON.stringify(bookingData));
+      
+      // El botón permanecerá deshabilitado porque no modificamos isBookingLoading después de este punto
+      // lo que mantiene el botón en estado de carga hasta que el usuario sea redirigido
       window.location.href = checkoutUrl;
     } catch (error) {
       console.error('Error creating booking:', error);
-    } finally {
+      // Solo habilitamos el botón nuevamente si hay un error
       setIsBookingLoading(false);
     }
-  }, [bookingPlan, selectedTimezone, userProfile]);
+  }, [bookingPlan, selectedSlot, userProfile, selectedTimezone]);
 
   return {
     sections,
