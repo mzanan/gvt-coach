@@ -1,22 +1,19 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Card } from "@/app/components/ui-kit/card"
 import { Button } from "@/app/components/ui-kit/button"
 import Link from 'next/link'
 import { ChevronLeft, Check } from "lucide-react"
-import { Loader2 } from "lucide-react"
+import { Loader2, Clock } from "lucide-react"
 import { BookingSummaryDisplay } from '@/app/components/features/booking/BookingSummaryDisplay'
 import { useRouter } from 'next/navigation'
 import { BookingDB } from '@/app/types/booking'
 import { BookingFrequency as SuperbaseBookingFrequency } from '@/app/types/enums/booking'
 import { BookingFrequency as AppBookingFrequency } from '@/app/types/booking'
-import { paymentService } from '@/services/paymentService';
-import { PaymentOrderStatus } from '@/app/types/payments';
-import { zoomService } from '@/services/zoomService';
-import { getAuthToken } from '@/lib/auth';
 import { useEmailNotifications } from '@/app/components/features/notifications/EmailNotifications';
 import { useToast } from '@/app/components/ui-kit/use-toast';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 // Helper function to convert between BookingFrequency types
 function convertBookingFrequency(frequency: SuperbaseBookingFrequency): AppBookingFrequency {
@@ -33,23 +30,68 @@ function convertBookingFrequency(frequency: SuperbaseBookingFrequency): AppBooki
 }
 
 export default function PaymentSuccessPage() {
-  const [isLoading, setIsLoading] = useState(true)
+  const [isPaymentPending, setIsPaymentPending] = useState(true)
   const [booking, setBooking] = useState<BookingDB | null>(null)
   const [userTimezone, setUserTimezone] = useState('')
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
   const [emailSent, setEmailSent] = useState(false)
   const [emailError, setEmailError] = useState<string | null>(null)
+  const [orderId, setOrderId] = useState<string | null>(null)
+  const [emailRetryCount, setEmailRetryCount] = useState(0)
+  const MAX_EMAIL_RETRIES = 3
   const router = useRouter()
-  const { sendBookingConfirmation, isSending, error } = useEmailNotifications()
+  const { sendBookingConfirmation, isSending } = useEmailNotifications()
   const { toast } = useToast()
+  const supabase = createClientComponentClient()
+
+  // Enviar confirmación por email
+  const sendConfirmationEmail = useCallback(async () => {
+    if (!booking || !userEmail || emailSent || isSending || emailRetryCount >= MAX_EMAIL_RETRIES) return;
+    
+    try {
+      // Call sendBookingConfirmation with the correct parameters
+      const success = await sendBookingConfirmation(
+        booking,
+        userEmail,
+        userName || undefined
+      );
+      
+      if (success) {
+        setEmailSent(true);
+        
+        toast({
+          title: "Confirmation Sent",
+          description: "We've sent you an email with your booking details",
+          variant: "default"
+        });
+      } else {
+        throw new Error("Failed to send email");
+      }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (e) {
+      setEmailRetryCount(prev => prev + 1);
+      
+      if (emailRetryCount >= MAX_EMAIL_RETRIES - 1) {
+        setEmailError("We couldn't send the confirmation email automatically. Please contact support.");
+      } else {
+        setEmailError(`We couldn't send the confirmation email automatically. Retrying... (${emailRetryCount + 1}/${MAX_EMAIL_RETRIES})`);
+      }
+      
+      toast({
+        title: "Couldn't Send Email",
+        description: emailRetryCount >= MAX_EMAIL_RETRIES - 1 
+          ? "Failed to send confirmation after multiple attempts. Please contact support."
+          : "There was an error sending the confirmation email. Retrying...",
+        variant: "destructive"
+      });
+    }
+  }, [booking, userEmail, userName, emailSent, isSending, toast, sendBookingConfirmation, emailRetryCount, MAX_EMAIL_RETRIES]);
 
   // Obtener datos del usuario actual
   useEffect(() => {
     const getUserData = async () => {
       try {
-        console.log('PaymentSuccess: Getting user data from localStorage...');
-        
         // Get user data from localStorage
         if (typeof window !== 'undefined') {
           // Get user profile from localStorage
@@ -60,54 +102,50 @@ export default function PaymentSuccessPage() {
               const profile = profileData.value; // Profile is inside .value
               
               if (profile && profile.email) {
-                console.log('PaymentSuccess: Email found in localStorage:', profile.email);
                 setUserEmail(profile.email);
                 
                 // Set name if available
                 if (profile.first_name) {
                   const name = `${profile.first_name} ${profile.last_name || ''}`.trim();
                   setUserName(name);
-                  console.log('PaymentSuccess: Name found in localStorage:', name);
                 }
                 return;
               }
-            } catch (e) {
-              console.error('PaymentSuccess: Error parsing user profile:', e);
+            } catch (e: unknown) {
+              const errorMessage = e instanceof Error ? e.message : String(e);
+              throw new Error(`Error getting user data: ${errorMessage}`);
             }
-          } else {
-            console.log('PaymentSuccess: No user profile found in localStorage');
           }
-          
+
           // Also check for email in pendingBooking
           const pendingBookingStr = localStorage.getItem('pendingBooking');
           if (pendingBookingStr) {
             try {
               const pendingData = JSON.parse(pendingBookingStr);
               if (pendingData.userEmail) {
-                console.log('PaymentSuccess: Email found in pendingBooking.userEmail:', pendingData.userEmail);
                 setUserEmail(pendingData.userEmail);
                 return;
               }
               if (pendingData.booking && pendingData.booking.user_email) {
-                console.log('PaymentSuccess: Email found in pendingBooking.booking.user_email:', pendingData.booking.user_email);
                 setUserEmail(pendingData.booking.user_email);
                 return;
               }
-            } catch (e) {
-              console.error('PaymentSuccess: Error parsing pendingBooking:', e);
+            } catch (e: unknown) {
+              const errorMessage = e instanceof Error ? e.message : String(e);
+              throw new Error(`Error getting user data: ${errorMessage}`);
             }
           }
         }
-        
-        console.log('PaymentSuccess: Could not find email in localStorage');
-      } catch (error) {
-        console.error('PaymentSuccess: Error getting user data:', error);
+      } catch (e: unknown) {
+        // En lugar de silenciar el error, lo registramos pero permitimos que la UI siga funcionando
+        console.error("Error al cargar datos de usuario:", e);
       }
     }
     
     getUserData()
   }, [])
 
+  // Load booking data from localStorage
   useEffect(() => {
     const pendingBooking = localStorage.getItem('pendingBooking')
     if (!pendingBooking) {
@@ -115,260 +153,125 @@ export default function PaymentSuccessPage() {
       return
     }
     
-    console.log('PaymentSuccess: Complete pendingBooking content:', JSON.parse(pendingBooking));
-    
     const bookingData = JSON.parse(pendingBooking)
     setUserTimezone(bookingData.selectedTimezone)
-    setBooking(bookingData.booking)
-    setIsLoading(false)
+    setOrderId(bookingData.orderId)
+    
+    // No direct booking assignment here - we'll get it from the database
   }, [router])
-
-  // Enviar correo de confirmación cuando tengamos los datos necesarios
+  
+  // Set up a Supabase subscription to listen for payment status changes
   useEffect(() => {
-    const sendConfirmationEmail = async () => {
-      // Si ya se envió un email o hay un error previo, no hacer nada
-      if (emailSent) {
-        console.log('PaymentSuccess: Email was already sent, skipping');
-        return;
-      }
-
-      // Determinar qué email usar (prioridad: userEmail, luego booking.user_email)
-      const emailToUse = process.env.NODE_ENV === 'development' 
-        ? process.env.NEXT_PUBLIC_COACH_EMAIL 
-        : (userEmail || booking?.user_email);
-
-      
-      if (!booking || !emailToUse || isLoading) {
-        const reason = !booking 
-          ? 'No booking data available' 
-          : !emailToUse 
-            ? 'No user email available' 
-            : 'Page is still loading';
-              
-        console.log(`PaymentSuccess: Not sending email automatically. Reason: ${reason}`);
-        return;
-      }
-
-      // Marcar como enviado antes de intentar enviar para prevenir múltiples intentos
-      setEmailSent(true);
-
-      console.log(`PaymentSuccess: Attempting to send email to:`, emailToUse);
-      console.log('PaymentSuccess: Booking details:', {
-        id: booking.id,
-        date: new Date(booking.booking_date).toLocaleString(),
-        duration: booking.duration || 60,
-        link: booking.meet_link || 'Not available',
-        email_source: userEmail ? 'userEmail state' : 'booking.user_email'
-      });
+    if (!orderId) return;
+    
+    // First, get the current status
+    const checkPaymentStatus = async () => {
+      if (!orderId) return;
       
       try {
-        const success = await sendBookingConfirmation(booking, emailToUse, userName || undefined);
-        
-        if (success) {
-          console.log('PaymentSuccess: Confirmation email sent successfully');
-          
-          toast({
-            title: "Email sent",
-            description: "We've sent the confirmation to your email",
-          });
-        } else {
-          console.error('PaymentSuccess: Error sending confirmation email');
-          console.error('PaymentSuccess: Reported error:', error);
-          
-          setEmailSent(false); // Allow retry if failed
-          setEmailError(`Could not send the email automatically. Please use the button to try manually.`);
-          
-          toast({
-            title: "Error sending email",
-            description: error || "Could not send confirmation automatically. Use the button to try manually.",
-            variant: "destructive"
-          });
+        // Primero buscar en la tabla de mapeo
+        const { data: mappingData, error: mappingError } = await supabase
+          .from('gvt_coach_checkout_mapping')
+          .select('payment_status_id')
+          .eq('checkout_order_id', orderId)
+          .maybeSingle();
+
+        if (mappingError) {
+          console.error(`Error fetching mapping for orderId ${orderId}:`, mappingError);
+          return;
         }
-      } catch (error) {
-        console.error('PaymentSuccess: Exception sending confirmation email:', error);
         
-        setEmailSent(false); // Allow retry if failed
-        const errorMessage = error instanceof Error 
-          ? `Error: ${error.message}` 
-          : "Unexpected error sending the email";
-          
-        setEmailError(`${errorMessage}. Try with the manual button.`);
-        
-        toast({
-          title: "Unexpected error",
-          description: "An error occurred sending the confirmation. Try with the manual button.",
-          variant: "destructive"
-        });
-      }
-    };
-    
-    // Solo intentamos enviar el correo si tenemos los datos necesarios y no se ha enviado ya
-    if (booking?.meet_link && !emailSent) {
-      sendConfirmationEmail();
-    }
-  }, [booking?.meet_link]); // Solo depender del meet_link para enviar el email
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    
-    const checkStatus = async () => {
-      const pendingBooking = localStorage.getItem('pendingBooking');
-      if (!pendingBooking) return;
-  
-      const data = JSON.parse(pendingBooking);
-      if (!data.orderId) {
-        console.error('No orderId found in pendingBooking');
-        router.push('/payment/cancel');
-        return;
-      }
-  
-      try {
-        const orderStatus = await paymentService.getOrderStatus(data.orderId);
-        console.log('orderStatus:', orderStatus);
-        
-        // Si hay un email en el booking, guardarlo
-        if (data.booking && data.booking.user_email && !userEmail) {
-          console.log('PaymentSuccess: Email obtained from booking in checkStatus:', data.booking.user_email);
-          setUserEmail(data.booking.user_email);
+        if (!mappingData || !mappingData.payment_status_id) {
+          console.warn(`No payment mapping found for orderId: ${orderId}`);
+          return;
         }
-
-        if ([PaymentOrderStatus.Active, PaymentOrderStatus.Paid].includes(orderStatus)) {
-          if (interval) clearInterval(interval);
-
-          try {
-            const meetLink = await zoomService.createMeeting(new Date(data.booking.booking_date));
-            const token = await getAuthToken();
+          
+        // Buscar el estado del pago usando el ID
+        const { data: paymentStatus, error: paymentError } = await supabase
+          .from('gvt_coach_payments_status')
+          .select('*')
+          .eq('id', mappingData.payment_status_id)
+          .maybeSingle();
+          
+        if (paymentError) {
+          console.error(`Error fetching payment status:`, paymentError);
+          return;
+        }
+        
+        if (!paymentStatus) {
+          console.warn(`No payment status found`);
+          return;
+        }
+        
+        // Si el pago está confirmado, buscar la reserva
+        if (paymentStatus.status === 'PAID' || paymentStatus.status === 'ACTIVE') {
+          setIsPaymentPending(false);
+          
+          // Buscar la reserva que referencia este checkout_order_id
+          const { data: bookingData, error: bookingError } = await supabase
+            .from('gvt_coach_meetings_bookings')
+            .select('*')
+            .eq('checkout_order_id', orderId)
+            .single();
             
-            // Log the full URL being used for the API call
-            const apiUrl = `/api/bookings/${data.booking.id}`;
-            console.log('Making API call to:', apiUrl);
-            console.log('Booking ID being used:', data.booking.id);
-            
-            try {
-              const response = await fetch(apiUrl, {
-                method: 'PATCH',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                  meet_link: meetLink
-                })
-              });
-
-              if (!response.ok) {
-                console.error('Failed API response:', {
-                  status: response.status,
-                  statusText: response.statusText
-                });
-                
-                // Try to get the error message from the response
-                try {
-                  const errorData = await response.json();
-                  console.error('API error details:', errorData);
-                } catch (e) {
-                  console.error('Could not parse error response', e);
-                }
-                
-                // If response is 404 (Not Found), try to find the booking by order_id instead
-                if (response.status === 404 && data.orderId) {
-                  console.log('Booking not found by ID, attempting to find by order_id:', data.orderId);
-                  
-                  // Make a request to fetch the booking by order_id
-                  const orderResponse = await fetch(`/api/bookings/by-order/${data.orderId}`, {
-                    method: 'GET',
-                    headers: {
-                      'Authorization': `Bearer ${token}`
-                    }
-                  });
-                  
-                  if (orderResponse.ok) {
-                    const bookingByOrder = await orderResponse.json();
-                    console.log('Found booking by order_id:', bookingByOrder);
-                    
-                    if (bookingByOrder?.id) {
-                      // Now try to update this booking with the Zoom link
-                      const updateResponse = await fetch(`/api/bookings/${bookingByOrder.id}`, {
-                        method: 'PATCH',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          'Authorization': `Bearer ${token}`
-                        },
-                        body: JSON.stringify({
-                          meet_link: meetLink
-                        })
-                      });
-                      
-                      if (updateResponse.ok) {
-                        const updatedBooking = await updateResponse.json();
-                        console.log('Successfully updated booking using order_id lookup:', updatedBooking);
-                        setBooking(updatedBooking);
-                        setIsLoading(false);
-                        localStorage.removeItem('pendingBooking');
-                        return; // Exit the function early
-                      } else {
-                        console.error('Failed to update booking even after finding by order_id');
-                      }
-                    }
-                  } else {
-                    console.error('Failed to find booking by order_id:', data.orderId);
-                  }
-                }
-                
-                throw new Error('Failed to update booking with Zoom link');
-              }
-
-              const updatedBooking = await response.json();
-
-              setBooking(updatedBooking);
-              setIsLoading(false);
-
-              localStorage.removeItem('pendingBooking');
-            } catch (fetchError) {
-              console.error('Fetch error:', fetchError);
-              // Still show the booking information even if the update failed
-              setBooking({
-                ...data.booking,
-                meet_link: meetLink // Add the meet link anyway so user has access
-              });
-              setIsLoading(false);
-              
-              // Show error but don't remove pendingBooking
-              // so we can try again later if needed
-              throw fetchError;
-            }
-          } catch (error) {
-            console.error('Error creating/updating Zoom meeting:', error);
-            setBooking(data.booking);
-            setIsLoading(false);
+          if (bookingError) {
+            console.error(`Error fetching booking for orderId ${orderId}:`, bookingError);
+            return;
           }
-        } else if ([PaymentOrderStatus.Cancelled].includes(orderStatus)) {
-          if (interval) clearInterval(interval);
-          router.push('/payment/cancel');
+          
+          if (!bookingData) {
+            console.warn(`No booking found for orderId: ${orderId}`);
+            return;
+          }
+          
+          // Only log once when booking is first found
+          if (!booking && bookingData) {
+            console.log('Found booking:', bookingData);
+          }
+          
+          setBooking(bookingData);
+          
+          // If we have a booking and email, send the confirmation
+          if (bookingData && userEmail && !emailSent && !isSending && emailRetryCount < MAX_EMAIL_RETRIES) {
+            sendConfirmationEmail();
+          }
         }
-
-        // Verificar si tenemos el email después de obtener el booking actualizado
-        if (booking && booking.user_email && !userEmail) {
-          console.log('PaymentSuccess: Email obtained from updated booking:', booking.user_email);
-          setUserEmail(booking.user_email);
-        }
-      } catch (error) {
-        console.error('Error checking payment status:', error);
-        if (interval) clearInterval(interval);
-        router.push('/payment/cancel');
+      }
+      catch (e: unknown) {
+        // Registramos el error pero permitimos que la UI siga funcionando
+        console.error("Error checking payment status:", e);
       }
     };
-  
-    checkStatus();
-    interval = setInterval(checkStatus, 5000);
-  
+    
+    // Check immediately
+    checkPaymentStatus();
+    
+    // Set up subscription for real-time updates
+    const subscription = supabase
+      .channel('payment-status-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'gvt_coach_payments_status',
+          filter: `checkout_order_id=eq.${orderId}`
+        },
+        () => {
+          // Reduced logging
+          checkPaymentStatus();
+        }
+      )
+      .subscribe();
+      
+    // Poll every 15 seconds instead of 5 to reduce load
+    const interval = setInterval(checkPaymentStatus, 15000);
+    
     return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
+      subscription.unsubscribe();
+      clearInterval(interval);
     };
-  }, [router]);
-
+  }, [orderId, userEmail, emailSent, isSending, supabase, sendConfirmationEmail, booking, emailRetryCount, MAX_EMAIL_RETRIES]);
 
   // Actualizar el mensaje en la interfaz
   function getStatusMessage() {
@@ -387,31 +290,45 @@ export default function PaymentSuccessPage() {
     return "Confirm your booking details";
   }
 
-  if (isLoading) {
+  if (isPaymentPending) {
     return (
       <div className="container mx-auto py-8 max-w-2xl">
         <Card className="p-8 text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Processing your booking...</h1>
-          <p className="text-muted-foreground">Please wait while we confirm your payment</p>
+          <Clock className="h-8 w-8 text-orange-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold mb-2">Payment Processing</h1>
+          <div className="flex justify-center my-6">
+            <Loader2 className="h-6 w-6 animate-spin mr-2" />
+            <p>Waiting for payment confirmation...</p>
+          </div>
+          <p className="text-muted-foreground mb-4">
+            This may take a few moments. Please don&apos;t close this page.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Order ID: {orderId}
+          </p>
         </Card>
       </div>
     )
   }
 
+  // Si el pago está confirmado pero no tenemos datos de la reserva aún,
+  // seguimos mostrando "Payment Processing" en lugar de "Loading Booking Details"
   if (!booking) {
     return (
       <div className="container mx-auto py-8 max-w-2xl">
         <Card className="p-8 text-center">
-          <h1 className="text-2xl font-bold mb-2">Booking Not Found</h1>
-          <p className="text-muted-foreground">Unable to load booking details</p>
-          <div className="mt-8">
-            <Button variant="outline" asChild>
-              <Link href="/">
-                Return to Calendar
-              </Link>
-            </Button>
+          <Clock className="h-8 w-8 text-orange-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold mb-2">Payment Processing</h1>
+          <div className="flex justify-center my-6">
+            <Loader2 className="h-6 w-6 animate-spin mr-2" />
+            <p>Waiting for payment confirmation...</p>
           </div>
+          <p className="text-muted-foreground mb-4">
+            This may take a few moments. Please don&apos;t close this page.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Order ID: {orderId}
+          </p>
         </Card>
       </div>
     )
@@ -458,15 +375,17 @@ export default function PaymentSuccessPage() {
           <div className="border-b pb-4">
             <div className="space-y-4">
               <p className="text-muted-foreground">
-                📩 We&apos;ve sent your session details to <span className="font-medium text-foreground">{userEmail || booking.user_email}</span>.
+                📩 We&apos;ve sent your session details to <span className="font-medium text-foreground">{userEmail || (booking?.user_email || '')}</span>.
               </p>
             </div>
           </div>
           
-          <div>
-            <h2 className="font-medium text-lg mb-2">Booking Reference</h2>
-            <p className="font-mono text-sm text-muted-foreground">{booking.id}</p>
-          </div>
+          {booking && (
+            <div>
+              <h2 className="font-medium text-lg mb-2">Booking Reference</h2>
+              <p className="font-mono text-sm text-muted-foreground">{booking.id}</p>
+            </div>
+          )}
         </div>
 
         <div className="mt-8 text-center">

@@ -9,27 +9,27 @@ export async function GET(
     const supabase = await createClient();
     const { orderId } = await params;
 
-    console.log('[GET by-order] Looking for booking with order_id:', orderId);
+    console.log('[GET by-order] Looking for booking with checkout_order_id:', orderId);
 
     const { data: booking, error: bookingError } = await supabase
-      .from('meetings_bookings')
+      .from('gvt_coach_meetings_bookings')
       .select('*')
-      .eq('order_id', orderId)
+      .eq('checkout_order_id', orderId)
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
 
     if (bookingError) {
-      console.error('[GET by-order] Error finding booking by order_id:', bookingError);
+      console.error('[GET by-order] Error finding booking by checkout_order_id:', bookingError);
       
-      // Also try to find all bookings with this order_id (not using single)
+      // Also try to find all bookings with this checkout_order_id (not using single)
       const { data: allBookings } = await supabase
-        .from('meetings_bookings')
-        .select('id, order_id, user_email, created_at')
-        .eq('order_id', orderId)
+        .from('gvt_coach_meetings_bookings')
+        .select('id, checkout_order_id, user_email, created_at')
+        .eq('checkout_order_id', orderId)
         .order('created_at', { ascending: false });
         
-      console.log('[GET by-order] All bookings with this order_id:', allBookings);
+      console.log('[GET by-order] All bookings with this checkout_order_id:', allBookings);
       
       return NextResponse.json(
         { error: bookingError.message },
@@ -37,7 +37,7 @@ export async function GET(
       );
     }
 
-    console.log('[GET by-order] Found booking by order_id:', booking);
+    console.log('[GET by-order] Found booking by checkout_order_id:', booking);
     return NextResponse.json(booking);
   } catch (error) {
     console.error('[GET by-order] Error:', error);

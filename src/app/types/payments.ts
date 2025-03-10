@@ -2,10 +2,9 @@ import { BookingFrequency } from "./booking";
 
 export enum PaymentOrderStatus {
   Active = 'ACTIVE',
-  PastDue = 'PAST_DUE',
-  Cancelled = 'CANCELLED',
   Pending = 'PENDING',
-  Paid = 'PAID'
+  Paid = 'PAID',
+  Void = 'VOID'
 }
 
 export interface CheckoutPayload {

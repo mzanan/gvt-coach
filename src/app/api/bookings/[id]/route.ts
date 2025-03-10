@@ -13,7 +13,7 @@ export async function GET(
     console.log('[GET] Looking for booking with ID:', id);
 
     const { data: booking, error: bookingError } = await supabase
-      .from('meetings_bookings')
+      .from('gvt_coach_meetings_bookings')
       .select('*')
       .eq('id', id)
       .single();
@@ -63,8 +63,8 @@ export async function PATCH(
 
     // First, check if the booking exists
     const { data: existingBooking, error: findError } = await supabase
-      .from('meetings_bookings')
-      .select('id, order_id, user_email')
+      .from('gvt_coach_meetings_bookings')
+      .select('id, checkout_order_id, user_email')
       .eq('id', id)
       .single();
 
@@ -74,8 +74,8 @@ export async function PATCH(
 
       // Let's get all bookings for debugging
       const { data: allBookings } = await supabase
-        .from('meetings_bookings')
-        .select('id, order_id, user_email')
+        .from('gvt_coach_meetings_bookings')
+        .select('id, checkout_order_id, user_email')
         .limit(5);
       
       console.log('[PATCH] First 5 bookings in database:', allBookings);
@@ -89,7 +89,7 @@ export async function PATCH(
     console.log('[PATCH] Found existing booking:', existingBooking);
 
     const { data, error } = await supabase
-      .from('meetings_bookings')
+      .from('gvt_coach_meetings_bookings')
       .update({
         meet_link: updates.meet_link
       })

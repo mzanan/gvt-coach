@@ -52,7 +52,7 @@ export const bookingService = {
     
     if (mainBooking.frequency === 'twice-weekly') {
       const { data: secondBooking } = await supabase
-        .from('meetings_bookings')
+        .from('gvt_coach_meetings_bookings')
         .select('*')
         .eq('user_email', mainBooking.user_email)
         .eq('frequency', 'twice-weekly')
@@ -179,24 +179,24 @@ export const bookingService = {
     const [mainBookingsResult] = await Promise.all([
       // Obtener las reservas con pagos confirmados o activos (excluyendo pendientes)
       supabase
-        .from('meetings_bookings')
+        .from('gvt_coach_meetings_bookings')
         .select(`
           booking_date, 
-          recurring_time
+          recurring_time,
+          id,
+          checkout_order_id
         `)
-        .or(dateCondition)
-        .in('payments_status.status', ['PAID', 'ACTIVE']),
+        .or(dateCondition),
         
         // FUTURE IMPLEMENTATION: Re-enable weekly and twice-weekly booking options
         /*
         supabase
-          .from('multiple_bookings')
+          .from('gvt_coach_multiple_bookings')
           .select(`
             booking_date, 
             recurring_time
           `)
           .or(dateCondition)
-          .in('meetings_bookings.payments_status.status', ['PAID', 'ACTIVE'])
         */
     ]);
     
@@ -279,7 +279,7 @@ export const bookingService = {
         ? startDateTime 
         : endDate ? DateTime.fromJSDate(endDate).toUTC() : null;
 
-      // Crear la reserva principal sin order_id inicialmente
+      // Crear la reserva principal sin checkout_order_id inicialmente
       const mainBooking = {
         user_email: email,
         frequency,
@@ -288,13 +288,13 @@ export const bookingService = {
         duration,
         recurring_day: frequency !== 'once' ? DateTime.fromJSDate(startDate).weekdayLong : null,
         recurring_time: frequency !== 'once' ? startDateTime.toFormat('HH:mm') : null,
-        // Solo incluimos order_id si se proporciona
-        ...orderId ? { order_id: orderId } : {},  
+        // Solo incluimos checkout_order_id si se proporciona
+        ...orderId ? { checkout_order_id: orderId } : {},  
         meet_link: meetLink
       };
 
       const { data: savedBooking, error } = await supabase
-        .from('meetings_bookings')
+        .from('gvt_coach_meetings_bookings')
         .insert([mainBooking])
         .select()
         .single();
@@ -313,7 +313,7 @@ export const bookingService = {
         };
 
         const { error: secondError } = await supabase
-          .from('multiple_bookings')
+          .from('gvt_coach_multiple_bookings')
           .insert([secondSession]);
 
         if (secondError) throw secondError;
@@ -329,8 +329,8 @@ export const bookingService = {
   updateBookingWithOrderId: async (bookingId: string, orderId: string) => {
     try {
       const { data, error } = await supabase
-        .from('meetings_bookings')
-        .update({ order_id: orderId })
+        .from('gvt_coach_meetings_bookings')
+        .update({ checkout_order_id: orderId })
         .eq('id', bookingId)
         .select()
         .single();
@@ -353,29 +353,49 @@ export const bookingService = {
     const endOfMonth = DateTime.fromJSDate(new Date(month.getFullYear(), month.getMonth() + 1, 0)).endOf('day');
     
     const { data: bookings } = await supabase
-      .from('meetings_bookings')
+      .from('gvt_coach_meetings_bookings')
       .select(`
+        id,
         booking_date, 
         frequency, 
+        duration,
+        user_email,
+        meet_link,
         recurring_day, 
         recurring_time, 
         end_date,
-        order_id,
-        payments_status!inner (
-          status
-        )
+        checkout_order_id
       `)
       .or(`frequency.eq.once,frequency.neq.once`)
       .gte('booking_date', startOfMonth.toISO())
-      .lte('booking_date', endOfMonth.toISO())
-      .in('payments_status.status', ['PAID', 'ACTIVE']);
+      .lte('booking_date', endOfMonth.toISO());
 
     if (!bookings) {
       throw new Error('Failed to fetch bookings');
     }
 
-    const singleBookings = bookings.filter(b => b.frequency === 'once');
-    const recurringBookings = bookings.filter(b => b.frequency !== 'once');
+    // Obtener los estados de pago
+    const orderIds = bookings.map(booking => booking.checkout_order_id).filter(Boolean);
+    
+    let validBookings = bookings;
+    
+    if (orderIds.length > 0) {
+      const { data: paymentStatuses } = await supabase
+        .from('gvt_coach_payments_status')
+        .select('checkout_order_id, status')
+        .in('checkout_order_id', orderIds)
+        .in('status', ['PAID', 'ACTIVE']);
+      
+      if (paymentStatuses) {
+        const validOrderIds = new Set(paymentStatuses.map(ps => ps.checkout_order_id));
+        validBookings = bookings.filter(booking => 
+          booking.checkout_order_id && validOrderIds.has(booking.checkout_order_id)
+        );
+      }
+    }
+
+    const singleBookings = validBookings.filter(b => b.frequency === 'once');
+    const recurringBookings = validBookings.filter(b => b.frequency !== 'once');
 
     const bookingsByDate = new Map<string, number>();
     const TOTAL_SLOTS_PER_DAY = 9;

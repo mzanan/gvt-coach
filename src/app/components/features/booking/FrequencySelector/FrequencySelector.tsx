@@ -72,7 +72,7 @@ export function FrequencySelector({
         >
           <h3 className="text-xl font-semibold mb-2">Weekly Sessions</h3>
           <p className="text-muted-foreground">Schedule recurring weekly sessions</p>
-          <p className="mt-2 font-medium">$100</p>
+          {/* <p className="mt-2 font-medium">$100</p> */}
           {disableWeekly && (
             <p className="text-sm text-muted-foreground mt-2">(Coming soon)</p>
           )}
@@ -88,7 +88,7 @@ export function FrequencySelector({
         >
           <h3 className="text-xl font-semibold mb-2">Twice Weekly</h3>
           <p className="text-muted-foreground">Schedule two sessions per week</p>
-          <p className="mt-2 font-medium">$100</p>
+          {/* <p className="mt-2 font-medium">$100</p> */}
           {disableTwiceWeekly && (
             <p className="text-sm text-muted-foreground mt-2">(Coming soon)</p>
           )}

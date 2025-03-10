@@ -346,62 +346,60 @@ export function useBookingCalendar() {
     setIsBookingLoading(true);
 
     try {
-      let startDate: Date;
-      if (bookingPlan?.frequency === 'twice-weekly') {
-        if (!bookingPlan.firstSlot) {
-          throw new Error('First booking slot is not set');
-        }
-        startDate = bookingPlan.firstSlot.date;
-      } else {
-        if (!selectedSlot) {
-          throw new Error('No time slot selected');
-        }
-        startDate = selectedSlot.date;
-      }
-  
-      const endDate = bookingPlan?.frequency !== 'once' 
-        ? DateTime.fromJSDate(startDate)
-            .plus({ months: bookingPlan?.duration || 0 })
-            .toJSDate()
-        : null;
+      // Get selected date information
+      const startDate = new Date(selectedSlot?.date || new Date());
 
-      // Primero obtenemos el orderId del checkout
+      // First get the orderId from checkout
+      console.log('Creating checkout with payment service...');
       const { checkoutUrl, orderId } = await paymentService.createCheckout(
         bookingPlan as BookingPlan, 
         userProfile as UserProfile
       );
       
-      // Luego creamos el booking con el orderId
-      const savedBookings = await bookingService.createBooking(
-        (userProfile as UserProfile).email,
-        startDate,
-        (bookingPlan as BookingPlan).frequency,
-        endDate,
-        (bookingPlan as BookingPlan).duration,
-        orderId, // Usamos el orderId obtenido
-        bookingPlan?.secondSlot?.date,
-        undefined
-      );
-
-      const bookingData = {
+      if (!orderId || !checkoutUrl) {
+        throw new Error('Failed to create checkout: missing orderId or checkoutUrl');
+      }
+      
+      // Store basic information before creating booking
+      const tempBookingData = {
         userEmail: userProfile?.email,
         selectedTimezone,
-        bookingId: savedBookings[0].id,
         orderId,
-        booking: savedBookings[0] 
+        bookingPlan,
+        selectedDate: startDate.toISOString() // Add the selected date
       };
-
-      localStorage.setItem('pendingBooking', JSON.stringify(bookingData));
       
-      // El botón permanecerá deshabilitado porque no modificamos isBookingLoading después de este punto
-      // lo que mantiene el botón en estado de carga hasta que el usuario sea redirigido
+      // Store temporary data
+      localStorage.setItem('pendingBooking', JSON.stringify(tempBookingData));
+      
+      // The button will remain disabled because we don't modify isBookingLoading after this point,
+      // which keeps the button in a loading state until the user is redirected
       window.location.href = checkoutUrl;
+      
+      // Note: We've removed the booking creation step from here.
+      // The booking will be created after payment confirmation in the success page
+      // This prevents the foreign key constraint error
     } catch (error) {
       console.error('Error creating booking:', error);
-      // Solo habilitamos el botón nuevamente si hay un error
+      // Only re-enable the button if there's an error
       setIsBookingLoading(false);
     }
   }, [bookingPlan, selectedSlot, userProfile, selectedTimezone]);
+
+  const handleNextSection = useCallback(() => {
+    // No podemos comparar directamente 'activeSection' (string) con 'sections.length' (number)
+    // Encontramos el índice de la sección activa y incrementamos si no es la última
+    const activeIndex = sections.findIndex(s => s.id === activeSection);
+    if (activeIndex < sections.length - 1) {
+      const nextSection = sections[activeIndex + 1].id;
+      setActiveSection(nextSection);
+    }
+  }, [activeSection, sections]);
+
+  const handlePlanSelection = useCallback((plan: BookingPlan) => {
+    setBookingPlan(plan);
+    handleNextSection();
+  }, [handleNextSection]);
 
   return {
     sections,
@@ -425,7 +423,9 @@ export function useBookingCalendar() {
     handleTimezoneChange,
     handleFrequencySelect,
     formatSlotTime,
-    handleBookingConfirm
+    handleBookingConfirm,
+    handleNextSection,
+    handlePlanSelection
   }
 }
 
