@@ -48,7 +48,7 @@ export function TwiceWeeklySelector({ firstDate, onComplete, duration = 1, timez
 
   const formatTime = (date: Date) => {
     const dateTime = DateTime.fromJSDate(date).setZone(timezone)
-    return dateTime.hour === 0 ? "00:00 AM" : dateTime.toFormat('hh:mm a')
+    return dateTime.hour === 0 ? "00:00" : dateTime.toFormat('hh:mm a')
   }
 
   const getEndDate = () => {

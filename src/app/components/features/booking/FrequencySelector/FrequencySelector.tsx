@@ -1,8 +1,8 @@
 'use client'
 
 import { Button } from "@/app/components/ui-kit/button"
-import { BookingFrequency } from "@/app/types/booking"
-import { useState } from "react"
+import { BookingFrequency } from "@/app/types/enums/booking"
+import { useState, useEffect } from "react"
 import { Label } from "@/app/components/ui-kit/label"
 import {
   Select,
@@ -27,14 +27,31 @@ export function FrequencySelector({
   disableWeekly = false,
   disableTwiceWeekly = false
 }: FrequencySelectorProps) {
-  const [selectedFrequencyState, setSelectedFrequency] = useState<BookingFrequency | null>(selectedFrequency || null)
+  const [selectedFrequencyState, setSelectedFrequency] = useState<BookingFrequency | null>(selectedFrequency || BookingFrequency.Once)
   const [duration, setDuration] = useState<string>("1")
 
-  const handleSelect = (frequency: BookingFrequency) => {
-    setSelectedFrequency(frequency)
-    if (frequency === 'once') {
-      onFrequencySelect(frequency)
+  // Auto-select BookingFrequency.Once when component mounts
+  useEffect(() => {
+    if (!selectedFrequencyState) {
+      setSelectedFrequency(BookingFrequency.Once)
+      onFrequencySelect(BookingFrequency.Once)
     }
+  }, [])
+
+  const handleSelect = (frequency: BookingFrequency) => {
+    // Only allow BookingFrequency.Once frequency for now
+    if (frequency === BookingFrequency.Once) {
+      setSelectedFrequency(frequency)
+      onFrequencySelect(frequency)
+      return
+    }
+
+    // For other frequencies, check if they're disabled
+    if (disableWeekly && frequency === BookingFrequency.Weekly) return
+    if (disableTwiceWeekly && frequency === BookingFrequency.TwiceWeekly) return
+
+    setSelectedFrequency(frequency)
+    onFrequencySelect(frequency)
   }
 
   const handleDurationChange = (value: string) => {
@@ -42,7 +59,7 @@ export function FrequencySelector({
   }
 
   const handleConfirm = () => {
-    if (selectedFrequencyState && selectedFrequencyState !== 'once') {
+    if (selectedFrequencyState && selectedFrequencyState !== BookingFrequency.Once) {
       onFrequencySelect(selectedFrequencyState, parseInt(duration))
     }
   }
@@ -53,9 +70,9 @@ export function FrequencySelector({
         <Card 
           className={cn(
             "p-6 cursor-pointer hover:border-primary transition-colors",
-            selectedFrequency === 'once' && "border-primary"
+            selectedFrequency === BookingFrequency.Once && "border-primary"
           )}
-          onClick={() => handleSelect('once')}
+          onClick={() => handleSelect(BookingFrequency.Once)}
         >
           <h3 className="text-xl font-semibold mb-2">Single Session</h3>
           <p className="text-muted-foreground">Book a one-time consultation session</p>
@@ -65,37 +82,37 @@ export function FrequencySelector({
         <Card 
           className={cn(
             "p-6 cursor-pointer hover:border-primary transition-colors",
-            selectedFrequency === 'weekly' && "border-primary",
-            disableWeekly && "opacity-50 cursor-not-allowed hover:border-border"
+            disableWeekly ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
+            selectedFrequency === BookingFrequency.Weekly && "border-primary"
           )}
-          onClick={() => !disableWeekly && handleSelect('weekly')}
+          onClick={() => !disableWeekly && handleSelect(BookingFrequency.Weekly)}
         >
           <h3 className="text-xl font-semibold mb-2">Weekly Sessions</h3>
           <p className="text-muted-foreground">Schedule recurring weekly sessions</p>
           {/* <p className="mt-2 font-medium">$100</p> */}
           {disableWeekly && (
-            <p className="text-sm text-muted-foreground mt-2">(Coming soon)</p>
+            <p className="text-sm text-muted-foreground mt-2 font-medium">(Coming Soon)</p>
           )}
         </Card>
 
         <Card 
           className={cn(
             "p-6 cursor-pointer hover:border-primary transition-colors",
-            selectedFrequency === 'twice-weekly' && "border-primary",
-            disableTwiceWeekly && "opacity-50 cursor-not-allowed hover:border-border"
+            disableTwiceWeekly ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
+            selectedFrequency === BookingFrequency.TwiceWeekly && "border-primary"
           )}
-          onClick={() => !disableTwiceWeekly && handleSelect('twice-weekly')}
+          onClick={() => !disableTwiceWeekly && handleSelect(BookingFrequency.TwiceWeekly)}
         >
           <h3 className="text-xl font-semibold mb-2">Twice Weekly</h3>
           <p className="text-muted-foreground">Schedule two sessions per week</p>
           {/* <p className="mt-2 font-medium">$100</p> */}
           {disableTwiceWeekly && (
-            <p className="text-sm text-muted-foreground mt-2">(Coming soon)</p>
+            <p className="text-sm text-muted-foreground mt-2 font-medium">(Coming Soon)</p>
           )}
         </Card>
       </div>
 
-      {selectedFrequencyState && selectedFrequencyState !== 'once' && (
+      {selectedFrequencyState && selectedFrequencyState !== BookingFrequency.Once && (
         <div className="space-y-4 w-full">
           <div className="space-y-2 md:w-1/3">
             <Label>Duration (months)</Label>

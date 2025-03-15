@@ -1,11 +1,4 @@
-import { BookingFrequency } from "./booking";
-
-export enum PaymentOrderStatus {
-  Active = 'ACTIVE',
-  Pending = 'PENDING',
-  Paid = 'PAID',
-  Void = 'VOID'
-}
+import { BookingFrequency, PaymentOrderStatus } from "./enums/booking";
 
 export interface CheckoutPayload {
   variantId: string;

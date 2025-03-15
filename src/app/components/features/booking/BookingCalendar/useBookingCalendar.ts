@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { TimeSlot, BookingFrequency, BookingPlan } from '@/app/types/booking'
+import { TimeSlot, BookingPlan } from '@/app/types/booking'
 import { UserProfile } from '@/app/types/user'
 import { toast } from '@/app/components/ui-kit/use-toast'
 import { DateTime } from 'luxon'
 import { bookingService } from '@/services/bookingService'
-import { paymentService } from '@/services/paymentService'
+import { paymentService } from '@/services/payments'
+import { BookingFrequency } from '@/app/types/enums/booking'
 
 interface Section {
   id: 'date' | 'time' | 'summary' | 'frequency'
@@ -35,7 +36,10 @@ export function useBookingCalendar() {
   const [suggestedDate, setSuggestedDate] = useState<Date | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null)
   const [availableSlots, setAvailableSlots] = useState<DayGroup[]>([])
-  const [bookingPlan, setBookingPlan] = useState<BookingPlan | null>(null)
+  const [bookingPlan, setBookingPlan] = useState<BookingPlan>({
+    frequency: BookingFrequency.Once,
+    duration: 1
+  })
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [bookedDates, setBookedDates] = useState<Array<{ date: Date, fullyBooked: boolean }>>([])
@@ -137,7 +141,7 @@ export function useBookingCalendar() {
     // Establecer la fecha seleccionada inmediatamente para mejorar la UX
     setSelectedDate(selectedLocalDate.toJSDate());
     
-    if (bookingPlan?.frequency === 'twice-weekly') {
+    if (bookingPlan?.frequency === BookingFrequency.TwiceWeekly) {
       const suggested = selectedLocalDate.plus({ days: 3 }).toJSDate();
       setSuggestedDate(suggested);
       setIsLoadingSlots(false); // No cargamos slots para twice-weekly
@@ -187,24 +191,45 @@ export function useBookingCalendar() {
   const handleSlotSelect = useCallback((slot: TimeSlot) => {
     if (!slot.available) return;
     
-    // Create DateTime object in user's timezone
-    const slotDateTime = DateTime.fromJSDate(slot.date)
-      .setZone(selectedTimezone);
-     
+    // Validación básica
+    if (!slot.date) {
+      console.error('ERROR: Slot inválido sin fecha', slot);
+      toast({
+        title: "Error",
+        description: "El horario seleccionado es inválido. Por favor, intenta con otro.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Conversión de fecha simplificada - un solo paso
+    const slotDateTime = DateTime.fromJSDate(slot.date).setZone(selectedTimezone);
+    const slotUTC = slotDateTime.toUTC();
+    
+    // Log simplificado con información esencial
+    console.log(`Slot seleccionado:`, {
+      local: slotDateTime.toISO(),
+      utc: slotUTC.toISO(),
+      hora: slotDateTime.hour,
+      minuto: slotDateTime.minute
+    });
+    
+    // Crear slot corregido de forma directa
     const correctedSlot = {
       ...slot,
       date: slotDateTime.toJSDate(),
-      utcDate: slotDateTime.toUTC().toJSDate()
+      utcDate: slotUTC.toJSDate()
     };
     
+    // Actualizar datos de reserva
     const commonBookingData = {
       firstSlot: correctedSlot,
       duration: bookingPlan?.duration || 1,
-      frequency: bookingPlan?.frequency || 'once'
+      frequency: bookingPlan?.frequency || BookingFrequency.Once
     };
 
     setBookingPlan(prev => {
-      if (bookingPlan?.frequency === 'twice-weekly') {
+      if (bookingPlan?.frequency === BookingFrequency.TwiceWeekly) {
         return prev ? { ...prev, ...commonBookingData } : null;
       } else {
         return prev ? { ...prev, ...commonBookingData } : commonBookingData;
@@ -217,7 +242,7 @@ export function useBookingCalendar() {
       s.id === 'time' ? { ...s, completed: true } : s
     ));
     setActiveSection('summary');
-  }, [bookingPlan, selectedTimezone, sections]);
+  }, [bookingPlan, selectedTimezone]);
 
   const handleSectionClick = useCallback((sectionId: string) => {
     const sectionIndex = sections.findIndex(s => s.id === sectionId);
@@ -246,7 +271,7 @@ export function useBookingCalendar() {
         setSelectedDate(newSelectedDate)
 
         // También actualizar la fecha sugerida si existe
-        if (suggestedDate && bookingPlan?.frequency === 'twice-weekly') {
+        if (suggestedDate && bookingPlan?.frequency === BookingFrequency.TwiceWeekly) {
           const newSuggestedDate = DateTime.fromJSDate(suggestedDate)
             .setZone(timezone, { keepLocalTime: true })
             .toJSDate()
@@ -303,85 +328,101 @@ export function useBookingCalendar() {
           }
         }
       } catch (error) {
-        console.error('Error al actualizar zona horaria:', error);
+        console.error('Error updating timezone:', error);
         toast({
           title: "Error",
-          description: "No se pudo actualizar la zona horaria. Por favor, inténtelo de nuevo.",
+          description: "Could not update timezone. Please try again.",
           variant: "destructive"
         });
       }
     }
   }, [selectedDate, setSelectedTimezone]);
 
-  const handleFrequencySelect = useCallback((frequency: BookingFrequency, duration?: number) => {
-    setSelectedDate(null)
-    setSuggestedDate(null)
-    setSelectedSlot(null)
-    setAvailableSlots([])
-    
-    // FUTURE IMPLEMENTATION: Re-enable weekly and twice-weekly booking options
-    // For now, only single sessions are supported
-    if (frequency !== 'once') {
-      return;
-    }
-    
-    setBookingPlan({ 
-      frequency, 
-      duration: duration || 1 
-    })
-    
-    setSections(prev => prev.map(s => 
-      s.id === 'frequency' ? { ...s, completed: true } : s
-    ))
-    setActiveSection('date')
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const handleFrequencySelect = useCallback(
+    (frequency: BookingFrequency, duration?: number) => {
+      // Allow any valid frequency to be selected
+      setSelectedDate(null)
+      setSuggestedDate(null)
+      setSelectedSlot(null)
+      setAvailableSlots([])
+      
+      setBookingPlan(prev => ({
+        ...prev,
+        frequency: frequency,
+        duration: duration || (prev?.duration ?? 1)
+      }))
+      
+      setSections(prev => prev.map(s => 
+        s.id === 'frequency' ? { ...s, completed: true } : s
+      ));
+      
+      setActiveSection('date')
+    }, 
+    []
+  );
 
   const formatSlotTime = useCallback((date: Date) => {
-    return DateTime.fromJSDate(date)
-      .setZone(selectedTimezone)
-      .toFormat('h:mm a');
+    const dateTime = DateTime.fromJSDate(date).setZone(selectedTimezone);
+    return dateTime.hour === 0 && dateTime.minute === 0 
+      ? "00:00" 
+      : dateTime.toFormat('h:mm a');
   }, [selectedTimezone]);
 
   const handleBookingConfirm = useCallback(async () => {
     setIsBookingLoading(true);
 
     try {
-      // Get selected date information
-      const startDate = new Date(selectedSlot?.date || new Date());
+      if (!selectedSlot) {
+        throw new Error("No se seleccionó ningún horario");
+      }
 
-      // First get the orderId from checkout
-      console.log('Creating checkout with payment service...');
+      // Simplificación: obtener fecha local y UTC en un solo paso
+      const localDateTime = DateTime.fromJSDate(selectedSlot.date).setZone(selectedTimezone);
+      const utcDateTime = localDateTime.toUTC();
+
+      // Log simplificado con información clave
+      console.log('Confirmando reserva:', {
+        fecha_local: localDateTime.toISO(),
+        fecha_utc: utcDateTime.toISO(),
+        hora_local: localDateTime.toFormat('HH:mm'),
+        hora_utc: utcDateTime.toFormat('HH:mm')
+      });
+
+      // Usar directamente el selectedSlot actual
+      const updatedBookingPlan = {
+        ...bookingPlan,
+        firstSlot: selectedSlot,
+        duration: bookingPlan?.duration || 1,
+        frequency: bookingPlan?.frequency || BookingFrequency.Once
+      };
+
+      // Crear checkout
       const { checkoutUrl, orderId } = await paymentService.createCheckout(
-        bookingPlan as BookingPlan, 
-        userProfile as UserProfile
+        updatedBookingPlan,
+        userProfile as UserProfile,
+        true
       );
       
       if (!orderId || !checkoutUrl) {
-        throw new Error('Failed to create checkout: missing orderId or checkoutUrl');
+        throw new Error('Error al crear checkout: falta orderId o checkoutUrl');
       }
       
-      // Store basic information before creating booking
+      // Almacenar datos esenciales
       const tempBookingData = {
         userEmail: userProfile?.email,
         selectedTimezone,
         orderId,
-        bookingPlan,
-        selectedDate: startDate.toISOString() // Add the selected date
+        bookingPlan: updatedBookingPlan,
+        selectedDate: localDateTime.toISO(),
+        utcDate: utcDateTime.toISO()
       };
       
-      // Store temporary data
       localStorage.setItem('pendingBooking', JSON.stringify(tempBookingData));
       
-      // The button will remain disabled because we don't modify isBookingLoading after this point,
-      // which keeps the button in a loading state until the user is redirected
       window.location.href = checkoutUrl;
-      
-      // Note: We've removed the booking creation step from here.
-      // The booking will be created after payment confirmation in the success page
-      // This prevents the foreign key constraint error
     } catch (error) {
-      console.error('Error creating booking:', error);
-      // Only re-enable the button if there's an error
+      console.error('Error al crear reserva:', error);
       setIsBookingLoading(false);
     }
   }, [bookingPlan, selectedSlot, userProfile, selectedTimezone]);

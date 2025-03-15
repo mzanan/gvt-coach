@@ -1,13 +1,4 @@
-import { BookingFrequency as FrequencyEnum, BookingStatus as StatusEnum } from './enums/booking';
-
-export enum BookingStatus {
-  PENDING_PAYMENT = 'pending-payment',
-  PAYMENT_FAILED = 'payment-failed',
-  PAYMENT_PROCESSING = 'payment-processing',
-  PAYMENT_SUCCESSFUL = 'payment-successful',
-  BOOKING_CONFIRMED = 'booking-confirmed',
-  BOOKING_CANCELLED = 'booking-cancelled',
-}
+import { BookingFrequency, BookingStatus } from './enums/booking';
 
 export interface Booking {
   id: string
@@ -32,8 +23,6 @@ export interface GroupedTimeSlots {
   slots: TimeSlot[];
 }
 
-export type BookingFrequency = 'weekly' | 'twice-weekly' | 'once';
-
 export interface BookingPlan {
   frequency: BookingFrequency;
   duration: number;
@@ -52,11 +41,17 @@ export interface BookingDB {
   user_email: string;
   booking_date: string;
   end_date?: string;
-  frequency: FrequencyEnum;
-  status: StatusEnum;
+  frequency: BookingFrequency;
+  status: BookingStatus;
   meet_link: string;
   recurring_day?: string; 
   recurring_time?: string;
   second_booking_date?: string | null;
   duration?: number;
+  user_timezone?: string;
+  payment_status?: string;
+  payment_confirmed?: boolean;
+  checkout_completed?: boolean;
+  checkout_order_id?: string;
+  session_minutes?: number;
 } 

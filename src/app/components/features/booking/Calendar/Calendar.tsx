@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useCallback } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { BookingFrequency } from '@/app/types/booking'
+import { BookingFrequency } from '@/app/types/enums/booking'
 import { Button } from '@/app/components/ui-kit/button'
 import { DateTime } from 'luxon'
 

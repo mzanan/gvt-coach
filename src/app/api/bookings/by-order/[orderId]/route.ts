@@ -1,9 +1,15 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse, NextRequest } from 'next/server';
 
+// Type for route parameters in Next.js
+type RouteParams = {
+  params: Promise<{ orderId: string }>
+};
+
+// Using the same format as other working route files
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ orderId: string }> }
+  { params }: RouteParams
 ) {
   try {
     const supabase = await createClient();

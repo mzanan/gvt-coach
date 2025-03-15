@@ -9,6 +9,7 @@ export function Logo({ size = "42" }: { size?: string }) {
       alt="GVTNomad Logo"
       width={parseInt(size)}
       height={parseInt(size)}
+      priority={true}
     />
   )
 }

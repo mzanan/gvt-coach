@@ -7,6 +7,7 @@ import { Calendar } from '../../booking/Calendar/Calendar'
 import { TimezoneDropdown } from '../../../features/user/TimezoneDropdown/TimezoneDropdown'
 import { TimeSlot, BookingPlan } from '@/app/types/booking'
 import { useDateSelectionSection } from './useDateSelectionSection'
+import { BookingFrequency } from '@/app/types/enums/booking'
 
 interface SlotInfo {
   date: Date;
@@ -86,7 +87,7 @@ export function DateSelectionSection({
           </div>
         </div>
 
-        {bookingPlan?.frequency === 'twice-weekly' && selectedDate && (
+        {bookingPlan?.frequency === BookingFrequency.TwiceWeekly && selectedDate && (
           <div className="w-full space-y-4 mt-6">
             <h2 className="text-lg font-semibold">Second Weekly Session</h2>
             <div className="text-sm text-muted-foreground mb-4">

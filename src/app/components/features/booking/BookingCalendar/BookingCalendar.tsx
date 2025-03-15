@@ -9,8 +9,8 @@ import { ChevronDown, ChevronUp, Check, Edit2, Loader2 } from 'lucide-react'
 import { Card } from '@/app/components/ui-kit/card'
 import { DateTime } from 'luxon'
 import { FrequencySelector } from '../FrequencySelector/FrequencySelector'
-import { getBookingSummary } from '@/lib/utils'
-import { cn } from '@/lib/utils'
+import { getBookingSummary, cn } from '@/lib/utils'
+import { BookingFrequency } from '@/app/types/enums/booking'
 
 // Definir la constante COACH_TIMEZONE con el mismo valor que se usa en el servicio
 const COACH_TIMEZONE = process.env.COACH_TIMEZONE || 'UTC';
@@ -107,7 +107,7 @@ export function BookingCalendar() {
   const summaryContent = useMemo(() => {
     if (!bookingPlan || !selectedSlot) return null;
     
-    if (bookingPlan.frequency === 'twice-weekly') {
+    if (bookingPlan.frequency === BookingFrequency.TwiceWeekly) {
       const firstSlotDate = bookingPlan?.firstSlot?.date
       const secondSlotDate = bookingPlan?.secondSlot?.date
   
@@ -122,7 +122,7 @@ export function BookingCalendar() {
             <div className="space-y-2">
               <p>{getBookingSummary(
                 firstSlotDate,
-                'twice-weekly',
+                BookingFrequency.TwiceWeekly,
                 bookingPlan.duration,
                 true,
                 selectedTimezone,
@@ -146,7 +146,7 @@ export function BookingCalendar() {
     return (
       <div className="space-y-4 text-center">
         <p className="text-xl">
-          {getBookingSummary(selectedSlot.date, bookingPlan.frequency || 'once', bookingPlan.duration, true, selectedTimezone)}
+          {getBookingSummary(selectedSlot.date, bookingPlan.frequency || BookingFrequency.Once, bookingPlan.duration, true, selectedTimezone)}
         </p>
         <p className="font-medium">Price: $100</p>
         <div className="flex justify-center">
@@ -211,7 +211,21 @@ export function BookingCalendar() {
                             key={`${slot.date.toString()}-${index}`}
                             variant={selectedSlot?.date.toString() === slot.date.toString() ? 'default' : 'outline'}
                             disabled={!slot.available}
-                            onClick={() => handleSlotSelect(slot.slot!)}
+                            onClick={() => {
+                              // Add debug logging to trace slot information
+                              console.log('Clicked on time slot:', {
+                                index,
+                                slotDate: slot.date,
+                                slotDateISO: slot.date.toISOString(),
+                                slotTime: formatSlotTime(slot.date),
+                                slotInfo: slot.slot,
+                                slotId: slot.slot?.id,
+                                slotHour: DateTime.fromJSDate(slot.date).hour,
+                                slotMinute: DateTime.fromJSDate(slot.date).minute,
+                                selectedTimezone
+                              });
+                              handleSlotSelect(slot.slot!);
+                            }}
                             className={cn(
                               "whitespace-nowrap",
                               !slot.available && "opacity-60 cursor-not-allowed dark:bg-gray-800 bg-gray-100 dark:text-gray-400 text-gray-500"

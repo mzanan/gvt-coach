@@ -3,8 +3,9 @@
 import { Card } from '@/app/components/ui-kit/card'
 import { cn } from '@/lib/utils'
 import { Check } from 'lucide-react'
-import { BookingFrequency, BookingPlan } from '@/app/types/booking'
+import { BookingPlan } from '@/app/types/booking'
 import { useFrequencySection } from './useFrequencySection'
+import { BookingFrequency } from '@/app/types/enums/booking'
 
 interface FrequencySectionProps {
   bookingPlan: BookingPlan | null
@@ -24,8 +25,8 @@ export function FrequencySection({
       <h2 className="text-lg font-semibold">How often would you like to have coaching sessions?</h2>
       <div className="grid gap-4 md:grid-cols-1">
         <Card className={cn("p-4 cursor-pointer border-2 transition-colors", 
-          bookingPlan?.frequency === 'once' ? "border-primary" : "border-transparent hover:border-primary/50")}
-          onClick={() => handleFrequencyCardClick('once', 60)}>
+          bookingPlan?.frequency === BookingFrequency.Once ? "border-primary" : "border-transparent hover:border-primary/50")}
+          onClick={() => handleFrequencyCardClick(BookingFrequency.Once, 60)}>
           <div className="flex justify-between items-center p-2">
             <div>
               <div className="text-lg font-medium">Single Session</div>
@@ -33,7 +34,7 @@ export function FrequencySection({
               <div className="text-sm">60 minutes</div>
             </div>
             <div className="font-semibold text-lg">$250</div>
-            {bookingPlan?.frequency === 'once' && (
+            {bookingPlan?.frequency === BookingFrequency.Once && (
               <div className="ml-2">
                 <Check className="h-5 w-5 text-primary" />
               </div>
@@ -42,8 +43,8 @@ export function FrequencySection({
         </Card>
 
         <Card className={cn("p-4 cursor-pointer border-2 transition-colors", 
-          bookingPlan?.frequency === 'weekly' ? "border-primary" : "border-transparent hover:border-primary/50")}
-          onClick={() => handleFrequencyCardClick('weekly', 60)}>
+          bookingPlan?.frequency === BookingFrequency.Weekly ? "border-primary" : "border-transparent hover:border-primary/50")}
+          onClick={() => handleFrequencyCardClick(BookingFrequency.Weekly, 60)}>
           <div className="flex justify-between items-center p-2">
             <div>
               <div className="text-lg font-medium">Weekly</div>
@@ -51,7 +52,7 @@ export function FrequencySection({
               <div className="text-sm">60 minutes</div>
             </div>
             <div className="font-semibold text-lg">$850 <span className="text-sm font-normal text-muted-foreground">/month</span></div>
-            {bookingPlan?.frequency === 'weekly' && (
+            {bookingPlan?.frequency === BookingFrequency.Weekly && (
               <div className="ml-2">
                 <Check className="h-5 w-5 text-primary" />
               </div>
@@ -60,8 +61,8 @@ export function FrequencySection({
         </Card>
 
         <Card className={cn("p-4 cursor-pointer border-2 transition-colors",
-          bookingPlan?.frequency === 'twice-weekly' ? "border-primary" : "border-transparent hover:border-primary/50")}
-          onClick={() => handleFrequencyCardClick('twice-weekly', 60)}>
+          bookingPlan?.frequency === BookingFrequency.TwiceWeekly ? "border-primary" : "border-transparent hover:border-primary/50")}
+          onClick={() => handleFrequencyCardClick(BookingFrequency.TwiceWeekly, 60)}>
           <div className="flex justify-between items-center p-2">
             <div>
               <div className="text-lg font-medium">Twice Weekly</div>
@@ -69,7 +70,7 @@ export function FrequencySection({
               <div className="text-sm">60 minutes</div>
             </div>
             <div className="font-semibold text-lg">$1,500 <span className="text-sm font-normal text-muted-foreground">/month</span></div>
-            {bookingPlan?.frequency === 'twice-weekly' && (
+            {bookingPlan?.frequency === BookingFrequency.TwiceWeekly && (
               <div className="ml-2">
                 <Check className="h-5 w-5 text-primary" />
               </div>

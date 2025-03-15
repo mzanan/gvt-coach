@@ -1,0 +1,5 @@
+[functions.gvt_coach_lemon_webhook]
+verify_jwt = false
+
+[functions.gvt_coach_polar_webhook]
+verify_jwt = false 

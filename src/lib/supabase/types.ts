@@ -1,14 +1,4 @@
-export enum BookingStatus {
-  Confirmed = 'CONFIRMED',
-  Pending = 'PENDING',
-  Cancelled = 'CANCELLED'
-}
-
-export enum BookingFrequency {
-  Once = 'ONCE',
-  Weekly = 'WEEKLY',
-  TwiceWeekly = 'TWICE_WEEKLY'
-}
+import { BookingStatus, BookingFrequency } from '@/app/types/enums/booking';
 
 export interface UserProfile {
   id: string;

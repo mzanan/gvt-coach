@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { BookingFrequency, PaymentOrderStatus } from '@/app/types/enums/booking';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { orderId, bookingData } = body;
+    const { orderId, bookingData, provider } = body;
+
+    console.log('POST /api/payments/status - Received request:', { orderId, provider });
 
     if (!orderId) {
       return NextResponse.json(
@@ -16,6 +19,9 @@ export async function POST(request: NextRequest) {
     // Get Supabase credentials
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    console.log('Supabase URL available:', !!supabaseUrl);
+    console.log('Supabase Key available:', !!supabaseKey);
 
     if (!supabaseUrl || !supabaseKey) {
       console.error('Missing Supabase credentials');
@@ -31,7 +37,7 @@ export async function POST(request: NextRequest) {
     const { data: paymentData, error: paymentError } = await supabase
       .from('gvt_coach_payments_status')
       .insert({
-        status: 'PENDING',
+        status: PaymentOrderStatus.Pending,
         json_data: bookingData || null
       })
       .select('id')
@@ -50,9 +56,10 @@ export async function POST(request: NextRequest) {
       .from('gvt_coach_checkout_mapping')
       .upsert({
         checkout_order_id: orderId,
-        payment_order_id: null,
+        payment_order_id: orderId,
         payment_identifier_id: null,
-        payment_status_id: paymentData.id
+        payment_status_id: paymentData.id,
+        provider: provider || process.env.NEXT_PUBLIC_PAYMENT_PROVIDER || 'lemonsqueezy'
       }, {
         onConflict: 'checkout_order_id'
       });
@@ -69,7 +76,7 @@ export async function POST(request: NextRequest) {
     if (bookingData && bookingData.userEmail && bookingData.selectedDate) {
       try {
         const bookingDate = new Date(bookingData.selectedDate);
-        const bookingFrequency = bookingData.bookingPlan?.frequency || 'once';
+        const bookingFrequency = bookingData.bookingPlan?.frequency || BookingFrequency.Once;
         const bookingDuration = bookingData.bookingPlan?.duration || 1;
         const userTimezone = bookingData.selectedTimezone || 'UTC';
         
@@ -79,13 +86,12 @@ export async function POST(request: NextRequest) {
           .insert({
             checkout_order_id: orderId,
             user_email: bookingData.userEmail,
-            payment_status: 'PENDING',
+            payment_status: PaymentOrderStatus.Pending,
             checkout_completed: false,
             payment_confirmed: false,
             booking_date: bookingDate.toISOString(),
             frequency: bookingFrequency,
-            duration: bookingDuration, // Just use the months directly, not converted to minutes
-            recurring_time: new Date(bookingDate).toISOString().substring(11, 16), // Extract HH:MM
+            duration: bookingDuration,
             updated_at: new Date().toISOString(),
             user_timezone: userTimezone
           });
