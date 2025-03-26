@@ -301,8 +301,7 @@ async function processWebhookEvent(req: Request) {
                 .update({
                   payment_status: PAYMENT_STATUS.PAID,
                   checkout_completed: true,
-                  payment_confirmed: true,
-                  status: BOOKING_STATUS.CONFIRMED
+                  payment_confirmed: true
                 })
                 .eq('id', booking.id);
               
@@ -316,7 +315,13 @@ async function processWebhookEvent(req: Request) {
                   try {
                     // We need to call the API to create a Zoom meeting
                     // Get environment variables or configuration
-                    const BASE_URL = Deno.env.get('API_BASE_URL') || 'https://gvt-coach.vercel.app';
+                    // Use current environment to determine base URL - locally it can be localhost,
+                    // in production it should be your deployed URL
+                    const isDevelopment = Deno.env.get('NEXT_PUBLIC_ENV') === 'development';
+                    const BASE_URL = Deno.env.get('API_BASE_URL') || 
+                      (isDevelopment ? 'http://localhost:3000' : 'https://gvt-coach.vercel.app');
+                    
+                    console.log(`Using API base URL: ${BASE_URL} for Zoom meeting creation`);
                     
                     // Call the Zoom API
                     const meetingTime = new Date(booking.booking_date);

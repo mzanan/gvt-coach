@@ -243,8 +243,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           .insert([{
             user_email: bookingData.userEmail,
             booking_date: bookingDateValue,
-            frequency: bookingData.bookingPlan?.frequency || 'ONCE',
-            status: 'PENDING',
+            frequency: bookingData.bookingPlan?.frequency || BookingFrequency.Once,
+            payment_status: PaymentOrderStatus.Pending,
             checkout_order_id: orderId,
             user_timezone: userTimezone // Add user timezone to the booking record
           }])

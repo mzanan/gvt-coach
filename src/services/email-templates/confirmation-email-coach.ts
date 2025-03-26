@@ -28,7 +28,7 @@ export function getCoachConfirmationEmail(bookingDetails: CoachConfirmationEmail
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
         <h2 style="color: #4CAF50;">New coaching session is confirmed!</h2>
         <p>Hello Coach,</p>
-        <p>The user ${userName} (${bookingDetails.user_email}) has booked the following session:</p>
+        <p>The user ${userName} has booked the following session:</p>
         <div style="padding: 15px; border-left: 4px solid #4CAF50; background-color: #F9F9F9; margin: 20px 0;">
           <p><strong>Date:</strong> ${startDateTime.toFormat('EEEE, MMMM d, yyyy')}</p>
           <p><strong>Time:</strong> ${startDateTime.toFormat('HH:mm')} - ${endDateTime.toFormat('HH:mm')} ${bookingDetails.user_timezone ? `(${bookingDetails.user_timezone})` : ''}</p>
@@ -39,7 +39,6 @@ export function getCoachConfirmationEmail(bookingDetails: CoachConfirmationEmail
             <p><strong>Booking ID:</strong> ${bookingDetails.booking_id || 'N/A'}</p>
             <p><strong>Checkout Order ID:</strong> ${bookingDetails.checkout_order_id || 'N/A'}</p>
             <p><strong>Payment Status:</strong> ${bookingDetails.payment_status || 'N/A'}</p>
-            <p><strong>Payment Confirmed:</strong> ${bookingDetails.payment_confirmed ? 'Yes' : 'No'}</p>
             <p><strong>Payment Provider:</strong> ${bookingDetails.payment_provider ? bookingDetails.payment_provider.charAt(0).toUpperCase() + bookingDetails.payment_provider.slice(1) : 'N/A'}</p>
             <p><strong>User Timezone:</strong> ${bookingDetails.user_timezone || 'N/A'}</p>
           </div>
