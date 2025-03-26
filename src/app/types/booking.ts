@@ -39,6 +39,7 @@ export interface BookingPlan {
 export interface BookingDB {
   id: string;
   user_email: string;
+  user_name?: string;
   booking_date: string;
   end_date?: string;
   frequency: BookingFrequency;
@@ -53,5 +54,6 @@ export interface BookingDB {
   payment_confirmed?: boolean;
   checkout_completed?: boolean;
   checkout_order_id?: string;
+  confirmation_email_sent?: boolean;
   session_minutes?: number;
 } 

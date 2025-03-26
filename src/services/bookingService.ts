@@ -9,18 +9,13 @@ const COACH_TIMEZONE = process.env.COACH_TIMEZONE || 'UTC';
 
 // Cache to store results and reduce unnecessary calls
 const cache = {
-  availableSlots: new Map<string, {data: GroupedTimeSlots[], timestamp: number}>(),
-  bookedDates: { data: null as Array<{ date: Date, fullyBooked: boolean }> | null, timestamp: 0 },
-  bookings: new Map<string, {data: BookingDB, timestamp: number}>(),
-  CACHE_DURATION: 1 * 60 * 1000, // 1 minute (reduced from 5 minutes)
-  
-  isValid: function(timestamp: number) {
-    return Date.now() - timestamp < this.CACHE_DURATION;
-  },
+  availableSlots: new Map<string, GroupedTimeSlots[]>(),
+  bookedDates: { data: null as Array<{ date: Date, fullyBooked: boolean }> | null },
+  bookings: new Map<string, BookingDB>(),
   
   clearAll: function() {
     this.availableSlots.clear();
-    this.bookedDates = { data: null, timestamp: 0 };
+    this.bookedDates = { data: null };
     this.bookings.clear();
   },
   
@@ -29,7 +24,7 @@ const cache = {
   },
   
   clearBookedDates: function() {
-    this.bookedDates = { data: null, timestamp: 0 };
+    this.bookedDates = { data: null };
   }
 };
 
@@ -37,8 +32,8 @@ export const bookingService = {
   fetchBookingById: async (id: string): Promise<BookingDB> => {
     // Check if we have the booking in cache
     const cachedBooking = cache.bookings.get(id);
-    if (cachedBooking && cache.isValid(cachedBooking.timestamp)) {
-      return cachedBooking.data;
+    if (cachedBooking) {
+      return cachedBooking;
     }
     
     const token = await getToken()
@@ -81,13 +76,13 @@ export const bookingService = {
         };
         
         // Save to cache
-        cache.bookings.set(id, {data: result, timestamp: Date.now()});
+        cache.bookings.set(id, result);
         return result;
       }
     }
     
     // Save to cache
-    cache.bookings.set(id, {data: mainBooking, timestamp: Date.now()});
+    cache.bookings.set(id, mainBooking);
     return mainBooking
   },
 
@@ -112,7 +107,7 @@ export const bookingService = {
 
     // Also save to the database
     const { data, error } = await supabase
-      .from('meetings_user_profiles')
+      .from('gvt_coach_user_profiles')
       .upsert({
         email: profile.email,
         first_name: profile.first_name,
@@ -165,9 +160,9 @@ export const bookingService = {
     
     // Check if we have available slots in cache
     const cachedSlots = cache.availableSlots.get(cacheKey);
-    if (cachedSlots && cache.isValid(cachedSlots.timestamp)) {
+    if (cachedSlots) {
       console.log('Returning cached slots for', dateString);
-      return cachedSlots.data;
+      return cachedSlots;
     }
     
     // Add current time in the selected timezone for debugging
@@ -254,31 +249,60 @@ export const bookingService = {
     // Prepare a map for faster lookup of occupied slots
     const bookedSlotsMap = new Map();
     
-    // Add all bookings to the map for O(1) lookup instead of O(n)
+    // First, determine valid coach hours for the day
+    const validSlots = new Set<string>();
+    for (let hour = 0; hour < 24; hour++) {
+      const userSlotDateTime = userDateTime.plus({ hours: hour });
+      const utcSlotDateTime = userSlotDateTime.toUTC();
+      const coachSlotDateTime = utcSlotDateTime.setZone(COACH_TIMEZONE);
+      
+      const coachHour = coachSlotDateTime.hour;
+      
+      // Check if it's coach working hours (1-4 AM or 12-4 PM)
+      if ((coachHour >= 1 && coachHour <= 4) || (coachHour >= 12 && coachHour <= 16)) {
+        // Only add future slots and never from the current day in coach timezone
+        const nowInCoachTimezone = DateTime.now().setZone(COACH_TIMEZONE);
+        const slotCoachDate = coachSlotDateTime.startOf('day');
+        const todayInCoachTimezone = nowInCoachTimezone.startOf('day');
+        
+        // Skip slots from the current day in coach timezone
+        if (slotCoachDate > todayInCoachTimezone && userSlotDateTime >= DateTime.now().setZone(userTimezone)) {
+          // Add the slot to valid slots
+          const slotKey = userSlotDateTime.toFormat('yyyy-MM-dd-HH');
+          validSlots.add(slotKey);
+        }
+      }
+    }
+    
+    // Only process bookings that fall within valid coach hours
     [...mainBookings, ...secondaryBookings].forEach(booking => {
       try {
         // Convert the UTC booking date to the user's timezone for accurate slot blocking
         const bookingDateTime = DateTime.fromISO(booking.booking_date).setZone(userTimezone);
+        const slotKey = bookingDateTime.toFormat('yyyy-MM-dd-HH');
         
-        // Create multiple keys for better slot blocking - one for the exact hour and half-hour
-        const keyFormat = 'yyyy-MM-dd-HH-mm';
-        const exactKey = bookingDateTime.toFormat(keyFormat);
-        
-        // Block the whole hour for the booked slot
-        const hourKey = bookingDateTime.startOf('hour').toFormat('yyyy-MM-dd-HH');
-        
-        // Also block the half-hour if applicable
-        const minuteValue = bookingDateTime.minute;
-        const halfHourKey = minuteValue < 30 
-          ? bookingDateTime.set({ minute: 0 }).toFormat(keyFormat) 
-          : bookingDateTime.set({ minute: 30 }).toFormat(keyFormat);
-        
-        console.log(`Marking slot as booked: ${booking.booking_date} => ${exactKey} (${userTimezone})`);
-        
-        // Mark all relevant keys as booked
-        bookedSlotsMap.set(exactKey, true);
-        bookedSlotsMap.set(hourKey, true);
-        bookedSlotsMap.set(halfHourKey, true);
+        // Only process if the booking is in a valid slot
+        if (validSlots.has(slotKey)) {
+          // Create multiple keys for better slot blocking - one for the exact hour and half-hour
+          const keyFormat = 'yyyy-MM-dd-HH-mm';
+          const exactKey = bookingDateTime.toFormat(keyFormat);
+          
+          // Block the whole hour for the booked slot
+          const hourKey = bookingDateTime.startOf('hour').toFormat('yyyy-MM-dd-HH');
+          
+          // Also block the half-hour if applicable
+          const minuteValue = bookingDateTime.minute;
+          const halfHourKey = minuteValue < 30 
+            ? bookingDateTime.set({ minute: 0 }).toFormat(keyFormat) 
+            : bookingDateTime.set({ minute: 30 }).toFormat(keyFormat);
+          
+          console.log(`Marking slot as booked: ${booking.booking_date} => ${exactKey} (${userTimezone})`);
+          
+          // Mark all relevant keys as booked
+          bookedSlotsMap.set(exactKey, true);
+          bookedSlotsMap.set(hourKey, true);
+          bookedSlotsMap.set(halfHourKey, true);
+        }
       } catch (error) {
         console.error('Error processing booking date:', booking.booking_date, error);
       }
@@ -286,8 +310,7 @@ export const bookingService = {
 
     const slots: TimeSlot[] = [];
 
-    // Reduced range - only generate slots for the selected day
-    // Instead of iterating over 72 hours (3 days), only iterate over 24 hours (1 day)
+    // Generate slots using the same valid hours logic
     for (let hour = 0; hour < 24; hour++) {
       const userSlotDateTime = userDateTime.plus({ hours: hour });
       const utcSlotDateTime = userSlotDateTime.toUTC();
@@ -327,7 +350,7 @@ export const bookingService = {
 
     // Finally, save the results in cache
     const result = dailyGroups;
-    cache.availableSlots.set(cacheKey, {data: result, timestamp: Date.now()});
+    cache.availableSlots.set(cacheKey, result);
     return result;
   },
 
@@ -416,7 +439,7 @@ export const bookingService = {
 
   getFullyBookedDates: async (month: Date): Promise<Array<{ date: Date, fullyBooked: boolean }>> => {
     // Check if we have the booked dates in cache
-    if (cache.bookedDates.data && cache.isValid(cache.bookedDates.timestamp)) {
+    if (cache.bookedDates.data) {
       return cache.bookedDates.data;
     }
     
@@ -517,7 +540,6 @@ export const bookingService = {
       }
     }
 
-    /* eslint-disable @typescript-eslint/no-unused-vars */
     const result = Array.from(bookingsByDate.entries())
       .filter(([_, count]) => count >= TOTAL_SLOTS_PER_DAY)
       .map(([dateStr, _]) => ({
@@ -527,7 +549,7 @@ export const bookingService = {
     /* eslint-enable @typescript-eslint/no-unused-vars */
     
     // Finally, save the results in cache
-    cache.bookedDates = {data: result, timestamp: Date.now()};
+    cache.bookedDates = {data: result};
     return result;
   },
 

@@ -338,7 +338,6 @@ export function useBookingCalendar() {
     }
   }, [selectedDate, setSelectedTimezone]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleFrequencySelect = useCallback(
     (frequency: BookingFrequency, duration?: number) => {
       // Allow any valid frequency to be selected

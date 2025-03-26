@@ -16,7 +16,8 @@ export async function POST(req: NextRequest) {
     const { 
       to, 
       type, 
-      bookingDetails 
+      bookingDetails,
+      userTimezone 
     } = data;
 
     // Validate required data
@@ -56,13 +57,22 @@ export async function POST(req: NextRequest) {
     
     switch (type as NotificationType) {
       case 'confirmation':
-        result = await sendBookingConfirmation(to, bookingDetails);
+        result = await sendBookingConfirmation(to, {
+          ...bookingDetails,
+          user_timezone: userTimezone
+        });
         break;
       case 'reminder':
-        result = await sendSessionReminder(to, bookingDetails);
+        result = await sendSessionReminder(to, {
+          ...bookingDetails,
+          user_timezone: userTimezone
+        });
         break;
       case 'cancellation':
-        result = await sendCancellationNotification(to, bookingDetails);
+        result = await sendCancellationNotification(to, {
+          ...bookingDetails,
+          user_timezone: userTimezone
+        });
         break;
     }
 

@@ -1,8 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Clock, Video, AlertTriangle } from 'lucide-react'
-import { Button } from '@/app/components/ui-kit/button'
+import { Clock } from 'lucide-react'
 import { Card } from '@/app/components/ui-kit/card'
 import Link from 'next/link'
 import { ChevronLeft, Check } from "lucide-react"
@@ -25,7 +24,7 @@ export function PaymentSuccess() {
   } = usePaymentSuccess();
 
   // Show loading state while waiting for payment info
-  if (isLoading) {
+  if (isLoading || !isPaid) {
     return (
       <PaymentProgress
         icon={<Clock className="h-8 w-8 text-orange-500 mx-auto" />}
@@ -39,33 +38,6 @@ export function PaymentSuccess() {
         refreshButtonText="Check Status"
         loadingButtonText="Checking..."
       />
-    )
-  }
-
-  if (!isPaid) {
-    return (
-      <div className="container mx-auto py-8 max-w-2xl">
-        <Link href="/" className="text-primary hover:underline mb-8 inline-flex items-center gap-2">
-          <ChevronLeft className="h-4 w-4" />
-          Back to Calendar
-        </Link>
-
-        <Card className="max-w-2xl mx-auto p-8">
-          <div className="text-center mb-8">
-            <div className="h-12 w-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <AlertTriangle className="h-6 w-6 text-orange-600" />
-            </div>
-            <h1 className="text-2xl font-bold mb-2">Payment Pending</h1>
-            <p className="text-muted-foreground">
-              Your payment is still being processed
-            </p>
-            <p className="text-sm text-muted-foreground mt-4">
-              If you&apos;ve completed the payment process, please wait a moment for our system to confirm your payment.
-              This page will automatically update once your payment is confirmed.
-            </p>
-          </div>
-        </Card>
-      </div>
     )
   }
 
@@ -101,12 +73,10 @@ export function PaymentSuccess() {
             </div>
           </div>
           
-          <div className="border-b pb-4">
-            <div className="space-y-4">
-              <p className="text-muted-foreground">
-                📩 Your session details have been sent to <span className="font-medium text-foreground">{userEmail || (booking?.user_email || '')}</span>.
-              </p>
-            </div>
+          <div className="space-y-4">
+            <p className="text-muted-foreground">
+              📩 Your session details have been sent to <span className="font-medium text-foreground">{userEmail || (booking?.user_email || '')}</span>.
+            </p>
           </div>
         </div>
       </Card>

@@ -238,35 +238,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         console.log("API: /booking/create: Using user timezone:", userTimezone);
 
         // Create the booking record
-        const bookingRecord = {
-          user_email: bookingData.userEmail || '',
-          frequency: BookingFrequency.Once, // Default to single booking
-          booking_date: bookingDateValue, // Ahora estamos seguros de que esto siempre tiene un valor
-          end_date: null, // Only used for recurring bookings
-          recurring_day: null, // Only used for recurring bookings
-          recurring_time: null, // Only used for recurring bookings
-          user_timezone: userTimezone, // Use the user's selected timezone
-          duration: 1, // Default 1 hour
-          checkout_order_id: orderId,
-          checkout_completed: false,
-          payment_confirmed: false,
-          payment_status: PaymentOrderStatus.Pending,
-          meet_link: bookingData.meetLink || null
-        };
-        
-        console.log("API: /booking/create: Final booking record being inserted:", bookingRecord);
-        
-        const { data: newBooking, error: createBookingError } = await supabase
+        const { data: newBooking, error: createError } = await supabase
           .from('gvt_coach_meetings_bookings')
-          .insert(bookingRecord)
-          .select('id')
+          .insert([{
+            user_email: bookingData.userEmail,
+            booking_date: bookingDateValue,
+            frequency: bookingData.bookingPlan?.frequency || 'ONCE',
+            status: 'PENDING',
+            checkout_order_id: orderId,
+            user_timezone: userTimezone // Add user timezone to the booking record
+          }])
+          .select()
           .single();
           
-        if (createBookingError) {
-          console.error('API: /booking/create: Error creating booking record:', createBookingError);
+        if (createError) {
+          console.error('API: /booking/create: Error creating booking record:', createError);
           return NextResponse.json({ 
             error: 'Failed to create booking record', 
-            details: createBookingError.message 
+            details: createError.message 
           }, { status: 500 });
         }
         

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useToast } from '@/app/components/ui-kit/use-toast'
 import { BookingDB } from '@/app/types/booking'
@@ -7,6 +7,7 @@ import { fetchBookingByOrderId, fetchPaymentMapping, fetchPaymentStatus } from '
 import { bookingService } from '@/services/bookingService'
 import { supabase } from '@/lib/supabase/client'
 import { PaymentOrderStatus, BookingStatus } from '@/app/types/enums/booking'
+import { sendBookingConfirmation } from '@/services/mailer'
 
 export const usePaymentSuccess = () => {
   const [isLoading, setIsLoading] = useState(true)
@@ -18,196 +19,226 @@ export const usePaymentSuccess = () => {
   const searchParams = useSearchParams()
   const { toast } = useToast()
   
-  // References for controlling retries
+  // Referencias para controlar proceso
   const retryCountRef = useRef(0)
   const MAX_RETRIES = 10
   const checkoutOrderIdRef = useRef<string | null>(null)
   const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isCompletedRef = useRef(false)
+  const emailSentRef = useRef(false) // Ref para controlar si el email ya fue enviado
+  const effectExecutionFlag = useRef(false) // Mover fuera del callback para evitar error de linter
   
-  // Function to load payment data (to reuse in polling)
-  const loadPaymentData = async (checkoutOrderId: string) => {
+  // Función centralizada para envío de correo
+  const sendConfirmationEmailOnce = async (bookingData: BookingDB) => {
+    // Comprobar si el email ya fue enviado usando el ref (persistente entre renderizados)
+    if (emailSentRef.current) {
+      console.log("Email ya enviado según ref (omitiendo envío)");
+      return;
+    }
+    
+    // Marcar como enviado inmediatamente para evitar duplicados
+    emailSentRef.current = true;
+    
+    console.log("Enviando email de confirmación...");
     try {
-      // Skip if already completed
-      if (isCompletedRef.current) {
-        return true
+      await sendBookingConfirmation(
+        bookingData.user_email,
+        {
+          start_time: bookingData.booking_date,
+          end_time: new Date(new Date(bookingData.booking_date).getTime() + (bookingData.duration || 60) * 60000),
+          zoom_link: bookingData.meet_link,
+          user_name: bookingData.user_name,
+          booking_id: bookingData.id,
+          user_timezone: bookingData.user_timezone
+        }
+      );
+      
+      console.log("Correo enviado y marcado en base de datos");
+    } catch (emailError) {
+      // En caso de error, permitir reintentos
+      emailSentRef.current = false;
+      console.error("Error enviando correo de confirmación:", emailError);
+    }
+  };
+  
+  // Función para manejar la confirmación del booking - envuelta en useCallback
+  const handleBookingConfirmation = useCallback(async (bookingData: BookingDB) => {
+    try {
+      // Si el booking ya está confirmado completamente, no hacer nada más
+      if (bookingData.meet_link && bookingData.confirmation_email_sent) {
+        console.log("Booking ya completamente confirmado con meet_link y correo enviado");
+        emailSentRef.current = true; // Marcar como enviado en el ref
+        return bookingData;
       }
-      
-      // Get booking directly
-      const bookingData = await fetchBookingByOrderId(checkoutOrderId)
-      
-      if (bookingData) {
-        console.log("Found booking:", bookingData)
-        setBooking(bookingData)
+
+      // 1. Actualizar estado del booking
+      const { data, error } = await supabase
+        .from('gvt_coach_meetings_bookings')
+        .update({
+          payment_status: PaymentOrderStatus.Paid,
+          checkout_completed: true,
+          payment_confirmed: true
+        })
+        .eq('id', bookingData.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error actualizando estado del booking:", error);
+        return null;
+      }
+
+      const updatedBooking = data || bookingData;
+
+      // 2. Generar enlace de Zoom si es necesario
+      if (!updatedBooking.meet_link) {
+        console.log("Generando reunión en Zoom...");
+        const meetingTime = new Date(updatedBooking.booking_date);
+        const meetingTopic = `GVT Coaching Session with ${updatedBooking.user_email}`;
+        const duration = updatedBooking.duration || 60;
         
-        // Si la reserva ya está confirmada, hemos terminado
-        if (bookingData.status === BookingStatus.BookingConfirmed || 
-            bookingData.payment_status === PaymentOrderStatus.Paid || 
-            bookingData.payment_confirmed === true) {
-          console.log("Booking is confirmed, setting payment status to PAID and stopping polling")
-          setPaymentStatus(PaymentOrderStatus.Paid)
-          isCompletedRef.current = true
-          setIsLoading(false)
-          return true
+        const response = await fetch('/api/zoom/meeting', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            meetingTopic,
+            meetingTime: meetingTime.toISOString(),
+            duration,
+            timezone: updatedBooking.user_timezone || 'UTC'
+          })
+        });
+
+        if (response.ok) {
+          const zoomData = await response.json();
+          if (zoomData.join_url) {
+            const { error: updateError } = await supabase
+              .from('gvt_coach_meetings_bookings')
+              .update({ meet_link: zoomData.join_url })
+              .eq('id', updatedBooking.id);
+
+            if (!updateError) {
+              updatedBooking.meet_link = zoomData.join_url;
+            }
+          }
         }
       }
-      
-      // Si la reserva no está confirmada, verificamos el estado del pago
-      const mappingData = await fetchPaymentMapping(checkoutOrderId)
-      
-      if (!mappingData) {
-        console.warn("No payment mapping found")
-        return false
+
+      // Actualizar estado UI
+      setBooking(updatedBooking);
+      setPaymentStatus(PaymentOrderStatus.Paid);
+      isCompletedRef.current = true;
+      setIsLoading(false);
+
+      // 3. Enviar correo de confirmación (centralizado) - solo si no está marcado como enviado
+      if (!bookingData.confirmation_email_sent && !emailSentRef.current) {
+        await sendConfirmationEmailOnce(updatedBooking);
+      }
+
+      // 4. Limpiar caché de slots de tiempo
+      bookingService.clearTimeSlotsCache();
+
+      return updatedBooking;
+    } catch (error) {
+      console.error("Error en handleBookingConfirmation:", error);
+      return null;
+    }
+  }, []);
+
+  // Función para cargar datos de pago (reutilizada en polling) - envuelta en useCallback
+  const loadPaymentData = useCallback(async (checkoutOrderId: string) => {
+    try {
+      // Omitir si ya está completado
+      if (isCompletedRef.current) {
+        console.log("Pago ya completado, omitiendo verificación");
+        return true;
       }
       
-      // Get payment status from mapping
+      // Obtener booking directamente
+      const bookingData = await fetchBookingByOrderId(checkoutOrderId);
+      
+      if (bookingData) {
+        console.log("Booking encontrado:", bookingData);
+        
+        // Si el booking ya tiene el flag de correo enviado, actualizar estado ref
+        if (bookingData.confirmation_email_sent) {
+          emailSentRef.current = true;
+        }
+        
+        // Si el booking ya está confirmado, hemos terminado
+        if (bookingData.payment_status === PaymentOrderStatus.Paid || 
+            bookingData.payment_confirmed === true ||
+            bookingData.checkout_completed === true) {
+          console.log("Booking confirmado, estableciendo estado de pago como PAID y deteniendo polling");
+          
+          // Actualizar UI primero
+          setBooking(bookingData);
+          setPaymentStatus(PaymentOrderStatus.Paid);
+          isCompletedRef.current = true;
+          setIsLoading(false);
+
+          // Luego manejar confirmación (correos, etc.)
+          await handleBookingConfirmation(bookingData);
+          return true;
+        }
+
+        // Si no está confirmado, actualizar estado del booking en UI
+        setBooking(bookingData);
+      }
+      
+      // Si el booking no está confirmado, verificar estado de pago
+      const mappingData = await fetchPaymentMapping(checkoutOrderId);
+      
+      if (!mappingData) {
+        console.warn("No se encontró mapping de pago");
+        return false;
+      }
+      
+      // Obtener estado de pago desde mapping
       if (mappingData.payment_status_id) {
-        const paymentStatusData = await fetchPaymentStatus(mappingData.payment_status_id)
+        const paymentStatusData = await fetchPaymentStatus(mappingData.payment_status_id);
         
         if (paymentStatusData) {
-          console.log("Payment status found:", paymentStatusData)
+          console.log("Estado de pago encontrado:", paymentStatusData);
           
-          // Solo nos interesa el status principal, no el de json_data
-          const statusFromRecord = paymentStatusData.status
-          console.log("Using main status field for determination:", statusFromRecord)
+          const statusFromRecord = paymentStatusData.status;
+          console.log("Usando campo de estado principal para determinar:", statusFromRecord);
           
-          setPaymentStatus(statusFromRecord)
+          setPaymentStatus(statusFromRecord);
           
-          // Si el estado es PAID/ACTIVE, marcar como completado y detener polling
+          // Si el estado es PAID/ACTIVE, confirmar el booking
           if (statusFromRecord === PaymentOrderStatus.Paid || statusFromRecord === PaymentOrderStatus.Active) {
-            console.log("Payment status is PAID/ACTIVE, marking as complete and stopping polling")
+            console.log("Estado de pago es PAID/ACTIVE, confirmando booking");
             
-            // 1. Actualizar la reserva para marcarla como confirmada
-            try {
-              const { data, error } = await supabase
-                .from('gvt_coach_meetings_bookings')
-                .update({
-                  payment_status: PaymentOrderStatus.Paid,
-                  checkout_completed: true,
-                  payment_confirmed: true
-                })
-                .eq('checkout_order_id', checkoutOrderId)
-                .select();
-              
-              if (error) {
-                console.error("Error updating booking record:", error);
-              } else {
-                console.log("Updated booking record successfully:", data);
-              }
-            } catch (updateError) {
-              console.error("Exception updating booking record:", updateError);
+            if (bookingData) {
+              // Actualizar UI primero
+              setBooking(bookingData);
+              setPaymentStatus(PaymentOrderStatus.Paid);
+              isCompletedRef.current = true;
+              setIsLoading(false);
+
+              // Luego manejar confirmación (correos, etc.)
+              await handleBookingConfirmation(bookingData);
+              return true;
             }
-            
-            // 2. Actualizar json_data en payment_status
-            try {
-              const updatedJsonData = {
-                ...(paymentStatusData.json_data || {}),
-                status: PaymentOrderStatus.Paid
-              };
-              
-              const { error } = await supabase
-                .from('gvt_coach_payments_status')
-                .update({
-                  json_data: updatedJsonData
-                })
-                .eq('id', mappingData.payment_status_id);
-              
-              if (error) {
-                console.error("Error updating payment json_data:", error);
-              } else {
-                console.log("Updated payment json_data successfully");
-              }
-            } catch (jsonError) {
-              console.error("Exception updating json_data:", jsonError);
-            }
-            
-            // 3. Generate Zoom meeting link if it doesn't exist yet
-            try {
-              // First get the updated booking
-              const updatedBooking = await fetchBookingByOrderId(checkoutOrderId);
-              
-              if (updatedBooking && !updatedBooking.meet_link) {
-                console.log("Generating Zoom meeting link for booking:", updatedBooking.id);
-                
-                const meetingTime = new Date(updatedBooking.booking_date);
-                const meetingTopic = `GVT Coaching Session with ${updatedBooking.user_email}`;
-                const duration = updatedBooking.session_minutes || 60;
-                
-                const response = await fetch('/api/zoom/meeting', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify({
-                    meetingTopic,
-                    meetingTime: meetingTime.toISOString(),
-                    duration,
-                    timezone: updatedBooking.user_timezone || 'UTC'
-                  })
-                });
-                
-                if (!response.ok) {
-                  console.error("Failed to create Zoom meeting:", await response.text());
-                } else {
-                  const data = await response.json();
-                  
-                  if (data.join_url) {
-                    // Update the booking with the meeting link
-                    const { error } = await supabase
-                      .from('gvt_coach_meetings_bookings')
-                      .update({ meet_link: data.join_url })
-                      .eq('id', updatedBooking.id);
-                      
-                    if (error) {
-                      console.error("Error updating booking with meet link:", error);
-                    } else {
-                      console.log("Updated booking with meet link:", data.join_url);
-                    }
-                  }
-                }
-              } else if (updatedBooking?.meet_link) {
-                console.log("Booking already has a meet link:", updatedBooking.meet_link);
-              }
-            } catch (meetingError) {
-              console.error("Error generating meeting link:", meetingError);
-            }
-            
-            // Limpiar cache de time slots para reflejar la reserva inmediatamente
-            bookingService.clearTimeSlotsCache()
-            console.log("Cleared time slots cache after payment confirmation")
-            
-            // Confirmar que el proceso está completado
-            isCompletedRef.current = true
-            
-            // Buscar la reserva relacionada
-            try {
-              const updatedBooking = await fetchBookingByOrderId(checkoutOrderId)
-              if (updatedBooking) {
-                console.log("Found booking via mapping:", updatedBooking)
-                setBooking(updatedBooking)
-              }
-            } catch (error) {
-              console.error("Error fetching updated booking:", error)
-            }
-            
-            return true
           }
         }
       }
       
-      return false
+      return false;
     } catch (error) {
-      console.error("Error checking payment status:", error)
-      return false
+      console.error("Error verificando estado de pago:", error);
+      return false;
     }
-  }
+  }, [handleBookingConfirmation]);
 
-  // Function to fetch booking by user email for LemonSqueezy where we don't have checkout_order_id in URL
+  // Función para buscar booking por email para LemonSqueezy donde no tenemos checkout_order_id en URL
   const fetchLatestBookingByEmail = async (email: string): Promise<BookingDB | null> => {
     try {
       if (!email) return null
       
-      console.log(`Looking for latest booking with email: ${email}`)
+      console.log(`Buscando booking más reciente con email: ${email}`)
       const { data, error } = await supabase
         .from('gvt_coach_meetings_bookings')
         .select('*')
@@ -216,61 +247,73 @@ export const usePaymentSuccess = () => {
         .limit(1)
       
       if (error) {
-        console.error("Error fetching booking by email:", error)
+        console.error("Error buscando booking por email:", error)
         return null
       }
       
       if (data && data.length > 0) {
-        console.log(`Found booking for email ${email}:`, data[0])
+        console.log(`Booking encontrado para email ${email}:`, data[0])
         return data[0] as BookingDB
       }
       
       return null
     } catch (error) {
-      console.error("Error in fetchLatestBookingByEmail:", error)
+      console.error("Error en fetchLatestBookingByEmail:", error)
       return null
     }
   }
 
-  // Get order ID from URL and fetch data
+  // Obtener ID de orden desde URL y cargar datos
   useEffect(() => {
     let isMounted = true
     
     async function loadData() {
+      if (effectExecutionFlag.current) return 
+      effectExecutionFlag.current = true
+      
       try {
-        // Try to get checkout order ID from URL (for Polar)
+        // Intentar obtener checkout order ID desde URL (para Polar)
         const checkoutOrderIdFromUrl = searchParams.get('checkout_order_id')
         
+        // Cargar datos de usuario desde localStorage primero
+        const userData = getUserDataFromLocalStorage()
+        if (userData && isMounted) {
+          if (userData.timezone) setUserTimezone(userData.timezone)
+          if (userData.userEmail) setUserEmail(userData.userEmail)
+        }
+
         if (!checkoutOrderIdFromUrl) {
-          // For LemonSqueezy, we don't need a specific order ID - payments are handled by webhooks
-          const userData = getUserDataFromLocalStorage()
+          // Para LemonSqueezy, no tenemos checkout_order_id en URL
           if (userData && userData.userEmail) {
-            setUserEmail(userData.userEmail)
-            
-            // Try to find the booking by email
+            // Intentar encontrar booking por email
             const bookingByEmail = await fetchLatestBookingByEmail(userData.userEmail)
             
             if (bookingByEmail) {
               setBooking(bookingByEmail)
+              // Asignar el checkout_order_id solo si existe
+              checkoutOrderIdRef.current = bookingByEmail.checkout_order_id || null
               
-              // If booking is confirmed, we're done
-              if (bookingByEmail.status === BookingStatus.BookingConfirmed || 
-                  bookingByEmail.payment_status === PaymentOrderStatus.Paid || 
-                  bookingByEmail.payment_confirmed === true) {
-                console.log("Found confirmed booking for LemonSqueezy payment")
+              // Si el booking ya está confirmado, hemos terminado
+              if (bookingByEmail.payment_status === PaymentOrderStatus.Paid || 
+                  bookingByEmail.payment_confirmed === true ||
+                  bookingByEmail.status === BookingStatus.BookingConfirmed) {
+                console.log("Booking confirmado encontrado para pago de LemonSqueezy")
+                
+                // Actualizar UI primero
+                setBooking(bookingByEmail)
                 setPaymentStatus(PaymentOrderStatus.Paid)
                 isCompletedRef.current = true
+                setIsLoading(false)
+                
+                // Luego manejar confirmación (correos, etc.)
+                await handleBookingConfirmation(bookingByEmail);
               } else if (bookingByEmail.checkout_order_id) {
-                // If we found a booking with checkout_order_id, check its payment status
-                console.log(`Found booking with checkout_order_id: ${bookingByEmail.checkout_order_id}`)
-                checkoutOrderIdRef.current = bookingByEmail.checkout_order_id
-                setOrderId(bookingByEmail.checkout_order_id)
+                // Si encontramos un booking con checkout_order_id, iniciar polling de su estado
+                console.log("Booking pendiente encontrado, iniciando polling con checkout_order_id:", bookingByEmail.checkout_order_id)
+                const isComplete = await loadPaymentData(bookingByEmail.checkout_order_id)
                 
-                // Start polling for this order ID
-                const isComplete = await loadPaymentData(bookingByEmail.checkout_order_id || '')
-                
+                // Iniciar polling si no está completo
                 if (!isComplete && !isCompletedRef.current && isMounted) {
-                  // Configure polling interval
                   const pollInterval = setInterval(async () => {
                     if (!isMounted) {
                       clearInterval(pollInterval)
@@ -280,20 +323,28 @@ export const usePaymentSuccess = () => {
                     retryCountRef.current += 1
                     
                     if (retryCountRef.current > MAX_RETRIES) {
-                      console.log(`Reached maximum retries (${MAX_RETRIES}), stopping polling`)
+                      console.log(`Máximo de reintentos alcanzado (${MAX_RETRIES}), deteniendo polling`)
                       clearInterval(pollInterval)
                       pollingTimeoutRef.current = null
                       if (isMounted) setIsLoading(false)
                       return
                     }
                     
-                    const isComplete = await loadPaymentData(bookingByEmail.checkout_order_id || '')
+                    // Comprobación explícita de que checkout_order_id existe y no es undefined
+                    if (!bookingByEmail.checkout_order_id) {
+                      console.error("No hay checkout_order_id para polling");
+                      clearInterval(pollInterval);
+                      pollingTimeoutRef.current = null;
+                      if (isMounted) setIsLoading(false);
+                      return;
+                    }
+                    
+                    const isComplete = await loadPaymentData(bookingByEmail.checkout_order_id)
                     
                     if (isComplete || isCompletedRef.current || paymentStatus !== PaymentOrderStatus.Pending) {
-                      console.log("Payment status changed, stopping polling")
+                      console.log("Estado de pago cambiado, deteniendo polling")
                       clearInterval(pollInterval)
                       pollingTimeoutRef.current = null
-                      
                       if (isMounted) setIsLoading(false)
                       return
                     }
@@ -303,18 +354,16 @@ export const usePaymentSuccess = () => {
                 } else if (isMounted) {
                   setIsLoading(false)
                 }
-                
-                return
               }
+            } else {
+              console.log("No se encontró booking para email:", userData.userEmail)
+              if (isMounted) setIsLoading(false)
             }
-            
-            // If we can't find a booking or it's not confirmed, just show the pending state
-            if (isMounted) setIsLoading(false)
           } else {
-            // If we don't even have the email, we can't proceed
+            // Si no tenemos email, no podemos proceder
             toast({
               title: "Error",
-              description: "Missing user information. Please contact support.",
+              description: "Falta información de usuario. Por favor contacte soporte.",
               variant: "destructive"
             })
             if (isMounted) setIsLoading(false)
@@ -322,25 +371,17 @@ export const usePaymentSuccess = () => {
           return
         }
         
-        // For Polar, continue with the checkout order ID from URL
+        // Para Polar, continuar con el checkout order ID desde URL
         if (isMounted) {
           setOrderId(checkoutOrderIdFromUrl)
           checkoutOrderIdRef.current = checkoutOrderIdFromUrl
         }
         
-        // Load user data from localStorage
-        const userData = getUserDataFromLocalStorage()
-        if (userData && isMounted) {
-          if (userData.timezone) setUserTimezone(userData.timezone)
-          if (userData.userEmail) setUserEmail(userData.userEmail)
-        }
-        
-        // Primera carga de datos
+        // Carga inicial de datos
         const isComplete = await loadPaymentData(checkoutOrderIdFromUrl)
         
-        // Solo iniciar polling si no está completo y el estado es PENDING
+        // Iniciar polling si no está completo
         if (!isComplete && !isCompletedRef.current && isMounted) {
-          // Configure polling interval - SOLO PARA PAGOS PENDIENTES
           const pollInterval = setInterval(async () => {
             if (!isMounted) {
               clearInterval(pollInterval)
@@ -349,41 +390,35 @@ export const usePaymentSuccess = () => {
             
             retryCountRef.current += 1
             
-            // Si excedimos el número máximo de intentos, detenemos el polling
             if (retryCountRef.current > MAX_RETRIES) {
-              console.log(`Reached maximum retries (${MAX_RETRIES}), stopping polling`)
+              console.log(`Máximo de reintentos alcanzado (${MAX_RETRIES}), deteniendo polling`)
               clearInterval(pollInterval)
               pollingTimeoutRef.current = null
               if (isMounted) setIsLoading(false)
               return
             }
             
-            // Verificar estado del pago
             const isComplete = await loadPaymentData(checkoutOrderIdFromUrl)
             
-            // Si el proceso está completo o el estado ya no es PENDING, detener polling
             if (isComplete || isCompletedRef.current || paymentStatus !== PaymentOrderStatus.Pending) {
-              console.log("Payment status changed, stopping polling")
+              console.log("Estado de pago cambiado, deteniendo polling")
               clearInterval(pollInterval)
               pollingTimeoutRef.current = null
-              
-              // Establecer loading a false solo después de confirmar el estado
               if (isMounted) setIsLoading(false)
               return
             }
-          }, 3000) // Verificar cada 3 segundos
+          }, 3000)
           
           pollingTimeoutRef.current = pollInterval
         } else if (isMounted) {
-          // Si ya está completo, no necesitamos polling
           setIsLoading(false)
         }
       } catch (error) {
-        console.error("Error loading payment data:", error)
+        console.error("Error cargando datos de pago:", error)
         if (isMounted) {
           toast({
             title: "Error",
-            description: "Failed to load booking information",
+            description: "No se pudo cargar la información de reserva",
             variant: "destructive"
           })
           setIsLoading(false)
@@ -393,7 +428,7 @@ export const usePaymentSuccess = () => {
     
     loadData()
     
-    // Cleanup when unmounting
+    // Limpieza al desmontar
     return () => {
       isMounted = false
       if (pollingTimeoutRef.current) {
@@ -401,7 +436,7 @@ export const usePaymentSuccess = () => {
         pollingTimeoutRef.current = null
       }
     }
-  }, [searchParams, toast, paymentStatus])
+  }, [searchParams, handleBookingConfirmation, loadPaymentData, paymentStatus, toast]) // Incluir todas las dependencias requeridas
   
   return {
     isLoading,

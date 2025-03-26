@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { BookingDB } from '@/app/types/booking';
+import { toast } from "@/components/ui/use-toast";
 
 interface EmailNotificationOptions {
   to?: string;
@@ -8,8 +9,10 @@ interface EmailNotificationOptions {
     end_time: string | Date;
     zoom_link?: string;
     user_name?: string;
+    booking_id: string;
   };
   type: 'confirmation' | 'reminder' | 'cancellation';
+  userTimezone?: string;
 }
 
 export const useEmailNotifications = () => {
@@ -54,19 +57,29 @@ export const useEmailNotifications = () => {
   };
   
   const sendBookingConfirmation = async (booking: BookingDB, userEmail?: string, userName?: string) => {
-    const startDate = new Date(booking.booking_date);
-    const endDate = new Date(startDate.getTime() + (booking.duration || 60) * 60000);
-    
-    return sendBookingNotification({
-      to: userEmail || booking.user_email, // Use provided email or booking email
-      type: 'confirmation',
-      bookingDetails: {
-        start_time: startDate.toISOString(),
-        end_time: endDate.toISOString(),
-        zoom_link: booking.meet_link,
-        user_name: userName
-      }
-    });
+    try {
+      await sendBookingConfirmation(
+        userEmail || booking.user_email,
+        {
+          start_time: booking.booking_date,
+          end_time: new Date(new Date(booking.booking_date).getTime() + (booking.session_minutes || 60) * 60000),
+          zoom_link: booking.meet_link,
+          user_name: userName || booking.user_name,
+          booking_id: booking.id
+        }
+      );
+      toast({
+        title: "Email sent",
+        description: "Booking confirmation email sent successfully",
+      });
+    } catch (error) {
+      console.error("Error sending booking confirmation:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send booking confirmation email",
+        variant: "destructive",
+      });
+    }
   };
   
   return {

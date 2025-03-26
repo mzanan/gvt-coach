@@ -2,56 +2,54 @@ import { supabase } from '@/lib/supabase/client'
 import { BookingDB } from '@/app/types/booking'
 
 /**
- * Fetch booking data by checkout order ID
+ * Fetch booking by checkout order ID
  */
-export async function fetchBookingByOrderId(checkoutOrderId: string): Promise<BookingDB | null> {
+export async function fetchBookingByOrderId(checkoutOrderId: string) {
   try {
-    // Direct lookup by checkout_order_id - most common case
-    const { data: bookingResults, error: bookingError } = await supabase
+    if (!checkoutOrderId) {
+      console.warn("Cannot fetch booking: checkout order ID is missing");
+      return null;
+    }
+    
+    // First try to find the booking directly
+    const { data: bookingData, error: bookingError } = await supabase
       .from('gvt_coach_meetings_bookings')
       .select('*')
       .eq('checkout_order_id', checkoutOrderId)
-      .order('created_at', { ascending: false })
-      .limit(1);
-    
-    if (!bookingError && bookingResults && bookingResults.length > 0) {
-      console.log("Found booking directly by checkout_order_id:", bookingResults[0]);
-      return bookingResults[0] as BookingDB;
+      .maybeSingle();
+      
+    if (bookingError) {
+      console.error(`Error fetching booking for orderId ${checkoutOrderId}:`, bookingError);
+      return null;
     }
     
-    // Second attempt: check if this is a Polar order ID in the mapping table
-    try {
-      const { data: mapping, error: mappingError } = await supabase
-        .from('gvt_coach_checkout_mapping')
-        .select('checkout_order_id')
-        .eq('payment_order_id', checkoutOrderId)
-        .maybeSingle();
+    if (bookingData) {
+      return bookingData;
+    }
+    
+    // If not found directly, try to find through mapping
+    const { data: mappingData, error: mappingError } = await supabase
+      .from('gvt_coach_checkout_mapping')
+      .select('*')
+      .eq('checkout_order_id', checkoutOrderId)
+      .maybeSingle();
       
-      if (!mappingError && mapping && mapping.checkout_order_id) {
-        const actualCheckoutOrderId = mapping.checkout_order_id;
+    if (!mappingError && mappingData) {
+      // Now get the booking using the mapping
+      const { data: bookingByMapping, error: bookingByMappingError } = await supabase
+        .from('gvt_coach_meetings_bookings')
+        .select('*')
+        .eq('checkout_order_id', mappingData.checkout_order_id)
+        .maybeSingle();
         
-        if (actualCheckoutOrderId !== checkoutOrderId) {
-          // Try fetching with the mapped checkout_order_id
-          const { data: mappedBookingResults, error: mappedBookingError } = await supabase
-            .from('gvt_coach_meetings_bookings')
-            .select('*')
-            .eq('checkout_order_id', actualCheckoutOrderId)
-            .order('created_at', { ascending: false })
-            .limit(1);
-          
-          if (!mappedBookingError && mappedBookingResults && mappedBookingResults.length > 0) {
-            console.log("Found booking via mapping table:", mappedBookingResults[0]);
-            return mappedBookingResults[0] as BookingDB;
-          }
-        }
+      if (!bookingByMappingError && bookingByMapping) {
+        return bookingByMapping;
       }
-    } catch (mappingCheckError) {
-      console.error("Error checking mapping table:", mappingCheckError);
     }
     
     return null;
   } catch (error) {
-    console.error("Error fetching booking data:", error);
+    console.error("Error fetching booking:", error);
     return null;
   }
 }
