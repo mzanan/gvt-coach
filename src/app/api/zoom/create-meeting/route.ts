@@ -83,7 +83,6 @@ export async function POST(request: NextRequest) {
       topic: `GVT Coaching Session with ${booking.user_email}`,
       type: 2, // Scheduled meeting
       start_time: meetingTime.toISOString(),
-      duration: durationMinutes,
       timezone: booking.user_timezone || 'UTC',
       settings: {
         host_video: true,

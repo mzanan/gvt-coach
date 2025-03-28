@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { bookingService } from '@/services/bookingService'
-import { BookingStatus, PaymentOrderStatus } from '@/app/types/enums/booking'
+import { PaymentOrderStatus } from '@/app/types/enums/booking'
 
 export async function POST(request: Request) {
   try {
@@ -416,7 +416,7 @@ async function processWebhookEvent(body: any) {
               payment_status: PaymentOrderStatus.Paid,
               checkout_completed: true,
               payment_confirmed: true,
-              status: BookingStatus.Confirmed,
+              status: PaymentOrderStatus.Paid,
               user_timezone: booking.user_timezone || data.metadata?.timezone || 'UTC'
             })
             .eq('id', booking.id);
@@ -479,7 +479,7 @@ async function processWebhookEvent(body: any) {
               checkout_order_id: checkoutOrderId,
               checkout_completed: true,
               payment_confirmed: true,
-              status: BookingStatus.Confirmed,
+              status: PaymentOrderStatus.Paid,
               user_timezone: booking.user_timezone || data.metadata?.timezone || 'UTC'
             })
             .eq('id', booking.id);

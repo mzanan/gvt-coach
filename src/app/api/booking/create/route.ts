@@ -246,7 +246,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             frequency: bookingData.bookingPlan?.frequency || BookingFrequency.Once,
             payment_status: PaymentOrderStatus.Pending,
             checkout_order_id: orderId,
-            user_timezone: userTimezone // Add user timezone to the booking record
+            user_timezone: userTimezone,
           }])
           .select()
           .single();

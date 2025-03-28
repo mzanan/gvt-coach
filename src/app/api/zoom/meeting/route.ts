@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       topic: meetingTopic,
       type: 2, // Scheduled meeting
       start_time: meetingTime,
-      duration: duration || 60, // Default to 60 minutes
+      duration: 60, 
       timezone: timezone || 'UTC',
       settings: {
         host_video: true,

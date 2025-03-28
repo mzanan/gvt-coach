@@ -379,7 +379,7 @@ export const bookingService = {
         frequency,
         booking_date: startDateTime.toJSDate(),
         end_date: endDateTime?.toJSDate() || null,
-        duration,
+        duration: frequency === BookingFrequency.Once ? null : duration,
         recurring_day: frequency !== BookingFrequency.Once ? DateTime.fromJSDate(startDate).weekdayLong : null,
         recurring_time: frequency !== BookingFrequency.Once ? startDateTime.toFormat('HH:mm') : null,
         // Only include checkout_order_id if provided

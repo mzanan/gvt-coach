@@ -1,10 +1,10 @@
-import { BookingFrequency, BookingStatus } from './enums/booking';
+import { BookingFrequency, PaymentOrderStatus } from './enums/booking';
 
 export interface Booking {
   id: string
   userId: string
   date: Date
-  status: BookingStatus
+  status: PaymentOrderStatus
   meetLink: string
 }
 
@@ -43,7 +43,7 @@ export interface BookingDB {
   booking_date: string;
   end_date?: string;
   frequency: BookingFrequency;
-  status: BookingStatus;
+  status: PaymentOrderStatus;
   meet_link: string;
   recurring_day?: string; 
   recurring_time?: string;

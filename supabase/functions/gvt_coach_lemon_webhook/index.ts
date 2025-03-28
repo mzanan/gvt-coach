@@ -424,7 +424,7 @@ serve(async (req: Request): Promise<Response> => {
               topic: "Coaching Session",
               type: 2, // Scheduled meeting
               start_time: bookingDate.toISOString(),
-              duration: (booking.duration || 1) * 60, // Convertir horas a minutos
+              duration: booking.frequency === "ONCE" ? 60 : ((booking.duration || 1) * 60), // Default to 60 minutes for "ONCE" frequency
               timezone: booking.timezone || "UTC",
               settings: {
                 join_before_host: true,

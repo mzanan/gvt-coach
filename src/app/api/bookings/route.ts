@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse, NextRequest } from 'next/server';
-import { BookingStatus } from '@/app/types/enums/booking';
+import { BookingFrequency, PaymentOrderStatus } from '@/app/types/enums/booking';
 
 export async function POST(request: NextRequest) {
   try {
@@ -89,11 +89,10 @@ export async function POST(request: NextRequest) {
       booking_date: bookingDate.toISOString(),
       frequency: frequency,
       end_date: endBookingDate ? endBookingDate.toISOString() : null,
-      duration: duration,
       checkout_order_id: orderId,
       meet_link: meetLink,
       second_slot_date: secondSlotDate ? secondSlotDate.toISOString() : null,
-      status: BookingStatus.Confirmed // Updated to use enum value
+      status: PaymentOrderStatus.Pending // Usando el enum de estado de pago
     };
 
     console.log('[POST /api/bookings] Inserting booking with data:', bookingData);

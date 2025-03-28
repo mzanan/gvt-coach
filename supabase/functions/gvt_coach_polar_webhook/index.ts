@@ -1,6 +1,8 @@
 // deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+// ADD: Import crypto if needed for Zoom token generation (like in Lemon)
+// import { crypto } from "https://deno.land/std@0.181.0/crypto/mod.ts"; // Use appropriate std version
 
 // Crear un client de Supabase
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -22,6 +24,41 @@ const BOOKING_STATUS = {
   PENDING: 'PENDING',
   CANCELLED: 'CANCELLED'
 };
+
+// ADD: Function to get Zoom access token (copied from Lemon webhook)
+async function getZoomAccessToken(): Promise<string> {
+  const zoomAccountId = Deno.env.get("GVT_COACH_ZOOM_ACCOUNT_ID");
+  const zoomClientId = Deno.env.get("GVT_COACH_ZOOM_CLIENT_ID");
+  const zoomClientSecret = Deno.env.get("GVT_COACH_ZOOM_CLIENT_SECRET");
+
+  if (!zoomAccountId || !zoomClientId || !zoomClientSecret) {
+    throw new Error("Faltan credenciales de Zoom en las variables de entorno.");
+  }
+
+  console.log("Obteniendo token de Zoom con Account ID:", zoomAccountId);
+
+  const tokenResponse = await fetch("https://zoom.us/oauth/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Authorization": `Basic ${btoa(`${zoomClientId}:${zoomClientSecret}`)}`,
+    },
+    body: new URLSearchParams({
+      grant_type: "account_credentials",
+      account_id: zoomAccountId,
+    }),
+  });
+
+  if (!tokenResponse.ok) {
+    const errorText = await tokenResponse.text();
+    console.error("Error en respuesta de Zoom al obtener token:", errorText);
+    throw new Error(`Error obteniendo el token de Zoom: ${errorText}`);
+  }
+
+  const tokenData = await tokenResponse.json();
+  console.log("Token de Zoom obtenido exitosamente para Polar webhook.");
+  return tokenData.access_token;
+}
 
 serve(async (req: Request) => {
   try {
@@ -293,6 +330,7 @@ async function processWebhookEvent(req: Request) {
               console.error('Error finding booking:', bookingError);
             } else if (bookings && bookings.length > 0) {
               const booking = bookings[0];
+
               console.log('Found booking for payment:', booking);
               
               // Update booking status to confirmed
@@ -313,63 +351,82 @@ async function processWebhookEvent(req: Request) {
                 // Generate Zoom meeting link if it doesn't exist
                 if (!booking.meet_link) {
                   try {
-                    // We need to call the API to create a Zoom meeting
-                    // Get environment variables or configuration
-                    // Use current environment to determine base URL - locally it can be localhost,
-                    // in production it should be your deployed URL
-                    const isDevelopment = Deno.env.get('NEXT_PUBLIC_ENV') === 'development';
-                    const BASE_URL = Deno.env.get('API_BASE_URL') || 
-                      (isDevelopment ? 'http://localhost:3000' : 'https://gvt-coach.vercel.app');
-                    
-                    console.log(`Using API base URL: ${BASE_URL} for Zoom meeting creation`);
-                    
-                    // Call the Zoom API
+                    // Get Zoom token directly
+                    const access_token = await getZoomAccessToken();
+                    console.log("Zoom token acquired successfully for Polar, creating meeting...");
+
+                    // Prepare meeting details
                     const meetingTime = new Date(booking.booking_date);
-                    const meetingTopic = `GVT Coaching Session with ${booking.user_email}`;
-                    const duration = booking.session_minutes || 60;
-                    
-                    // Make a request to the API endpoint
-                    const zoomResponse = await fetch(`${BASE_URL}/api/zoom/meeting`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${Deno.env.get('API_SECRET_KEY') || ''}`
-                      },
-                      body: JSON.stringify({
-                        meetingTopic,
-                        meetingTime: meetingTime.toISOString(),
-                        duration,
-                        timezone: booking.user_timezone || 'UTC'
-                      })
-                    });
-                    
-                    if (zoomResponse.ok) {
-                      const zoomData = await zoomResponse.json();
-                      
-                      if (zoomData.join_url) {
-                        // Update booking with meet link
-                        const { error: meetLinkError } = await supabase
-                          .from('gvt_coach_meetings_bookings')
-                          .update({ meet_link: zoomData.join_url })
-                          .eq('id', booking.id);
-                        
-                        if (meetLinkError) {
-                          console.error('Error updating booking with meet link:', meetLinkError);
-                        } else {
-                          console.log('Added Zoom meeting link to booking:', zoomData.join_url);
-                        }
+                    // Use user_name or user_email if available, otherwise a generic topic
+                    const userName = booking.user_name || booking.user_email || 'Client';
+                    const meetingTopic = `GVT Coaching Session with ${userName}`;
+                    const duration = booking.session_minutes || 60; // Use session_minutes or default
+                    const timezone = booking.user_timezone || 'UTC'; // Use user_timezone or default
+
+                    const meetingDetails = {
+                      topic: meetingTopic,
+                      type: 2, // Scheduled meeting
+                      start_time: meetingTime.toISOString(),
+                      duration: duration,
+                      timezone: timezone,
+                      settings: {
+                        join_before_host: true,
+                        waiting_room: false, // Adjust as needed
+                        auto_recording: "cloud" // Adjust as needed
                       }
+                    };
+
+                    console.log("Polar - Zoom Meeting details:", JSON.stringify(meetingDetails));
+
+                    // Call Zoom API directly
+                    const meetingResponse = await fetch("https://api.zoom.us/v2/users/me/meetings", {
+                      method: "POST",
+                      headers: {
+                        "Authorization": `Bearer ${access_token}`,
+                        "Content-Type": "application/json"
+                      },
+                      body: JSON.stringify(meetingDetails)
+                    });
+
+                    if (!meetingResponse.ok) {
+                      const meetingError = await meetingResponse.text();
+                      console.error("Polar - Failed to create Zoom meeting:", meetingError);
+                      throw new Error(`Failed to create Zoom meeting: ${meetingResponse.status} - ${meetingError}`);
+                    }
+
+                    const meetingData = await meetingResponse.json();
+                    const zoomLink = meetingData.join_url;
+
+                    if (!zoomLink) {
+                      console.error("Polar - No join URL received from Zoom");
+                      throw new Error("No join URL received from Zoom");
+                    }
+
+                    console.log("Polar - Created Zoom meeting successfully:", zoomLink);
+
+                    // Update booking with meet link
+                    const { error: meetLinkError } = await supabase
+                      .from('gvt_coach_meetings_bookings')
+                      .update({ meet_link: zoomLink })
+                      .eq('id', booking.id);
+
+                    if (meetLinkError) {
+                      console.error('Polar - Error updating booking with meet link:', meetLinkError);
                     } else {
-                      console.error('Error creating Zoom meeting:', await zoomResponse.text());
+                      console.log('Polar - Added Zoom meeting link to booking:', zoomLink);
                     }
                   } catch (zoomError) {
-                    console.error('Error generating Zoom meeting link:', zoomError);
+                    console.error('Polar - Error generating Zoom meeting link:', zoomError);
                   }
+                } else {
+                   console.log('Polar - Booking already has a meet link:', booking.meet_link);
                 }
               }
+            } else {
+               console.log('Polar - No booking found for checkout_id:', checkoutId);
             }
           } catch (bookingError) {
-            console.error('Error processing booking update:', bookingError);
+            console.error('Polar - Error processing booking update:', bookingError);
           }
         }
         
@@ -433,7 +490,7 @@ async function processWebhookEvent(req: Request) {
       });
     }
   } catch (error) {
-    console.error("Unexpected error in webhook processing:", error);
+    console.error("Unexpected error in Polar webhook processing:", error);
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       headers: { 'Content-Type': 'application/json' },
       status: 500

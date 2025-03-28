@@ -6,7 +6,7 @@ import { getUserDataFromLocalStorage } from '@/lib/utils/payment'
 import { fetchBookingByOrderId, fetchPaymentMapping, fetchPaymentStatus } from '@/lib/utils/payment/queries'
 import { bookingService } from '@/services/bookingService'
 import { supabase } from '@/lib/supabase/client'
-import { PaymentOrderStatus, BookingStatus } from '@/app/types/enums/booking'
+import { PaymentOrderStatus } from '@/app/types/enums/booking'
 import { sendBookingConfirmation } from '@/services/mailer'
 
 export const usePaymentSuccess = () => {
@@ -296,7 +296,7 @@ export const usePaymentSuccess = () => {
               // Si el booking ya está confirmado, hemos terminado
               if (bookingByEmail.payment_status === PaymentOrderStatus.Paid || 
                   bookingByEmail.payment_confirmed === true ||
-                  bookingByEmail.status === BookingStatus.BookingConfirmed) {
+                  bookingByEmail.payment_status === PaymentOrderStatus.Completed) {
                 console.log("Booking confirmado encontrado para pago de LemonSqueezy")
                 
                 // Actualizar UI primero
