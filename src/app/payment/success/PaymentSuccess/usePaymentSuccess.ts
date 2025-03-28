@@ -16,6 +16,8 @@ export const usePaymentSuccess = () => {
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [paymentStatus, setPaymentStatus] = useState<PaymentOrderStatus>(PaymentOrderStatus.Pending)
   const [orderId, setOrderId] = useState<string | null>(null)
+  const [isEmailSending, setIsEmailSending] = useState(false)
+  const [isEmailSent, setIsEmailSent] = useState(false)
   const searchParams = useSearchParams()
   const { toast } = useToast()
   
@@ -33,11 +35,15 @@ export const usePaymentSuccess = () => {
     // Comprobar si el email ya fue enviado usando el ref (persistente entre renderizados)
     if (emailSentRef.current) {
       console.log("Email ya enviado según ref (omitiendo envío)");
+      setIsEmailSent(true); // Actualizar estado UI
       return;
     }
     
     // Marcar como enviado inmediatamente para evitar duplicados
     emailSentRef.current = true;
+    
+    // Actualizar UI - Iniciando envío de email
+    setIsEmailSending(true);
     
     console.log("Enviando email de confirmación...");
     try {
@@ -54,10 +60,22 @@ export const usePaymentSuccess = () => {
       );
       
       console.log("Correo enviado y marcado en base de datos");
+      // Actualizar UI - Email enviado con éxito
+      setIsEmailSending(false);
+      setIsEmailSent(true);
     } catch (emailError) {
       // En caso de error, permitir reintentos
       emailSentRef.current = false;
       console.error("Error enviando correo de confirmación:", emailError);
+      // Actualizar UI - Error en envío de email
+      setIsEmailSending(false);
+      
+      // Reintentar después de un breve retraso
+      setTimeout(() => {
+        if (bookingData) {
+          sendConfirmationEmailOnce(bookingData);
+        }
+      }, 5000); // Reintentar después de 5 segundos
     }
   };
   
@@ -68,6 +86,7 @@ export const usePaymentSuccess = () => {
       if (bookingData.meet_link && bookingData.confirmation_email_sent) {
         console.log("Booking ya completamente confirmado con meet_link y correo enviado");
         emailSentRef.current = true; // Marcar como enviado en el ref
+        setIsEmailSent(true); // Actualizar estado UI
         return bookingData;
       }
 
@@ -134,6 +153,9 @@ export const usePaymentSuccess = () => {
       // 3. Enviar correo de confirmación (centralizado) - solo si no está marcado como enviado
       if (!bookingData.confirmation_email_sent && !emailSentRef.current) {
         await sendConfirmationEmailOnce(updatedBooking);
+      } else if (bookingData.confirmation_email_sent) {
+        // Si ya se había enviado anteriormente, actualizar estado UI
+        setIsEmailSent(true);
       }
 
       // 4. Limpiar caché de slots de tiempo
@@ -445,6 +467,8 @@ export const usePaymentSuccess = () => {
     userTimezone,
     userEmail,
     paymentStatus,
-    orderId
+    orderId,
+    isEmailSending,
+    isEmailSent
   }
 }

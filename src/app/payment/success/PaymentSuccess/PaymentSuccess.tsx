@@ -1,10 +1,10 @@
 'use client'
 
 import React from 'react'
-import { Clock } from 'lucide-react'
+import { Clock, Loader2, Check } from 'lucide-react'
 import { Card } from '@/app/components/ui-kit/card'
 import Link from 'next/link'
-import { ChevronLeft, Check } from "lucide-react"
+import { ChevronLeft } from "lucide-react"
 import { BookingSummaryDisplay } from '@/app/components/features/booking/BookingSummaryDisplay'
 import { convertBookingFrequency } from '@/lib/utils/payment'
 import { usePaymentSuccess } from './usePaymentSuccess'
@@ -20,7 +20,9 @@ export function PaymentSuccess() {
     booking,
     userTimezone,
     userEmail,
-    orderId
+    orderId,
+    isEmailSending,
+    isEmailSent
   } = usePaymentSuccess();
 
   // Show loading state while waiting for payment info
@@ -77,6 +79,26 @@ export function PaymentSuccess() {
             <p className="text-muted-foreground">
               📩 Your session details have been sent to <span className="font-medium text-foreground">{userEmail || (booking?.user_email || '')}</span>.
             </p>
+            
+            {/* Indicador de estado del envío del email */}
+            <div className="flex items-center justify-center border-t pt-4 mt-4">
+              {isEmailSending ? (
+                <div className="flex items-center text-sm text-amber-600">
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <span>Sending email to your account...</span>
+                </div>
+              ) : isEmailSent ? (
+                <div className="flex items-center text-sm text-green-600">
+                  <Check className="h-4 w-4 mr-2" />
+                  <span>You can now close this screen</span>
+                </div>
+              ) : (
+                <div className="flex items-center text-sm text-amber-600">
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <span>Preparing email confirmation...</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </Card>
