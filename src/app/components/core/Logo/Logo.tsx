@@ -1,15 +1,9 @@
 'use client'
 
-import Image from 'next/image'
+import GVTNomadLogo from '@/app/assets/images/gvtnomad_logo.svg'
 
-export function Logo({ size = "42" }: { size?: string }) {
+export function Logo({ size = 42 }: { size?: number }) {
   return (
-    <Image
-      src="/gvtnomad_logo.svg"
-      alt="GVTNomad Logo"
-      width={parseInt(size)}
-      height={parseInt(size)}
-      priority={true}
-    />
+    <GVTNomadLogo width={size} height={size} />
   )
 }

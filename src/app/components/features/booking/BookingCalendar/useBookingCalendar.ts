@@ -6,6 +6,11 @@ import { DateTime } from 'luxon'
 import { bookingService } from '@/services/bookingService'
 import { paymentService } from '@/services/payments'
 import { BookingFrequency } from '@/app/types/enums/booking'
+import { useDebouncedCallback } from 'use-debounce'
+import { lemonSqueezyService } from '@/services/payments/lemonsqueezy'
+import { setClientCookie } from '@/lib/utils/cookies'
+import { userService } from '@/services/userService'
+import { useToast } from '@/app/components/ui-kit/use-toast'
 
 interface Section {
   id: 'date' | 'time' | 'summary' | 'frequency'
@@ -25,6 +30,7 @@ interface DayGroup {
 }
 
 export function useBookingCalendar() {
+  const { toast } = useToast()
   const [sections, setSections] = useState<Section[]>([
     { id: 'frequency', title: 'Select Frequency', completed: false },
     { id: 'date', title: 'Select Date', completed: false },
@@ -41,7 +47,6 @@ export function useBookingCalendar() {
     duration: 1
   })
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
-  const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [bookedDates, setBookedDates] = useState<Array<{ date: Date, fullyBooked: boolean }>>([])
   const [isBookingLoading, setIsBookingLoading] = useState(false)
   const [isLoadingSlots, setIsLoadingSlots] = useState(false)
@@ -57,12 +62,26 @@ export function useBookingCalendar() {
   });
 
   useEffect(() => {
-    // Only fetch profile on client side
-    if (cachedUserProfile) {
-      setUserProfile(cachedUserProfile);
-      setSelectedTimezone(cachedUserProfile.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
-    }
-  }, [cachedUserProfile]);
+    // Cargar datos del usuario desde el servicio
+    const loadUserData = async () => {
+      try {
+        const userData = await userService.getUserFromAuthUsers();
+        if (userData) {
+          setUserProfile(userData);
+          setSelectedTimezone(userData.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
+        }
+      } catch (error) {
+        console.error('Error al cargar datos de usuario:', error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los datos del usuario.",
+          variant: "destructive"
+        });
+      }
+    };
+    
+    loadUserData();
+  }, [toast]);
 
   // Memoizar loadBookedDates para evitar recrear la función en cada renderizado
   const loadBookedDates = useCallback(async () => {
@@ -117,17 +136,16 @@ export function useBookingCalendar() {
 
   // Memoizar funciones de manejo para evitar recrearlas en cada renderizado
   const handleProfileComplete = useCallback(() => {
-    const profile = bookingService.getUserProfile();
-    if (profile) {
-      setUserProfile(profile);
-      setSelectedTimezone(profile.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
-      setIsEditingProfile(false);
-    }
+    // No hace nada, ya que no hay edición de perfil
   }, []);
 
   const handleEditProfile = useCallback(() => {
-    setIsEditingProfile(true);
-  }, []);
+    // No hace nada, ya que no hay edición de perfil
+    toast({
+      title: "Información",
+      description: "La edición de perfil no está disponible. Los datos se obtienen automáticamente.",
+    });
+  }, [toast]);
 
   const handleDateSelect = useCallback(async (date: Date) => {
     // Mostrar indicador de carga inmediatamente
@@ -410,14 +428,12 @@ export function useBookingCalendar() {
       // Almacenar datos esenciales
       const tempBookingData = {
         userEmail: userProfile?.email,
-        selectedTimezone,
-        orderId,
         bookingPlan: updatedBookingPlan,
         selectedDate: localDateTime.toISO(),
         utcDate: utcDateTime.toISO()
       };
       
-      localStorage.setItem('pendingBooking', JSON.stringify(tempBookingData));
+      setClientCookie('pending_booking', tempBookingData);
       
       window.location.href = checkoutUrl;
     } catch (error) {
@@ -450,7 +466,6 @@ export function useBookingCalendar() {
     availableSlots,
     bookingPlan,
     userProfile,
-    isEditingProfile,
     bookedDates,
     isBookingLoading,
     isLoadingSlots,

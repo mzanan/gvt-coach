@@ -5,9 +5,14 @@ import { Label } from '@/app/components/ui-kit/label';
 interface TimezoneDropdownProps {
   selectedTimezone: string;
   onTimezoneChange: (timezone: string) => void;
+  showLabel?: boolean;
 }
 
-export function TimezoneDropdown({ selectedTimezone, onTimezoneChange }: TimezoneDropdownProps) {
+export function TimezoneDropdown({ 
+  selectedTimezone, 
+  onTimezoneChange,
+  showLabel = false 
+}: TimezoneDropdownProps) {
   const [timezones, setTimezones] = useState<string[]>([]);
 
   useEffect(() => {
@@ -16,7 +21,7 @@ export function TimezoneDropdown({ selectedTimezone, onTimezoneChange }: Timezon
 
   return (
     <div className="space-y-2">
-      <Label htmlFor="timezone">Timezone</Label>
+      {showLabel && <Label htmlFor="timezone">Timezone</Label>}
       <select
         id="timezone"
         value={selectedTimezone}

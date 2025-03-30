@@ -5,10 +5,11 @@ import { Card } from "@/app/components/ui-kit/card"
 import { Button } from "@/app/components/ui-kit/button"
 import Link from 'next/link'
 import { XCircle } from "lucide-react"
+import { deleteClientCookie } from '@/lib/utils/cookies'
 
 export default function PaymentCancelPage() {
   useEffect(() => {
-    localStorage.removeItem('pendingBooking')
+    deleteClientCookie('pending_booking')
   }, [])
 
   return (

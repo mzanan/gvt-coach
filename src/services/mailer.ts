@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase/client';
 import { getUserConfirmationEmail } from './email-templates/confirmation-email-user';
 import { getCoachConfirmationEmail } from './email-templates/confirmation-email-coach';
+import { BookingFrequency, PaymentOrderStatus } from '@/app/types/enums/booking';
 
 // Interface for email data
 export interface EmailData {
@@ -149,7 +150,7 @@ export async function sendBookingConfirmation(
         user_timezone: coachTimezone,
         booking_id: bookingDetails.booking_id || 'Unknown',
         checkout_order_id: bookingInfo.checkout_order_id, // Use the retrieved checkout_order_id
-        payment_status: 'Confirmed', // Simplified
+        payment_status: PaymentOrderStatus.Paid, // Usar el enum correcto en lugar de 'Confirmed'
         payment_confirmed: true, // Simplified
         payment_provider: bookingInfo.provider
       });

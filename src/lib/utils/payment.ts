@@ -1,5 +1,6 @@
 import { BookingFrequency as SuperbaseBookingFrequency } from '@/app/types/enums/booking'
 import { BookingFrequency as AppBookingFrequency } from '@/app/types/enums/booking'
+import { getClientCookie } from './cookies'
 
 /**
  * Helper function to convert between BookingFrequency types
@@ -18,9 +19,9 @@ export function convertBookingFrequency(frequency: SuperbaseBookingFrequency): A
 }
 
 /**
- * Get user data from local storage
+ * Get user data from cookies
  */
-export function getUserDataFromLocalStorage(): { 
+export function getUserDataFromCookies(): { 
   userEmail: string | null; 
   userName: string | null;
   timezone?: string;
@@ -40,21 +41,34 @@ export function getUserDataFromLocalStorage(): {
   
   if (typeof window === 'undefined') return result;
 
-  // Get user profile from localStorage
-  const userProfileStr = localStorage.getItem('userProfile');
-  if (userProfileStr) {
+  // Get user profile from cookies
+  const userData = getClientCookie('user_data');
+  if (userData) {
     try {
-      const profileData = JSON.parse(userProfileStr);
-      const profile = profileData.value; // Profile is inside .value
-      
-      if (profile && profile.email) {
-        result.userEmail = profile.email;
+      if (userData && userData.email) {
+        result.userEmail = userData.email;
         
-        // Set name if available
-        if (profile.first_name) {
-          const name = `${profile.first_name} ${profile.last_name || ''}`.trim();
-          result.userName = name;
+        // Set name using different possible formats
+        if (userData.first_name && userData.last_name) {
+          result.userName = `${userData.first_name} ${userData.last_name}`.trim();
+        } else if (userData.name) {
+          result.userName = userData.name;
+        } else {
+          // Fallback to email username
+          result.userName = userData.email.split('@')[0];
         }
+        
+        // Get timezone if available
+        if (userData.timezone) {
+          result.timezone = userData.timezone;
+        }
+        
+        // Get orderId if available - new field we added
+        if (userData.orderId) {
+          result.orderId = userData.orderId;
+          console.log("Retrieved orderId from user_data cookie:", userData.orderId);
+        }
+        
         return result;
       }
     } catch (e) {
@@ -62,25 +76,24 @@ export function getUserDataFromLocalStorage(): {
     }
   }
 
-  // Also check for email in pendingBooking
-  const pendingBookingStr = localStorage.getItem('pendingBooking');
-  if (pendingBookingStr) {
+  // Also check for booking data in a cookie
+  const pendingBookingData = getClientCookie('pending_booking');
+  if (pendingBookingData) {
     try {
-      const pendingData = JSON.parse(pendingBookingStr);
-      
-      if (pendingData.userEmail) {
-        result.userEmail = pendingData.userEmail;
-      } else if (pendingData.booking && pendingData.booking.user_email) {
-        result.userEmail = pendingData.booking.user_email;
+      if (pendingBookingData.userEmail) {
+        result.userEmail = pendingBookingData.userEmail;
+      } else if (pendingBookingData.booking && pendingBookingData.booking.user_email) {
+        result.userEmail = pendingBookingData.booking.user_email;
       }
       
       // Get timezone and orderId if available
-      if (pendingData.selectedTimezone) {
-        result.timezone = pendingData.selectedTimezone;
+      if (pendingBookingData.selectedTimezone) {
+        result.timezone = pendingBookingData.selectedTimezone;
       }
       
-      if (pendingData.orderId) {
-        result.orderId = pendingData.orderId;
+      if (pendingBookingData.orderId) {
+        result.orderId = pendingBookingData.orderId;
+        console.log("Retrieved orderId from pending_booking cookie:", pendingBookingData.orderId);
       }
     } catch (e) {
       console.error("Error parsing pending booking:", e);

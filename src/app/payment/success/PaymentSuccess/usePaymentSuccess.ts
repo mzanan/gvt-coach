@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useToast } from '@/app/components/ui-kit/use-toast'
 import { BookingDB } from '@/app/types/booking'
-import { getUserDataFromLocalStorage } from '@/lib/utils/payment'
+import { getUserDataFromCookies } from '@/lib/utils/payment'
 import { fetchBookingByOrderId, fetchPaymentMapping, fetchPaymentStatus } from '@/lib/utils/payment/queries'
 import { bookingService } from '@/services/bookingService'
 import { supabase } from '@/lib/supabase/client'
@@ -213,7 +213,7 @@ export const usePaymentSuccess = () => {
       const mappingData = await fetchPaymentMapping(checkoutOrderId);
       
       if (!mappingData) {
-        console.warn("No se encontró mapping de pago");
+        console.warn("No payment mapping found");
         return false;
       }
       
@@ -297,8 +297,8 @@ export const usePaymentSuccess = () => {
         // Intentar obtener checkout order ID desde URL (para Polar)
         const checkoutOrderIdFromUrl = searchParams.get('checkout_order_id')
         
-        // Cargar datos de usuario desde localStorage primero
-        const userData = getUserDataFromLocalStorage()
+        // Cargar datos de usuario desde cookies
+        const userData = getUserDataFromCookies()
         if (userData && isMounted) {
           if (userData.timezone) setUserTimezone(userData.timezone)
           if (userData.userEmail) setUserEmail(userData.userEmail)

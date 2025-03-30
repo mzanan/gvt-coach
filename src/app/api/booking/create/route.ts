@@ -210,10 +210,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         console.log('API: /booking/create: Creating new booking, full bookingData received:', bookingData);
 
         // Simplificamos la lógica de fecha: usamos selectedDate, bookingDate o fecha actual
-        const currentDate = new Date();
-        currentDate.setDate(currentDate.getDate() + 1); // Por defecto, programar para mañana
-        currentDate.setHours(10, 0, 0, 0); // A las 10 AM
-
+        const userTimezone = bookingData.selectedTimezone || bookingData.userTimezone || 'UTC';
+        console.log("API: /booking/create: Using user timezone:", userTimezone);
+        
         // Extraer fecha en un solo paso con fallbacks claros
         let bookingDateValue = null;
         
@@ -221,21 +220,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           bookingDateValue = typeof bookingData.selectedDate === 'string' 
             ? bookingData.selectedDate 
             : new Date(bookingData.selectedDate).toISOString();
+          console.log("API: /booking/create: Using selectedDate from request:", bookingDateValue);
         } else if (bookingData.bookingDate) {
           bookingDateValue = typeof bookingData.bookingDate === 'string' 
             ? bookingData.bookingDate 
             : new Date(bookingData.bookingDate).toISOString();
+          console.log("API: /booking/create: Using bookingDate from request:", bookingDateValue);
         }
 
-        // Si no hay fecha disponible, usar la fecha por defecto (mañana a las 10 AM)
+        // Si no hay fecha disponible, devolvemos error en lugar de usar una por defecto
         if (!bookingDateValue) {
-          bookingDateValue = currentDate.toISOString();
-          console.log("API: /booking/create: No date provided, using default date:", bookingDateValue);
+          console.error("API: /booking/create: No booking date provided in request");
+          return NextResponse.json({ 
+            error: 'No booking date provided in request' 
+          }, { status: 400 });
         }
 
         // Ensure we have a valid user timezone
-        const userTimezone = bookingData.selectedTimezone || bookingData.userTimezone || 'UTC';
-        console.log("API: /booking/create: Using user timezone:", userTimezone);
+        console.log("API: /booking/create: Final booking date value:", bookingDateValue);
 
         // Create the booking record
         const { data: newBooking, error: createError } = await supabase

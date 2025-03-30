@@ -19,10 +19,8 @@ export const metadata: Metadata = {
   title: "Trading Coach Booking",
   description: "Book your trading consultation",
   icons: {
-    icon: [
-      { url: '/favicon.svg', type: 'image/svg+xml' },
-      { url: '/favicon.ico', type: 'image/x-icon' }
-    ],
+    icon: { url: '/gvtnomad_logo.svg', type: 'image/svg+xml' },
+    shortcut: { url: '/gvtnomad_logo.svg', type: 'image/svg+xml' }
   }
 };
 

@@ -3,6 +3,7 @@ import { UserProfile } from '@/app/types/user';
 import { CheckoutResponse, PaymentProviderService } from '../types';
 import { BookingFrequency } from '@/app/types/enums/booking';
 import { DateTime } from 'luxon';
+import { getClientCookie, setClientCookie } from '@/lib/utils/cookies';
 
 export const polarService: PaymentProviderService = {
   createCheckout: async (
@@ -17,8 +18,8 @@ export const polarService: PaymentProviderService = {
         throw new Error('Configuration error');
       }
       
-      // Get user email
-      const userEmail = userProfile?.email || localStorage.getItem('userEmail') || '';
+      // Get user email from user profile or cookies
+      const userEmail = userProfile?.email || getClientCookie('user_email') || '';
       
       // Get variant ID based on booking plan
       const variantId = polarService.getVariantIdForBookingPlan(bookingPlan.frequency);
@@ -39,23 +40,18 @@ export const polarService: PaymentProviderService = {
         apiUrl: process.env.GVT_COACH_POLAR_SANDBOX_API_URL ? 'Set' : 'Not set'
       });
       
-      // Get the selectedSlot data from localStorage if available
+      // Get the pending booking data from cookies if available
       let selectedDate = null;
       let utcDate = null;
       const userTimezone = userProfile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
       
       try {
-        const pendingBookingStr = localStorage.getItem('pendingBooking');
-        if (pendingBookingStr) {
-          const pendingBookingData = JSON.parse(pendingBookingStr);
+        const pendingBookingData = getClientCookie('pending_booking');
+        if (pendingBookingData) {
           selectedDate = pendingBookingData.selectedDate;
           
           // Intentar obtener la fecha UTC del booking plan
           if (bookingPlan.firstSlot) {
-            // Import DateTime from luxon at the top of the file instead of using require()
-            // const { DateTime } = require('luxon');
-            // (ensure to add the import at the top of the file)
-            
             // Si tenemos una fecha seleccionada y utcDate, usamos esas directamente
             if (bookingPlan.firstSlot.date && bookingPlan.firstSlot.utcDate) {
               console.log('⭐ Polar: Usando firstSlot con fecha local y UTC');
@@ -101,8 +97,8 @@ export const polarService: PaymentProviderService = {
         timezone: userTimezone
       });
       
-      // Store booking data in localStorage for reference
-      localStorage.setItem('pendingBooking', JSON.stringify(bookingData));
+      // Store booking data in cookie for reference
+      setClientCookie('pending_booking', bookingData);
       
       // Call the checkout API
       console.log('Calling /api/checkout with:', { variantId, bookingData, provider: 'polar', storePendingBooking });
@@ -134,39 +130,57 @@ export const polarService: PaymentProviderService = {
         orderId 
       });
       
-      // Update the pendingBooking in localStorage with the orderId
+      // Update the pendingBooking in cookie with the orderId
       try {
-        const pendingBookingStr = localStorage.getItem('pendingBooking');
-        if (pendingBookingStr) {
-          const pendingData = JSON.parse(pendingBookingStr);
-
+        const pendingBookingData = getClientCookie('pending_booking');
+        if (pendingBookingData) {
           const updatedBookingData = {
-            ...pendingData,
+            ...pendingBookingData,
             orderId,
             booking: {
-              ...pendingData.booking,
+              ...pendingBookingData.booking,
               checkout_order_id: orderId
             }
           };
-          localStorage.setItem('pendingBooking', JSON.stringify(updatedBookingData));
+          setClientCookie('pending_booking', updatedBookingData);
           
           // NUEVO: Crear registros en la base de datos con booking/create
           console.log('Registering booking data using booking/create endpoint');
+          
+          // Make sure we're passing the selectedDate from the pendingBookingData
+          const bookingCreateData = {
+            orderId,
+            bookingData: {
+              userEmail,
+              // Make sure we always have a valid selectedDate
+              selectedDate: bookingPlan.firstSlot?.date ? 
+                DateTime.fromJSDate(bookingPlan.firstSlot.date)
+                  .setZone(userTimezone)
+                  .toISO() : 
+                pendingBookingData?.selectedDate,
+              selectedTimezone: pendingBookingData?.selectedTimezone || userProfile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+              productId: variantId
+            },
+            provider: 'polar'
+          };
+          
+          // Verify we have a valid date before proceeding
+          if (!bookingCreateData.bookingData.selectedDate) {
+            console.error('Error: No valid date found for booking, cannot proceed:', { 
+              pendingBookingDate: pendingBookingData?.selectedDate,
+              bookingPlanDate: bookingPlan.firstSlot?.date ? 'Present' : 'Missing'
+            });
+            throw new Error('No valid booking date available');
+          }
+          
+          console.log('Sending booking create data:', JSON.stringify(bookingCreateData));
+          
           const bookingCreateResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/booking/create`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-              orderId,
-              bookingData: {
-                userEmail,
-                selectedDate,
-                selectedTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                productId: variantId
-              },
-              provider: 'polar'
-            }),
+            body: JSON.stringify(bookingCreateData),
           });
           
           if (bookingCreateResponse.ok) {

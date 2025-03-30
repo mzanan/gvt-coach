@@ -277,6 +277,7 @@ async function processWebhookEvent(req: Request) {
     // Preparar los datos a actualizar
     let jsonData: any = { 
       ...((paymentRecord?.json_data as any) || {}),
+      status: status,
       event_type: eventType,
       timestamp: new Date().toISOString()
     };

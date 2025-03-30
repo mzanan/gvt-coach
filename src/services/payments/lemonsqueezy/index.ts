@@ -3,6 +3,7 @@ import { UserProfile } from '@/app/types/user';
 import { CheckoutResponse, PaymentProviderService } from '../types';
 import { BookingFrequency } from '@/app/types/enums/booking';
 import { DateTime } from 'luxon';
+import { getClientCookie, setClientCookie } from '@/lib/utils/cookies';
 
 export const lemonSqueezyService: PaymentProviderService = {
   createCheckout: async (
@@ -14,7 +15,7 @@ export const lemonSqueezyService: PaymentProviderService = {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
       
       // Get user email
-      const userEmail = userProfile?.email || localStorage.getItem('userEmail') || '';
+      const userEmail = userProfile?.email || getClientCookie('user_email') || '';
       
       // Get variant ID based on booking plan
       const variantId = lemonSqueezyService.getVariantIdForBookingPlan(bookingPlan.frequency);
@@ -71,14 +72,14 @@ export const lemonSqueezyService: PaymentProviderService = {
         selectedTimezone: userProfile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
       };
       
-      // Store booking data in localStorage for reference with complete details
-      localStorage.setItem('pendingBooking', JSON.stringify({
+      // Store booking data in cookie for reference with complete details
+      setClientCookie('pending_booking', {
         userEmail,
         bookingPlan,
         selectedDate: localTimeString || (slotTime ? new Date(slotTime).toISOString() : null),
         utcDate: utcTimeString || (utcDate ? new Date(utcDate).toISOString() : null),
         selectedTimezone: userProfile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
-      }));
+      });
       
       // Call the checkout API
       console.log('Calling /api/checkout with:', { variantId, bookingData, storePendingBooking });
@@ -146,21 +147,19 @@ export const lemonSqueezyService: PaymentProviderService = {
       
       console.log('Checkout created successfully:', { checkoutUrl, orderId });
       
-      // Update the pendingBooking in localStorage with the orderId
+      // Update the pendingBooking in cookie with the orderId
       try {
-        const pendingBookingStr = localStorage.getItem('pendingBooking');
-        if (pendingBookingStr) {
-          const bookingData = JSON.parse(pendingBookingStr);
-
+        const pendingBookingData = getClientCookie('pending_booking');
+        if (pendingBookingData) {
           const updatedBookingData = {
-            ...bookingData,
+            ...pendingBookingData,
             orderId,
             booking: {
-              ...bookingData.booking,
+              ...pendingBookingData.booking,
               checkout_order_id: orderId
             }
           };
-          localStorage.setItem('pendingBooking', JSON.stringify(updatedBookingData));
+          setClientCookie('pending_booking', updatedBookingData);
         }
       } catch (e) {
         console.error('Error updating pendingBooking with order IDs:', e);

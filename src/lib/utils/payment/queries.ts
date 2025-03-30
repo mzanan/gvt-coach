@@ -64,6 +64,8 @@ export async function fetchPaymentMapping(checkoutOrderId: string) {
       return null;
     }
     
+    console.log(`Searching mapping for checkoutOrderId: ${checkoutOrderId}`);
+    
     // Simple direct query
     const { data: mappingData, error: mappingError } = await supabase
       .from('gvt_coach_checkout_mapping')
@@ -73,26 +75,41 @@ export async function fetchPaymentMapping(checkoutOrderId: string) {
       
     if (mappingError) {
       console.error(`Error fetching mapping for orderId ${checkoutOrderId}:`, mappingError);
-      return null;
-    }
-    
-    if (mappingData) {
+    } else if (mappingData) {
       console.log(`Found payment mapping with ID ${mappingData.payment_status_id}`);
       return mappingData;
     }
     
     // Try by payment_order_id as fallback
+    console.log(`Trying to find mapping by payment_order_id: ${checkoutOrderId}`);
     const { data: orderMappingData, error: orderMappingError } = await supabase
       .from('gvt_coach_checkout_mapping')
       .select('*')
       .eq('payment_order_id', checkoutOrderId)
       .maybeSingle();
       
-    if (!orderMappingError && orderMappingData) {
+    if (orderMappingError) {
+      console.error(`Error fetching mapping by payment_order_id ${checkoutOrderId}:`, orderMappingError);
+    } else if (orderMappingData) {
       console.log(`Found mapping by payment_order_id with ID ${orderMappingData.payment_status_id}`);
       return orderMappingData;
     }
     
+    // As a last resort, look for the most recent mapping
+    console.log(`Trying to find most recent mapping`);
+    const { data: recentMapping, error: recentError } = await supabase
+      .from('gvt_coach_checkout_mapping')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+      
+    if (!recentError && recentMapping) {
+      console.log(`Using most recent mapping as fallback: ${recentMapping.checkout_order_id}`);
+      return recentMapping;
+    }
+    
+    console.warn("No payment mapping found after all attempts");
     return null;
   } catch (error) {
     console.error("Error fetching payment mapping:", error);

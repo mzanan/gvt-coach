@@ -3,7 +3,6 @@
 import React, { useMemo } from 'react'
 import { useBookingCalendar } from './useBookingCalendar'
 import { Calendar } from '../Calendar/Calendar'
-import { UserProfileForm } from '../../user/UserProfileForm/UserProfileForm'
 import { Button } from '@/app/components/ui-kit/button'
 import { ChevronDown, ChevronUp, Check, Edit2, Loader2 } from 'lucide-react'
 import { Card } from '@/app/components/ui-kit/card'
@@ -11,6 +10,7 @@ import { DateTime } from 'luxon'
 import { FrequencySelector } from '../FrequencySelector/FrequencySelector'
 import { getBookingSummary, cn } from '@/lib/utils'
 import { BookingFrequency } from '@/app/types/enums/booking'
+import { userService } from '@/services/userService'
 
 // Definir la constante COACH_TIMEZONE con el mismo valor que se usa en el servicio
 const COACH_TIMEZONE = process.env.COACH_TIMEZONE || 'UTC';
@@ -82,7 +82,6 @@ export function BookingCalendar() {
     availableSlots,
     bookingPlan,
     userProfile,
-    isEditingProfile,
     bookedDates,
     isBookingLoading,
     isLoadingSlots,
@@ -96,12 +95,6 @@ export function BookingCalendar() {
     formatSlotTime,
     handleBookingConfirm
   } = useBookingCalendar()
-
-  // Crear una función local para manejar la cancelación de edición
-  const handleCancelEditProfile = React.useCallback(() => {
-    // Simplemente reutilizamos handleProfileComplete para cerrar el formulario
-    handleProfileComplete();
-  }, [handleProfileComplete]);
 
   // Memoizamos el renderizado del resumen para evitar cálculos repetidos
   const summaryContent = useMemo(() => {
@@ -271,28 +264,6 @@ export function BookingCalendar() {
           </div>
         )}
       </div>
-      
-      {isEditingProfile && (
-        <Card className="mb-6">
-          <div className="p-4">
-            <UserProfileForm 
-              initialData={userProfile} 
-              onComplete={handleProfileComplete}
-              showCard={false}
-              showTitle={false}
-            />
-            <div className="mt-2 flex justify-end">
-              <Button 
-                variant="outline" 
-                onClick={handleCancelEditProfile}
-                className="ml-2"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
       
       {sections.map((section) => {
         const sectionIndex = sections.findIndex(s => s.id === section.id)

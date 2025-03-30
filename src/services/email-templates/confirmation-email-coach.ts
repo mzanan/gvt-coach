@@ -44,6 +44,7 @@ export function getCoachConfirmationEmail(bookingDetails: CoachConfirmationEmail
           </div>
         </div>
         <p>Please join the session 5 minutes early to ensure everything is working properly.</p>
+        <p style="margin-top: 30px; color: #777777; font-size: 14px; text-align: left; border-top: 1px solid #eeeeee; padding-top: 20px;">GVT Coach<br>From GVT Nomad Team</p>
       </div>
     `
   };

@@ -30,6 +30,7 @@ export function getUserConfirmationEmail(bookingDetails: UserConfirmationEmailPr
           ${bookingDetails.zoom_link ? `<p><strong>Zoom Link:</strong> <a href="${bookingDetails.zoom_link}" style="color: #4285F4;">${bookingDetails.zoom_link}</a></p>` : ''}
         </div>
         <p>Please join the session 5 minutes early to ensure everything is working properly.</p>
+        <p style="margin-top: 30px; color: #777777; font-size: 14px; text-align: left; border-top: 1px solid #eeeeee; padding-top: 20px;">GVT Coach<br>From GVT Nomad Team</p>
       </div>
     `
   };
