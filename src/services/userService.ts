@@ -1,7 +1,6 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client'
-// import { setClientCookie } from '@/lib/utils/cookies'
 import { getClientCookie } from '@/lib/utils/cookies'
 
 const supabase = createClient()

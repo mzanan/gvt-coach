@@ -5,19 +5,19 @@ import { cn } from '@/lib/utils'
 import { Check } from 'lucide-react'
 import { BookingPlan } from '@/types/booking'
 import { useFrequencySection } from './useFrequencySection'
-import { BookingFrequency } from '@/types/enums/booking'
-import { Coach, COACHES_CONFIG } from '@/app/config/coaches'
+import { BookingFrequency } from '@/types/enums'
+import { CoachId, COACHES_CONFIG } from '@/config/coaches'
 
 interface FrequencySectionProps {
   bookingPlan: BookingPlan | null
   onFrequencySelect: (frequency: BookingFrequency, duration?: number) => void
-  selectedCoach?: Coach
+  selectedCoach?: CoachId
 }
 
 export function FrequencySection({
   bookingPlan,
   onFrequencySelect,
-  selectedCoach = Coach.Matias // Default to Matias if no coach selected
+  selectedCoach = CoachId.Matias
 }: FrequencySectionProps) {
   const {
     handleFrequencyCardClick

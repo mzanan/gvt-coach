@@ -1,49 +1,40 @@
 import { BookingPlan } from '@/types/booking';
 import { UserProfile } from '@/types/user';
-import { CheckoutResponse, PaymentProviderService } from '../types';
-import { BookingFrequency } from '@/types/enums/booking';
+import { CheckoutResponse, PaymentProviderService } from '@/types/payment';
+import { BookingFrequency } from '@/types/enums';
 import { DateTime } from 'luxon';
 import { getClientCookie, setClientCookie } from '@/lib/utils/cookies';
 
 export const polarService: PaymentProviderService = {
-  createCheckout: async (
-    bookingPlan: BookingPlan, 
+  async createCheckout(
+    bookingPlan: BookingPlan,
     userProfile: UserProfile,
-    storePendingBooking = false
-  ): Promise<CheckoutResponse> => {
+    storePendingBooking = true
+  ): Promise<CheckoutResponse> {
     try {
-      // Validate required environment variables
-      if (!process.env.NEXT_PUBLIC_APP_URL) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+      if (!appUrl) {
         console.error('Missing NEXT_PUBLIC_APP_URL environment variable');
-        throw new Error('Configuration error');
+        throw new Error('Application URL configuration is missing.');
       }
       
-      // Get user email from user profile or cookies
       const userEmail = userProfile?.email || getClientCookie('user_email') || '';
-      
-      // Get variant ID based on booking plan
-      const variantId = polarService.getVariantIdForBookingPlan(bookingPlan.frequency);
-      console.log('variantId', variantId);
+
+      const frequencyString = bookingPlan.frequency;
+      if (!frequencyString) {
+        throw new Error('Invalid booking plan frequency: frequency is null');
+      }
+      const variantId = polarService.getVariantIdForBookingPlan(frequencyString);
       if (!variantId) {
-        throw new Error('Invalid booking plan frequency');
+        throw new Error(`Invalid booking plan frequency or no variant ID found for: ${frequencyString}`);
       }
       
-      // Log Polar environment variables for debugging
-      console.log('Polar env check:', {
-        accessToken: process.env.GVT_COACH_POLAR_SANDBOX_ACCESS_TOKEN ? 'Set' : 'Not set',
-        productIds: {
-          single: process.env.NEXT_PUBLIC_GVT_COACH_POLAR_SINGLE_SESSION_PRODUCT_ID ? 'Set' : 'Not set',
-          weekly: process.env.GVT_COACH_POLAR_WEEKLY_PRODUCT_ID ? 'Set' : 'Not set',
-          twiceWeekly: process.env.GVT_COACH_POLAR_TWICE_WEEKLY_PRODUCT_ID ? 'Set' : 'Not set'
-        },
-        webhookSecret: process.env.GVT_COACH_POLAR_WEBHOOK_SECRET ? 'Set' : 'Not set',
-        apiUrl: process.env.GVT_COACH_POLAR_SANDBOX_API_URL ? 'Set' : 'Not set'
-      });
-      
-      // Get the pending booking data from cookies if available
-      let selectedDate = null;
-      let utcDate = null;
-      const userTimezone = userProfile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const reliableUserTimezone = getClientCookie('user_timezone') || 
+                                    userProfile?.timezone || 
+                                    Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+      let selectedDate: string | null = null;
+      let utcDateString: string | null = null;
       
       try {
         const pendingBookingData = getClientCookie('pending_booking');
@@ -54,24 +45,13 @@ export const polarService: PaymentProviderService = {
           if (bookingPlan.firstSlot) {
             // Si tenemos una fecha seleccionada y utcDate, usamos esas directamente
             if (bookingPlan.firstSlot.date && bookingPlan.firstSlot.utcDate) {
-              console.log('⭐ Polar: Usando firstSlot con fecha local y UTC');
-              
-              // Convertir a string ISO para consistencia
               selectedDate = DateTime.fromJSDate(bookingPlan.firstSlot.date)
-                .setZone(userTimezone)
+                .setZone(reliableUserTimezone)
                 .toISO();
                 
-              utcDate = DateTime.fromJSDate(bookingPlan.firstSlot.utcDate)
+              utcDateString = DateTime.fromJSDate(bookingPlan.firstSlot.utcDate)
                 .toUTC()
                 .toISO();
-                
-              console.log('📅 Polar: Fechas extraídas del slot:', {
-                selectedDate,
-                utcDate,
-                timezone: userTimezone,
-                localHour: DateTime.fromJSDate(bookingPlan.firstSlot.date).hour,
-                utcHour: DateTime.fromJSDate(bookingPlan.firstSlot.utcDate).hour
-              });
             }
           }
         }
@@ -86,24 +66,15 @@ export const polarService: PaymentProviderService = {
           frequency: bookingPlan.frequency
         },
         selectedDate,
-        utcDate,
-        selectedTimezone: userTimezone
+        utcDate: utcDateString,
+        selectedTimezone: reliableUserTimezone
       };
-      
-      // Log booking data being sent
-      console.log('📤 Polar: Enviando datos de reserva:', {
-        selectedDate,
-        utcDate,
-        timezone: userTimezone
-      });
       
       // Store booking data in cookie for reference
       setClientCookie('pending_booking', bookingData);
       
       // Call the checkout API
-      console.log('Calling /api/checkout with:', { variantId, bookingData, provider: 'polar', storePendingBooking });
-      
-      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/checkout`, {
+      const response = await fetch(`${appUrl}/api/checkout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -125,76 +96,72 @@ export const polarService: PaymentProviderService = {
       const responseData = await response.json();
       const { checkoutUrl, orderId } = responseData;
       
-      console.log('Checkout created successfully:', { 
-        checkoutUrl, 
-        orderId 
-      });
-      
-      // Update the pendingBooking in cookie with the orderId
-      try {
-        const pendingBookingData = getClientCookie('pending_booking');
-        if (pendingBookingData) {
-          const updatedBookingData = {
-            ...pendingBookingData,
-            orderId,
-            booking: {
-              ...pendingBookingData.booking,
-              checkout_order_id: orderId
+      if (storePendingBooking) {
+        try {
+          const pendingBookingData = getClientCookie('pending_booking');
+          if (pendingBookingData) {
+            const updatedBookingData = {
+              ...pendingBookingData,
+              orderId,
+              booking: {
+                ...pendingBookingData.booking,
+                checkout_order_id: orderId
+              }
+            };
+            setClientCookie('pending_booking', updatedBookingData);
+            
+            // NUEVO: Crear registros en la base de datos con booking/create
+            console.log('Registering booking data using booking/create endpoint');
+            
+            // Make sure we're passing the selectedDate from the pendingBookingData
+            const bookingCreateData = {
+              orderId,
+              bookingData: {
+                userEmail,
+                // Pass the entire bookingPlan object received by createCheckout
+                bookingPlan: bookingPlan,
+                // Make sure we always have a valid selectedDate
+                selectedDate: bookingPlan.firstSlot?.date ? 
+                  DateTime.fromJSDate(bookingPlan.firstSlot.date)
+                    .setZone(reliableUserTimezone)
+                    .toISO() : 
+                  pendingBookingData?.selectedDate,
+                selectedTimezone: pendingBookingData?.selectedTimezone || userProfile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+                productId: variantId
+              },
+              provider: 'polar'
+            };
+            
+            // Verify we have a valid date before proceeding
+            if (!bookingCreateData.bookingData.selectedDate) {
+              console.error('Error: No valid date found for booking, cannot proceed:', { 
+                pendingBookingDate: pendingBookingData?.selectedDate,
+                bookingPlanDate: bookingPlan.firstSlot?.date ? 'Present' : 'Missing'
+              });
+              throw new Error('No valid booking date available');
             }
-          };
-          setClientCookie('pending_booking', updatedBookingData);
-          
-          // NUEVO: Crear registros en la base de datos con booking/create
-          console.log('Registering booking data using booking/create endpoint');
-          
-          // Make sure we're passing the selectedDate from the pendingBookingData
-          const bookingCreateData = {
-            orderId,
-            bookingData: {
-              userEmail,
-              // Pass the entire bookingPlan object received by createCheckout
-              bookingPlan: bookingPlan,
-              // Make sure we always have a valid selectedDate
-              selectedDate: bookingPlan.firstSlot?.date ? 
-                DateTime.fromJSDate(bookingPlan.firstSlot.date)
-                  .setZone(userTimezone)
-                  .toISO() : 
-                pendingBookingData?.selectedDate,
-              selectedTimezone: pendingBookingData?.selectedTimezone || userProfile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
-              productId: variantId
-            },
-            provider: 'polar'
-          };
-          
-          // Verify we have a valid date before proceeding
-          if (!bookingCreateData.bookingData.selectedDate) {
-            console.error('Error: No valid date found for booking, cannot proceed:', { 
-              pendingBookingDate: pendingBookingData?.selectedDate,
-              bookingPlanDate: bookingPlan.firstSlot?.date ? 'Present' : 'Missing'
+            
+            console.log('Sending booking create data:', JSON.stringify(bookingCreateData));
+            
+            const bookingCreateResponse = await fetch(`${appUrl}/api/booking/create`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(bookingCreateData),
             });
-            throw new Error('No valid booking date available');
+            
+            if (bookingCreateResponse.ok) {
+              const bookingResult = await bookingCreateResponse.json();
+              console.log('Booking registration success:', bookingResult);
+            } else {
+              const errorText = await bookingCreateResponse.text();
+              console.error('Error registering booking:', errorText);
+            }
           }
-          
-          console.log('Sending booking create data:', JSON.stringify(bookingCreateData));
-          
-          const bookingCreateResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/booking/create`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(bookingCreateData),
-          });
-          
-          if (bookingCreateResponse.ok) {
-            const bookingResult = await bookingCreateResponse.json();
-            console.log('Booking registration success:', bookingResult);
-          } else {
-            const errorText = await bookingCreateResponse.text();
-            console.error('Error registering booking:', errorText);
-          }
+        } catch (e) {
+          console.error('Error updating pendingBooking or registering booking:', e);
         }
-      } catch (e) {
-        console.error('Error updating pendingBooking or registering booking:', e);
       }
 
       return {
@@ -208,8 +175,6 @@ export const polarService: PaymentProviderService = {
   },
 
   getVariantIdForBookingPlan(frequency: string): string | null {
-    console.log('Booking frequency:', frequency);
-    
     switch (frequency) {
       case BookingFrequency.Once:
         const singleSessionProductId = process.env.NEXT_PUBLIC_GVT_COACH_POLAR_SINGLE_SESSION_PRODUCT_ID;

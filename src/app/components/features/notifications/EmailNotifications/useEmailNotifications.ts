@@ -1,20 +1,8 @@
 import { useState } from 'react';
 import { BookingDB } from '@/types/booking';
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/app/components/ui-kit/use-toast";
 import { getTimezoneCookie } from '@/lib/utils/cookies';
-
-interface EmailNotificationOptions {
-  to?: string;
-  bookingDetails: {
-    start_time: string | Date;
-    end_time: string | Date;
-    zoom_link?: string;
-    user_name?: string;
-    booking_id: string;
-  };
-  type: 'confirmation' | 'reminder' | 'cancellation';
-  userTimezone?: string;
-}
+import { EmailNotificationOptions } from '@/types/email';
 
 export const useEmailNotifications = () => {
   const [isSending, setIsSending] = useState(false);

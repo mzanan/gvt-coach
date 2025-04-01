@@ -1,6 +1,6 @@
 import { lemonSqueezyService } from './lemonsqueezy';
 import { polarService } from './polar';
-import { PaymentProviderService } from './types';
+import { PaymentProviderService } from '@/types/payment';
 
 /**
  * Payment service selection based on environment variable

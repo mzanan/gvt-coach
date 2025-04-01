@@ -1,4 +1,4 @@
-import { PaymentOrderStatus } from '@/types/enums/booking';
+import { PaymentOrderStatus } from '@/types/enums';;
 
 /**
  * Checks the Polar order status via API

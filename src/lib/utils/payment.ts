@@ -1,5 +1,5 @@
-import { BookingFrequency as SuperbaseBookingFrequency } from '@/types/enums/booking'
-import { BookingFrequency as AppBookingFrequency } from '@/types/enums/booking'
+import { BookingFrequency as SuperbaseBookingFrequency } from '@/types/enums';
+import { BookingFrequency as AppBookingFrequency } from '@/types/enums';
 import { getClientCookie } from './cookies'
 
 /**

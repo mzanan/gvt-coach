@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { PaymentOrderStatus } from '@/types/enums/booking';
+import { PaymentOrderStatus } from '@/types/enums';
 
 // Type for route parameters in Next.js
 type RouteParams = {
@@ -191,10 +191,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({
       orderId,
       provider: mapping.provider,
-      status: paymentStatus?.status || 'UNKNOWN',
+      status: paymentStatus?.status,
       created: paymentStatus?.created_at,
       updated: paymentStatus?.updated_at,
-      paymentDetails: paymentStatus?.json_data || null,
+      paymentDetails: paymentStatus?.json_data,
       booking: booking || null,
       source: 'database'
     });

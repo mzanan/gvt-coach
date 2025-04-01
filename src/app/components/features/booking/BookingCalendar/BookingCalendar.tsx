@@ -11,9 +11,9 @@ import { FrequencySelector } from '../FrequencySelector'
 import { CoachSelector } from '../CoachSelector'
 import { TimeZoneSelector } from '../TimeZoneSelector/TimeZoneSelector'
 import { getBookingSummary, cn } from '@/lib/utils'
-import { BookingFrequency } from '@/types/enums/booking'
-import { COACHES_CONFIG, Coach } from '@/app/config/coaches'
-import { BookingSection } from '../BookingSection/BookingSection'
+import { BookingFrequency } from '@/types/enums'
+import { COACHES_CONFIG } from '@/config/coaches'
+import type { CoachId } from '@/config/coaches'
 
 // Memoized payment button component to reduce renders
 const PaymentButton = React.memo(({ onClick, isLoading }: { onClick: () => void, isLoading: boolean }) => (
@@ -105,9 +105,9 @@ export function BookingCalendar() {
       if (!firstSlotDate || !secondSlotDate) return null
   
       // Calculate total price (months x price per month)
-      const coach = bookingPlan.coach;
+      const coach = bookingPlan.coach as CoachId;
       const totalPrice = coach && bookingPlan.duration 
-        ? bookingPlan.duration * COACHES_CONFIG[coach as Coach].prices.twiceWeekly 
+        ? bookingPlan.duration * COACHES_CONFIG[coach].prices.twiceWeekly 
         : 0;
   
       return (
@@ -122,7 +122,7 @@ export function BookingCalendar() {
                 selectedTimezone,
                 secondSlotDate
               )}</p>
-              <p>Coach: {coach ? COACHES_CONFIG[coach as Coach].displayName : ''}</p>
+              <p>Coach: {coach ? COACHES_CONFIG[coach].displayName : ''}</p>
               <p>Duration: {bookingPlan.duration} {bookingPlan.duration === 1 ? 'month' : 'months'}</p>
               <p className="mt-4">Starting from {DateTime.fromJSDate(firstSlotDate).toFormat('MMMM d, yyyy')}</p>
               <p>Ending on {DateTime.fromJSDate(secondSlotDate)
@@ -140,12 +140,12 @@ export function BookingCalendar() {
   
     // Get price based on coach and frequency
     let price = 0;
-    const coach = bookingPlan.coach;
+    const coach = bookingPlan.coach as CoachId;
     if (coach) {
       if (bookingPlan.frequency === BookingFrequency.Once) {
-        price = COACHES_CONFIG[coach as Coach].prices.singleSession;
+        price = COACHES_CONFIG[coach].prices.singleSession;
       } else if (bookingPlan.frequency === BookingFrequency.Weekly) {
-        price = COACHES_CONFIG[coach as Coach].prices.weekly;
+        price = COACHES_CONFIG[coach].prices.weekly;
       }
     }
   
@@ -175,7 +175,7 @@ export function BookingCalendar() {
                   </div>
                   <div>
                     <h3 className="text-lg font-medium">Coach</h3>
-                    <p className="text-muted-foreground">{COACHES_CONFIG[coach as Coach].displayName}</p>
+                    <p className="text-muted-foreground">{COACHES_CONFIG[coach].displayName}</p>
                   </div>
                 </div>
               )}
@@ -230,15 +230,15 @@ export function BookingCalendar() {
       case 'coach':
         return (
           <CoachSelector
-            selectedCoach={bookingPlan.coach}
+            selectedCoach={bookingPlan.coach as CoachId | undefined}
             onCoachSelect={handleCoachSelect}
           />
         )
       case 'frequency':
         // Get the price based on selected coach or default to 100
-        const coach = bookingPlan.coach;
-        const singleSessionPrice = coach 
-          ? COACHES_CONFIG[coach as Coach].prices.singleSession 
+        const coachFreq = bookingPlan.coach as CoachId;
+        const singleSessionPrice = coachFreq 
+          ? COACHES_CONFIG[coachFreq].prices.singleSession 
           : 100;
           
         // This section is currently skipped in the flow
@@ -251,6 +251,7 @@ export function BookingCalendar() {
             disableWeekly={true}
             disableTwiceWeekly={true}
             singleSessionPrice={singleSessionPrice}
+            selectedCoach={coachFreq}
           />
         )
       case 'date':
@@ -262,7 +263,7 @@ export function BookingCalendar() {
             frequency={bookingPlan?.frequency}
             suggestedDate={suggestedDate}
             selectedTimezone={selectedTimezone}
-            selectedCoach={bookingPlan.coach || Coach.Matias}
+            selectedCoach={bookingPlan.coach as CoachId || CoachId.Matias}
           />
         )
       case 'time':
@@ -293,7 +294,7 @@ export function BookingCalendar() {
                           variant={selectedSlot?.date.toString() === slot.date.toString() ? 'default' : 'outline'}
                           disabled={!slot.available}
                           onClick={() => {
-                            handleSlotSelect(slot.slot!);
+                            handleSlotSelect(slot);
                           }}
                           className={cn(
                             "whitespace-nowrap",
@@ -312,10 +313,10 @@ export function BookingCalendar() {
             {/* Coach working hours explanation - shown AFTER the time slots */}
             <div className="mt-6 p-4 bg-muted/30 rounded-lg">
               {(() => {
-                const coach = bookingPlan.coach || Coach.Matias;
+                const coach = bookingPlan.coach as CoachId || CoachId.Matias;
                 return (
                   <p className="text-sm text-muted-foreground">
-                    These time slots are available based on {COACHES_CONFIG[coach as Coach].displayName}&apos;s working hours in their timezone ({COACHES_CONFIG[coach as Coach].timezone}, UTC{DateTime.now().setZone(COACHES_CONFIG[coach as Coach].timezone).toFormat('ZZ')}).
+                    These time slots are available based on {COACHES_CONFIG[coach].displayName}&apos;s working hours in their timezone ({COACHES_CONFIG[coach].timezone}, UTC{DateTime.now().setZone(COACHES_CONFIG[coach].timezone).toFormat('ZZ')}).
                   </p>
                 );
               })()}

@@ -1,12 +1,5 @@
-import { PaymentPollState } from '@/types/payment-status'
+import { PaymentPollState, PaymentStatusHandlers } from '@/types/payment'
 import { fetchBookingByOrderId, fetchPaymentMapping, fetchPaymentStatus } from './queries'
-import { BookingDB } from '@/types/booking'
-
-interface PaymentStatusHandlers {
-  onBookingFound: (booking: BookingDB) => void;
-  onPaymentConfirmed: () => void;
-  onPollCompleted: () => void;
-}
 
 /**
  * Check payment status by order ID using a polling mechanism as a fallback

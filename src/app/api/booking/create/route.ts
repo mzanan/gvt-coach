@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { BookingFrequency, PaymentOrderStatus } from '@/types/enums/booking';
+import { BookingFrequency, PaymentOrderStatus } from '@/types/enums';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   console.log('API: /booking/create: Processing request');
@@ -280,10 +280,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         }
         
         console.log('API: /booking/create: Created booking record with ID:', newBooking.id);
-        
-        // NOTA: La creación de Zoom meetings se ha movido a los webhooks (polar/route.ts, lemonsqueezy/route.ts)
-        // para asegurar que solo se creen cuando el pago esté CONFIRMADO
-        // Esto evita crear reuniones para pagos que nunca se completan
         
         return NextResponse.json({
           success: true,

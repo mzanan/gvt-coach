@@ -8,17 +8,3 @@ export function createClient() {
 }
 
 export const supabase = createClient()
-
-export async function getToken() {
-  const { data: { session }, error } = await supabase.auth.getSession()
-  if (error) {
-    console.error('Session error:', error)
-    return null
-  }
-
-  if (!session) {
-    return null 
-  }
-
-  return session.access_token
-}

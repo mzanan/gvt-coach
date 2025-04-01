@@ -4,22 +4,10 @@ import { Button } from '@/app/components/ui-kit/button'
 import { Check } from 'lucide-react'
 import { DateTime } from 'luxon'
 import { Calendar } from '../../booking/Calendar/Calendar'
-import { TimezoneDropdown } from '../../../features/user/TimezoneDropdown/TimezoneDropdown'
-import { TimeSlot, BookingPlan } from '@/types/booking'
-import { useDateSelectionSection } from './useDateSelectionSection'
-import { BookingFrequency } from '@/types/enums/booking'
-import { Coach } from '@/app/config/coaches'
-
-interface SlotInfo {
-  date: Date;
-  available: boolean;
-  slot: TimeSlot | null;
-}
-
-interface DayGroup {
-  date: Date;
-  slots: SlotInfo[];
-}
+import { TimeZoneSelector } from '../TimeZoneSelector/TimeZoneSelector'
+import { TimeSlot, BookingPlan, DayGroup } from '@/types/booking'
+import { BookingFrequency } from '@/types/enums'
+import { CoachId } from '@/config/coaches'
 
 interface DateSelectionSectionProps {
   selectedDate: Date | null
@@ -44,11 +32,7 @@ export function DateSelectionSection({
   bookedDates,
   onDateSelect,
   onTimezoneChange,
-  onSlotSelect
 }: DateSelectionSectionProps) {
-  const {
-    handleSecondWeeklyDaySelect
-  } = useDateSelectionSection({ onSlotSelect })
 
   return (
     <div className="space-y-4">
@@ -56,8 +40,8 @@ export function DateSelectionSection({
         <div className="space-y-4 w-full">
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold">Select a Date</h2>
-            <TimezoneDropdown 
-              selectedTimezone={selectedTimezone}
+            <TimeZoneSelector 
+              currentTimezone={selectedTimezone}
               onTimezoneChange={onTimezoneChange}
             />
           </div>
@@ -65,10 +49,9 @@ export function DateSelectionSection({
             onSelectDate={onDateSelect}
             selectedDate={selectedDate}
             bookedDates={bookedDates}
-            frequency={bookingPlan?.frequency}
             suggestedDate={suggestedDate}
             selectedTimezone={selectedTimezone}
-            selectedCoach={bookingPlan.coach || Coach.Matias}
+            selectedCoach={bookingPlan?.coach as CoachId || 'MATIAS'}
           />
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
@@ -102,7 +85,7 @@ export function DateSelectionSection({
                 })
                 .map((dayGroup, index) => {
                   const dayLabel = DateTime.fromJSDate(dayGroup.date).toFormat('EEEE');
-                  const hasAvailableSlots = dayGroup.slots.some((slot: SlotInfo) => slot.available);
+                  const hasAvailableSlots = dayGroup.slots.some((slot: TimeSlot) => slot.available);
 
                   return (
                     <Button
@@ -117,8 +100,9 @@ export function DateSelectionSection({
                       className="justify-start"
                       disabled={!hasAvailableSlots}
                       onClick={() => {
-                        if (selectedSlot && hasAvailableSlots) {
-                          handleSecondWeeklyDaySelect(selectedSlot, dayGroup.date)
+                        const firstAvailableSlot = dayGroup.slots.find(slot => slot.available);
+                        if (selectedSlot && hasAvailableSlots && firstAvailableSlot) {
+                          console.log("Second weekly day selected, need slot logic adjustment:", firstAvailableSlot);
                         }
                       }}
                     >

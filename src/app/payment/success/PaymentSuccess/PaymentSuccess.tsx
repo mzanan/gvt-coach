@@ -8,7 +8,7 @@ import { ChevronLeft } from "lucide-react"
 import { BookingSummaryDisplay } from '@/app/components/features/booking/BookingSummaryDisplay'
 import { convertBookingFrequency } from '@/lib/utils/payment'
 import { usePaymentSuccess } from './usePaymentSuccess'
-import { PaymentProgress } from '@/app/components/features/payment/PaymentProgress'
+import { PaymentProgress } from '@/app/components/features/payment/PaymentProgress/PaymentProgress'
 
 /**
  * Payment success component that displays the booking confirmation
@@ -37,7 +37,6 @@ export function PaymentSuccess() {
         fallbackText="Processing your payment. If you've completed checkout, please wait a moment."
         loadingRefresh={false}
         onRefresh={() => {}}
-        refreshButtonText="Check Status"
         loadingButtonText="Checking..."
       />
     )

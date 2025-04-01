@@ -1,7 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { DateTime } from 'luxon'
-import { BookingFrequency } from '@/types/enums/booking'
+import { BookingFrequency } from '@/types/enums';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -214,4 +214,9 @@ export function getRequestOrigin(server = ''): string {
   }
   
   return appUrl;
+}
+
+// Format date without time (moved from Calendar.tsx)
+export function formatDateWithoutTime(date: Date): string {
+  return DateTime.fromJSDate(date).toFormat('yyyy-MM-dd');
 } 

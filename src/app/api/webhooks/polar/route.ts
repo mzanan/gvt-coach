@@ -1,23 +1,45 @@
-// import { NextRequest, NextResponse } from 'next/server' // Removed
-// import crypto from 'crypto' // Removed
-// import { Polar } from '@polar-sh/sdk' // Removed
 import { createClient } from '@/lib/supabase/server'
 import { sendBookingConfirmation } from '@/services/mailer'
-import { Coach } from '@/app/config/coaches'
-import { PaymentOrderStatus } from '@/types/enums/booking'
+import { CoachId, COACHES_CONFIG } from '@/config/coaches'
+import { PaymentOrderStatus } from '@/types/enums'
+
+// Basic interface for expected Polar webhook data properties
+interface PolarWebhookData {
+  product_id?: string;
+  id?: string; // Can be checkout ID or order ID
+  checkout_id?: string;
+  metadata?: { 
+    checkoutOrderId?: string;
+    [key: string]: unknown; // Allow other metadata properties
+  };
+  customer_email?: string;
+  email?: string; // Fallback email
+  status?: string;
+  customer?: { 
+    email?: string;
+  };
+  payment_intent?: string;
+  amount?: number;
+  currency?: string;
+  [key: string]: unknown; // Allow other top-level properties
+}
+
+// Basic interface for the overall webhook payload
+interface WebhookPayload {
+  type?: string;
+  data?: PolarWebhookData | Record<string, unknown>; // Allow data to be PolarWebhookData or a generic object
+  [key: string]: unknown; // Allow other top-level properties
+}
 
 export async function POST(request: Request) {
   try {
-    // Clonar el request para poder leer el body múltiples veces
     const clonedRequest = request.clone();
     const body = await clonedRequest.json();
 
-    // Responder inmediatamente para evitar timeouts
     const response = new Response(JSON.stringify({ message: 'Webhook received' }), {
       status: 202,
     });
 
-    // Procesar el evento de forma asíncrona
     processWebhookEvent(body).catch(error => {
       console.error('[ERROR] Polar webhook processing failed:', error);
     });
@@ -31,27 +53,22 @@ export async function POST(request: Request) {
   }
 }
 
-async function processWebhookEvent(body: Record<string, unknown>) {
+async function processWebhookEvent(body: WebhookPayload) {
   try {
-    // Añadir timestamp y uid a los logs para rastreo
     const logId = Math.random().toString(36).substring(2, 8);
     console.log(`[${logId}] Polar Webhook - Received payload:`, JSON.stringify(body, null, 2));
 
-    // Extraer el tipo de evento
-    const eventType = body.type || '';
+    const eventType: string = body.type || '';
     console.log(`[${logId}] Polar Webhook - Event type: ${eventType}`);
 
-    // Filtrar solo eventos relevantes
     const RELEVANT_EVENTS = ['checkout.created', 'order.created', 'order.completed'];
     if (!RELEVANT_EVENTS.includes(eventType)) {
       console.log(`[${logId}] Polar Webhook - Ignoring non-essential event: ${eventType}`);
       return;
     }
 
-    // Acceder al objeto data donde está la información principal
-    const data = body.data || body;
+    const data: PolarWebhookData = body.data || body;
 
-    // Extraer identificadores relevantes
     let productId = '';
     let checkoutId = '';
     let orderId = '';
@@ -60,30 +77,28 @@ async function processWebhookEvent(body: Record<string, unknown>) {
     let paymentStatus = PaymentOrderStatus.Pending;
 
     if (eventType === 'checkout.created') {
-      productId = data.product_id || '';
-      checkoutId = data.id || '';
-      metadataCheckoutOrderId = data.metadata?.checkoutOrderId || '';
-      userEmail = data.customer_email || data.email || '';
-      // Para checkout.created, verificar si el estado es 'open'
+      // Access properties directly now, using nullish coalescing for defaults
+      productId = data.product_id ?? '';
+      checkoutId = data.id ?? '';
+      metadataCheckoutOrderId = data.metadata?.checkoutOrderId ?? '';
+      userEmail = data.customer_email ?? data.email ?? '';
       if (data.status === 'open') {
         paymentStatus = PaymentOrderStatus.Pending;
       }
-      console.log(`[${logId}] Polar Webhook - Processing checkout.created with ID: ${checkoutId}, status: ${data.status || 'unknown'}`);
+      console.log(`[${logId}] Polar Webhook - Processing checkout.created with ID: ${checkoutId}, status: ${data.status ?? 'unknown'}`);
     } else if (eventType === 'order.created' || eventType === 'order.completed') {
-      productId = data.product_id || '';
-      orderId = data.id || '';
-      checkoutId = data.checkout_id || '';
-      metadataCheckoutOrderId = data.metadata?.checkoutOrderId || '';
-      userEmail = data.customer?.email || data.email || '';
-      // Para order.created, siempre configurar como PAID
+      productId = data.product_id ?? '';
+      orderId = data.id ?? '';
+      checkoutId = data.checkout_id ?? '';
+      metadataCheckoutOrderId = data.metadata?.checkoutOrderId ?? '';
+      userEmail = data.customer?.email ?? data.email ?? '';
       if (eventType === 'order.created') {
         console.log(`Setting status to ${PaymentOrderStatus.Paid} for event ${eventType}`);
         paymentStatus = PaymentOrderStatus.Paid;
       }
-      console.log(`[${logId}] Polar Webhook - Processing ${eventType} with order ID: ${orderId}, checkout ID: ${checkoutId}, status: ${data.status || 'unknown'}`);
+      console.log(`[${logId}] Polar Webhook - Processing ${eventType} with order ID: ${orderId}, checkout ID: ${checkoutId}, status: ${data.status ?? 'unknown'}`);
     }
 
-    // Usar ID consistente
     const checkoutOrderId = checkoutId || orderId || metadataCheckoutOrderId || productId;
     if (!checkoutOrderId) {
       console.error(`[${logId}] Polar Webhook - No valid ID found`);
@@ -95,10 +110,7 @@ async function processWebhookEvent(body: Record<string, unknown>) {
     console.log(`[${logId}] Polar Webhook - IDs extracted: checkoutId=${checkoutId}, orderId=${orderId}, metadataCheckoutOrderId=${metadataCheckoutOrderId}, productId=${productId}`);
 
     // Iniciar Supabase Client
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-    );
+    const supabase = await createClient();
 
     // Primero buscar en la tabla de mapping para encontrar el payment_status_id
     console.log(`[${logId}] Polar Webhook - Buscando mapping para checkout_order_id: ${checkoutOrderId}`);
@@ -241,10 +253,10 @@ async function processWebhookEvent(body: Record<string, unknown>) {
           ...jsonData,
           status: paymentStatus, // Always update status in json_data to match main status
           provider: 'polar',
-          payment_intent: data.payment_intent || '',
-          amount: data.amount || 0,
-          currency: data.currency || '',
-          customer_email: data.customer_email || '',
+          payment_intent: data.payment_intent ?? '',
+          amount: data.amount ?? 0,
+          currency: data.currency ?? '',
+          customer_email: data.customer_email ?? '',
           updated_at: new Date().toISOString()
         };
 
@@ -254,16 +266,14 @@ async function processWebhookEvent(body: Record<string, unknown>) {
         }
 
         // Update the record
-        const { data: updatedPayment, error: updateError } = await supabase
+        const { error: updateError } = await supabase
           .from('gvt_coach_payments_status')
           .update({
             status: paymentStatus,
             json_data: updatedJsonData,
             updated_at: new Date().toISOString()
           })
-          .eq('id', existingPayment.id)
-          .select()
-          .single();
+          .eq('id', existingPayment.id);
         
         if (updateError) {
           console.error(`[${logId}] Polar Webhook - Error updating payment record:`, updateError);
@@ -275,27 +285,20 @@ async function processWebhookEvent(body: Record<string, unknown>) {
         console.log(`[${logId}] Polar Webhook - Status unchanged for payment record: ${paymentId}`);
       }
       
-      // Usar el ID existente
       paymentId = existingPayment.id;
     }
     
     // PASO 5: Actualizar o crear mapping para seguimiento
     if (paymentId) {
-      // SOLUCIÓN SIMPLIFICADA: 
-      // Siempre usar el checkout_order_id como payment_order_id para garantizar un valor único
-      
-      // Preparar datos para mapping con payment_order_id idéntico a checkout_order_id
       const mappingData = {
         checkout_order_id: checkoutOrderId,
         payment_status_id: paymentId,
         provider: 'polar',
-        // SIEMPRE usar checkout_order_id como payment_order_id
         payment_order_id: checkoutOrderId
       };
       
       console.log(`[${logId}] Polar Webhook - Using checkout_order_id as payment_order_id: ${checkoutOrderId}`);
       
-      // Buscar si ya existe un mapping para este checkout_order_id
       console.log(`[${logId}] Polar Webhook - Checking for existing mapping with checkout_order_id: ${checkoutOrderId}`);
       const { data: existingMapping, error: findMappingError } = await supabase
         .from('gvt_coach_checkout_mapping')
@@ -383,21 +386,23 @@ async function processWebhookEvent(body: Record<string, unknown>) {
             // Añadir llamada para enviar email de confirmación
             console.log(`[${logId}] Attempting to send confirmation email for booking ID: ${booking.id}`);
             try {
-              // Asegurarse que booking.coach es del tipo correcto o undefined
-              const coachValue = Object.values(Coach).includes(booking.coach as Coach) 
-                                 ? booking.coach as Coach 
-                                 : undefined;
+              // Check if booking.coach is a valid key in COACHES_CONFIG
+              const coachKey = booking.coach as string;
+              const coachValue: CoachId | undefined = 
+                coachKey && Object.prototype.hasOwnProperty.call(COACHES_CONFIG, coachKey) 
+                  ? coachKey as CoachId 
+                  : undefined;
                                  
               await sendBookingConfirmation(
                 booking.user_email,
                 {
                   start_time: booking.booking_date,
-                  end_time: new Date(new Date(booking.booking_date).getTime() + (booking.session_minutes || 60) * 60000),
-                  zoom_link: booking.meet_link || 'Link not generated yet', // Proveer fallback si no existe
-                  user_name: booking.user_name, 
-                  booking_id: booking.id,
-                  user_timezone: booking.user_timezone,
-                  coach: coachValue // Pasar el coach validado
+                  end_time: new Date(new Date(booking.booking_date as string).getTime() + ((booking.session_minutes as number) || 60) * 60000),
+                  zoom_link: (booking.meet_link as string),
+                  user_name: booking.user_name as string,
+                  booking_id: booking.id as string,
+                  user_timezone: booking.user_timezone as string,
+                  coach: coachValue
                 }
               );
               console.log(`[${logId}] Confirmation email call completed for booking ID: ${booking.id}`);
@@ -434,8 +439,8 @@ async function createZoomMeetingForBooking(booking: Record<string, unknown>, log
       return;
     }
     
-    if (!booking.booking_date) {
-      console.error(`[${logId}] Zoom - Booking ${booking.id} has no booking date`);
+    if (!booking.booking_date || typeof booking.booking_date !== 'string') {
+      console.error(`[${logId}] Zoom - Booking ${booking.id} has invalid booking date`);
       return;
     }
     
@@ -494,17 +499,24 @@ async function createZoomMeetingForBooking(booking: Record<string, unknown>, log
       console.log(`[${logId}] Zoom - Successfully obtained access token`);
       
       // Crear la reunión Zoom
-      const meetingTime = new Date(booking.booking_date);
-      const durationMinutes = booking.duration || booking.session_minutes || 60;
+      let meetingTime: Date;
+      try {
+          meetingTime = new Date(booking.booking_date as string);
+      } catch (dateError) {
+          console.error(`[${logId}] Zoom - Error parsing booking date: ${booking.booking_date}`, dateError);
+          return;
+      }
+      
+      const durationMinutes = (booking.duration as number) || (booking.session_minutes as number) || 60;
       
       console.log(`[${logId}] Zoom - Creating meeting for ${meetingTime.toISOString()} with duration ${durationMinutes} minutes`);
       
       const meetingData = {
-        topic: `GVT Coaching Session with ${booking.user_email}`,
+        topic: `GVT Coaching Session with ${booking.user_email as string}`,
         type: 2, // Scheduled meeting
         start_time: meetingTime.toISOString(),
         duration: durationMinutes,
-        timezone: booking.user_timezone || 'UTC',
+        timezone: (booking.user_timezone as string) || 'UTC',
         settings: {
           host_video: true,
           participant_video: true,
@@ -552,7 +564,7 @@ async function createZoomMeetingForBooking(booking: Record<string, unknown>, log
           return;
         }
         
-        const supabase = createClient(supabaseUrl, supabaseKey);
+        const supabase = await createClient();
         
         console.log(`[${logId}] Zoom - Updating booking ${booking.id} with meet link`);
         

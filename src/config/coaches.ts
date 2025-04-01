@@ -1,38 +1,8 @@
 import { DateTime } from 'luxon'
+import { CoachConfig, WorkingHours } from '@/types/coach'
 
-/**
- * Available coaches for booking
- */
-export enum Coach {
-  Matias = 'MATIAS',
-  Gabriel = 'GABRIEL'
-}
-
-interface WorkingHours {
-  morning: {
-    start: number;  // UTC hour
-    end: number;    // UTC hour
-  };
-  afternoon: {
-    start: number;  // UTC hour
-    end: number;    // UTC hour
-  };
-}
-
-interface CoachConfig {
-  name: string;
-  displayName: string;
-  description: string;
-  photoUrl: string;
-  timezone: string;
-  email: string;
-  workingHours: WorkingHours;
-  prices: {
-    singleSession: number;
-    weekly: number;
-    twiceWeekly: number;
-  };
-}
+// Define AND export Coach ID type locally as a workaround
+export type CoachId = 'MATIAS' | 'GABRIEL';
 
 // Helper function to format time in coach's timezone
 function getLocalTime(utcHour: number, timezone: string): string {
@@ -56,8 +26,8 @@ function getLocalWorkingHours(workingHours: WorkingHours, timezone: string) {
   };
 }
 
-export const COACHES_CONFIG: Record<Coach, CoachConfig> = {
-  [Coach.Matias]: {
+export const COACHES_CONFIG: Record<CoachId, CoachConfig> = {
+  'MATIAS': { 
     name: 'Matias',
     displayName: 'Matias',
     description: 'Basic coaching sessions for beginners',
@@ -66,12 +36,12 @@ export const COACHES_CONFIG: Record<Coach, CoachConfig> = {
     email: 'mzanan.net@gmail.com',
     workingHours: {
       morning: {
-        start: 1,  // UTC
-        end: 4,    // UTC
+        start: 1,  
+        end: 4,    
       },
       afternoon: {
-        start: 12, // UTC
-        end: 16,   // UTC
+        start: 12, 
+        end: 16,   
       }
     },
     prices: {
@@ -80,22 +50,16 @@ export const COACHES_CONFIG: Record<Coach, CoachConfig> = {
       twiceWeekly: 350
     }
   },
-  [Coach.Gabriel]: {
+  'GABRIEL': { 
     name: 'Gabriel',
     displayName: 'Gabriel',
     description: 'Advanced coaching sessions',
     photoUrl: '/coaches/gabriel.jpg',
-    timezone: 'Asia/Saigon',
+    timezone: 'Asia/Saigon', 
     email: 'coaching@gvtnomad.com',
     workingHours: {
-      morning: {
-        start: 1,  // UTC
-        end: 4,    // UTC
-      },
-      afternoon: {
-        start: 12, // UTC
-        end: 16,   // UTC
-      }
+      morning: { start: 1, end: 4 },
+      afternoon: { start: 12, end: 16 }
     },
     prices: {
       singleSession: 100,
@@ -103,10 +67,24 @@ export const COACHES_CONFIG: Record<Coach, CoachConfig> = {
       twiceWeekly: 700
     }
   }
+};
+
+// Export helper functions using the local CoachId type
+export function getCoachLocalWorkingHours(coach: CoachId, timezone: string) {
+  const config = COACHES_CONFIG[coach];
+  if (!config) {
+      console.warn(`Configuration for coach ${coach} not found.`);
+      return { morning: { start: '', end: '' }, afternoon: { start: '', end: '' } }; 
+  }
+  return getLocalWorkingHours(config.workingHours, timezone);
 }
 
-// Export helper functions for use in other parts of the application
-export function getCoachLocalWorkingHours(coach: Coach, timezone: string) {
-  const config = COACHES_CONFIG[coach];
-  return getLocalWorkingHours(config.workingHours, timezone);
+// Get coach timezone from config
+export function getCoachTimezone(coachId: CoachId = 'MATIAS'): string | null { 
+  const timezone = COACHES_CONFIG[coachId]?.timezone;
+  if (!timezone) {
+      console.error(`Timezone for coach ${coachId} not found in COACHES_CONFIG.`);
+      return null; 
+  }
+  return timezone;
 } 

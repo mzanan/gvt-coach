@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { BookingFrequency } from '@/types/enums/booking';
+import { BookingFrequency } from '@/types/enums';
 
 interface BookingData {
   userEmail: string;
@@ -38,19 +38,7 @@ export async function createLemonSqueezyCheckout(
     console.error('Checkout API: Missing GVT_COACH_LEMONSQUEEZY_API_URL environment variable');
     throw new Error('Server configuration error');
   }
-  
-  console.log('LemonSqueezy API Configuration:', {
-    apiBaseUrl,
-    hasApiKey: !!apiKey,
-    storeId
-  });
-  
-  console.log('Checkout API: Creating checkout in LemonSqueezy', {
-    variantId,
-    storeId,
-    userEmail: bookingData?.userEmail,
-  });
-  
+
   // Prepare data for LemonSqueezy
   const checkoutData = {
     data: {
@@ -87,10 +75,6 @@ export async function createLemonSqueezyCheckout(
     }
   };
   
-  // Call LemonSqueezy API
-  console.log('Sending data to LemonSqueezy:', JSON.stringify(checkoutData, null, 2));
-  console.log('Using API key (masked):', apiKey ? `${apiKey.substring(0, 5)}...${apiKey.substring(apiKey.length - 5)}` : 'missing');
-  
   // Build the complete API URL
   const apiUrl = `${apiBaseUrl}/checkouts`;
   console.log(`Making API request to: ${apiUrl}`);
@@ -118,11 +102,6 @@ export async function createLemonSqueezyCheckout(
       console.error('Checkout API: Invalid response from LemonSqueezy', response.data);
       throw new Error('Failed to create checkout');
     }
-    
-    console.log('Checkout API: Checkout created successfully', {
-      orderId,
-      checkoutUrl
-    });
     
     return { checkoutUrl, orderId };
   } catch (error) {

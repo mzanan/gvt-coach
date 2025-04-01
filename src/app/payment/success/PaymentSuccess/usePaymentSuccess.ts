@@ -6,7 +6,7 @@ import { getUserDataFromCookies } from '@/lib/utils/payment'
 import { fetchBookingByOrderId, fetchPaymentMapping, fetchPaymentStatus } from '@/lib/utils/payment/queries'
 import { bookingService } from '@/services/bookingService'
 import { supabase } from '@/lib/supabase/client'
-import { PaymentOrderStatus } from '@/types/enums/booking'
+import { PaymentOrderStatus } from '@/types/enums'
 import { sendBookingConfirmation } from '@/services/mailer'
 import { getTimezoneCookie } from '@/lib/utils/cookies'
 
@@ -31,8 +31,8 @@ export const usePaymentSuccess = () => {
   const emailSentRef = useRef(false) // Ref para controlar si el email ya fue enviado
   const effectExecutionFlag = useRef(false) // Mover fuera del callback para evitar error de linter
   
-  // Función centralizada para envío de correo
-  const sendConfirmationEmailOnce = async (bookingData: BookingDB) => {
+  // Función centralizada para envío de correo (envuelta en useCallback)
+  const sendConfirmationEmailOnce = useCallback(async (bookingData: BookingDB) => {
     // Comprobar si el email ya fue enviado usando el ref (persistente entre renderizados)
     if (emailSentRef.current) {
       return;
@@ -75,7 +75,7 @@ export const usePaymentSuccess = () => {
         }
       }, 5000); // Reintentar después de 5 segundos
     }
-  };
+  }, []); // Dependencies: only refs and state setters used, which don't need to be listed
   
   // Función para manejar la confirmación del booking - envuelta en useCallback
   const handleBookingConfirmation = useCallback(async (bookingData: BookingDB) => {
@@ -176,7 +176,7 @@ export const usePaymentSuccess = () => {
       console.error("Error en handleBookingConfirmation:", error);
       return null;
     }
-  }, []);
+  }, [sendConfirmationEmailOnce]);
 
   // Función para cargar datos de pago (reutilizada en polling) - envuelta en useCallback
   const loadPaymentData = useCallback(async (checkoutOrderId: string) => {
@@ -283,7 +283,7 @@ export const usePaymentSuccess = () => {
       console.error("Error en fetchLatestBookingByEmail:")
       return null
     }
-  }, [supabase]);
+  }, []); // Removed supabase dependency as it's stable
 
   // Obtener ID de orden desde URL y cargar datos
   useEffect(() => {
@@ -445,7 +445,7 @@ export const usePaymentSuccess = () => {
         } else if (isMounted) {
           setIsLoading(false)
         }
-      } catch (error) {
+      } catch {
         if (isMounted) {
           toast({
             title: "Error",
@@ -467,7 +467,7 @@ export const usePaymentSuccess = () => {
         pollingTimeoutRef.current = null
       }
     }
-  }, [searchParams, handleBookingConfirmation, loadPaymentData, paymentStatus, toast]) // Incluir todas las dependencias requeridas
+  }, [searchParams, handleBookingConfirmation, loadPaymentData, paymentStatus, toast, fetchLatestBookingByEmail])
   
   return {
     isLoading,

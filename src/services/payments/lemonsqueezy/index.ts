@@ -1,9 +1,9 @@
 import { BookingPlan } from '@/types/booking';
-import { UserProfile } from '@/types/user';
-import { CheckoutResponse, PaymentProviderService } from '../types';
-import { BookingFrequency } from '@/types/enums/booking';
+import { CheckoutResponse, PaymentProviderService } from '@/types/payment';
+import { BookingFrequency } from '@/types/enums';
 import { DateTime } from 'luxon';
 import { getClientCookie, setClientCookie } from '@/lib/utils/cookies';
+import { UserProfile } from '@/types/user';
 
 export const lemonSqueezyService: PaymentProviderService = {
   createCheckout: async (
@@ -12,56 +12,37 @@ export const lemonSqueezyService: PaymentProviderService = {
     storePendingBooking = false
   ): Promise<CheckoutResponse> => {
     try {
-      // Validate APP_URL
       const appUrl = process.env.NEXT_PUBLIC_APP_URL;
       if (!appUrl) {
         console.error('Missing NEXT_PUBLIC_APP_URL environment variable.');
         throw new Error('Application URL configuration is missing.');
       }
       
-      // Get user email
       const userEmail = userProfile?.email || getClientCookie('user_email') || '';
       
-      // Get variant ID based on booking plan
-      const variantId = lemonSqueezyService.getVariantIdForBookingPlan(bookingPlan.frequency);
-      
+      const frequencyString = bookingPlan.frequency;
+      if (!frequencyString) {
+        throw new Error('Invalid booking plan frequency: frequency is null');
+      }
+      const variantId = lemonSqueezyService.getVariantIdForBookingPlan(frequencyString);
       if (!variantId) {
-        throw new Error('Invalid booking plan frequency');
+        throw new Error(`Invalid booking plan frequency or no variant ID found for: ${frequencyString}`);
       }
 
-      // Debug: Log the environment and variant ID
-      console.log('Current environment:', process.env.NEXT_PUBLIC_ENV);
-      console.log('Using variant ID:', variantId);
-      
-      // Get the actual selected slot time from the booking plan
       const slotTime = bookingPlan.firstSlot?.date;
       const utcDate = bookingPlan.firstSlot?.utcDate;
       
-      // Logging simplificado del plan de reserva
-      console.log('Plan de reserva:', {
-        frequency: bookingPlan.frequency,
-        slot: bookingPlan.firstSlot ? {
-          id: bookingPlan.firstSlot.id,
-          local: bookingPlan.firstSlot.date ? new Date(bookingPlan.firstSlot.date).toISOString() : null,
-          utc: bookingPlan.firstSlot.utcDate ? new Date(bookingPlan.firstSlot.utcDate).toISOString() : null,
-        } : null
-      });
-      
-      // --- RELIABLE TIMEZONE FROM CLIENT COOKIE --- 
       const reliableUserTimezone = getClientCookie('user_timezone') || 
-                                   userProfile?.timezone || 
-                                   Intl.DateTimeFormat().resolvedOptions().timeZone;
-      console.log("🍋 [LemonSqueezy Service] Determined reliable user timezone:", reliableUserTimezone);
-      // --- END RELIABLE TIMEZONE ---
+                                     userProfile?.timezone || 
+                                     Intl.DateTimeFormat().resolvedOptions().timeZone;
       
-      // Convertir fechas de manera simplificada
       let localTimeString = null;
       let utcTimeString = null;
       
       try {
         if (slotTime) {
           const slotDateTime = DateTime.fromJSDate(new Date(slotTime));
-          localTimeString = slotDateTime.setZone(reliableUserTimezone).toISO(); // Use reliable timezone
+          localTimeString = slotDateTime.setZone(reliableUserTimezone).toISO();
           utcTimeString = utcDate ? 
             DateTime.fromJSDate(new Date(utcDate)).toISO() : 
             slotDateTime.toUTC().toISO();
@@ -70,22 +51,20 @@ export const lemonSqueezyService: PaymentProviderService = {
         console.error('Error processing date/time in LemonSqueezy service:', e);
       }
       
-      // Prepare booking data - Pass the reliable timezone
       const bookingData = {
         userEmail,
-        bookingPlan: bookingPlan, // Keep the full booking plan
+        bookingPlan: bookingPlan,
         selectedDate: localTimeString || null,
         utcDate: utcTimeString || null,
-        selectedTimezone: reliableUserTimezone // <-- Pass the reliable timezone
+        selectedTimezone: reliableUserTimezone
       };
       
-      // Store booking data in cookie for reference with complete details
       setClientCookie('pending_booking', {
         userEmail,
         bookingPlan,
         selectedDate: localTimeString || (slotTime ? new Date(slotTime).toISOString() : null),
         utcDate: utcTimeString || (utcDate ? new Date(utcDate).toISOString() : null),
-        selectedTimezone: reliableUserTimezone // Store reliable timezone in cookie too
+        selectedTimezone: reliableUserTimezone
       });
       
       // Call the checkout API

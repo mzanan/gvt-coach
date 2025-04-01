@@ -24,10 +24,6 @@ export async function POST(req: NextRequest) {
     const data = await req.json();
     const { to, subject, html, text, cc, bcc } = data;
 
-    // --- DEBUG LOG START ---
-    console.log("[API /email/send] Received email data:", JSON.stringify({ to, subject, cc, bcc, hasHtml: !!html, hasText: !!text }, null, 2));
-    // --- DEBUG LOG END ---
-
     // Validamos los datos mínimos necesarios
     if (!to || (!subject && !html && !text)) {
       return NextResponse.json(
@@ -49,10 +45,6 @@ export async function POST(req: NextRequest) {
       };
 
       const info = await transporter.sendMail(mailOptions);
-      
-      // --- DEBUG LOG START ---
-      console.log("[API /email/send] Email sent successfully. Info:", JSON.stringify(info, null, 2));
-      // --- DEBUG LOG END ---
       
       return NextResponse.json({ success: true, data: info });
     } catch (emailError) {

@@ -1,22 +1,8 @@
 import { DateTime } from 'luxon';
-import { Coach, COACHES_CONFIG } from '@/app/config/coaches';
+import { COACHES_CONFIG } from '@/config/coaches';
+import { ConfirmationEmailProps } from '@/types/email';
 
-interface CoachConfirmationEmailProps {
-  start_time: string | Date;
-  end_time: string | Date;
-  zoom_link?: string;
-  user_name?: string;
-  user_email: string;
-  user_timezone?: string;
-  booking_id?: string;
-  checkout_order_id?: string;
-  payment_status?: string;
-  payment_confirmed?: boolean;
-  payment_provider?: string;
-  coach: Coach;
-}
-
-export function getCoachConfirmationEmail(bookingDetails: CoachConfirmationEmailProps) {
+export function getCoachConfirmationEmail(bookingDetails: ConfirmationEmailProps) {
   const userName = bookingDetails.user_name || bookingDetails.user_email;
   const coachName = COACHES_CONFIG[bookingDetails.coach].displayName;
   const coachTimezone = COACHES_CONFIG[bookingDetails.coach].timezone;

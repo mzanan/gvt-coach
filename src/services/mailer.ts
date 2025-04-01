@@ -1,50 +1,33 @@
 import { supabase } from '@/lib/supabase/client';
 import { getUserConfirmationEmail } from './email-templates/confirmation-email-user';
 import { getCoachConfirmationEmail } from './email-templates/confirmation-email-coach';
-import { PaymentOrderStatus } from '@/types/enums/booking';
+import { PaymentOrderStatus } from '@/types/enums';
 import { getTimezoneCookie } from '@/lib/utils/cookies';
-import { COACHES_CONFIG } from '@/app/config/coaches';
-import { Coach } from '@/app/config/coaches';
+import { COACHES_CONFIG, getCoachTimezone, CoachId } from '@/config/coaches';
+import { EmailData } from "@/types/email";
 
-// Interface for email data
-export interface EmailData {
-  to: string | string[];
-  subject: string;
-  html?: string;
-  text?: string;
-  from?: string;
-  replyTo?: string;
-  cc?: string | string[];
-  bcc?: string | string[];
-  icalEvent?: {
-    method: string;
-    content: string;
-  };
-}
-
-// Generic email sending function
-export async function sendEmail(data: EmailData) {
-  console.log('Sending email:', data);
-
+export async function sendEmail(emailData: EmailData) {
   try {
     const response = await fetch('/api/email/send', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify(data)
+      body: JSON.stringify(emailData), // Pass the whole emailData object
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || 'Error sending email');
+      console.error('Error calling /api/email/send:', response.status, errorData);
+      throw new Error(`Failed to send email: ${errorData.error || response.statusText}`);
     }
 
     const result = await response.json();
-    return { success: true, data: result.data };
+    return { success: true, data: result.data }; // Return success and potential info from API
+
   } catch (error) {
-    console.error('Error sending email:', error);
-    return { success: false, error };
+    console.error('Error in sendEmail function:', error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
@@ -63,21 +46,22 @@ export async function sendBookingConfirmation(
     user_name?: string;
     booking_id?: string;
     user_timezone?: string;
-    coach?: Coach;
+    coach?: CoachId;
   }
 ) {
+  let userTimezone: string | null | undefined = bookingDetails.user_timezone;
+
   try {
-    // Verificar si el coach viene en los detalles
-    if (!bookingDetails.coach) {
-      console.error('[MAILER ERROR] Coach missing in bookingDetails! Cannot determine correct coach.', bookingDetails);
-      // Considerar lanzar un error o retornar para evitar enviar al coach equivocado
-      // Por ahora, usaremos un fallback pero lo loguearemos fuertemente
-      console.warn('[MAILER WARNING] Defaulting to Coach.Gabriel due to missing coach in bookingDetails.');
-      bookingDetails.coach = Coach.Gabriel; // Mantener fallback temporalmente con warning
+    const selectedCoach: CoachId = bookingDetails.coach as CoachId;
+    
+    if (!selectedCoach || !(selectedCoach in COACHES_CONFIG)) {
+      console.error('[MAILER ERROR] Invalid or missing coach in bookingDetails! Cannot determine correct coach.', bookingDetails);
+      return { success: false, error: 'Invalid coach specified' };
     }
     
-    const selectedCoach = bookingDetails.coach;
-    console.log(`[MAILER] Determined selectedCoach: ${selectedCoach}`);
+    const coachConfig = COACHES_CONFIG[selectedCoach];
+    const coachEmail = coachConfig?.email;
+    getCoachTimezone(selectedCoach);
 
     // 1. Check/Mark flag in DB to prevent duplicates
     if (bookingDetails.booking_id) {
@@ -89,7 +73,6 @@ export async function sendBookingConfirmation(
         .single();
 
       if (booking?.confirmation_email_sent) {
-        console.log('Email already sent according to database:', bookingDetails.booking_id);
         return { success: true, alreadySent: true };
       }
       
@@ -98,19 +81,13 @@ export async function sendBookingConfirmation(
         .from('gvt_coach_meetings_bookings')
         .update({ confirmation_email_sent: true })
         .eq('id', bookingDetails.booking_id);
-        
-      console.log('Flag marked in DB before actual sending');
     }
 
     // 2. Get user timezone from booking data, cookie, or fall back to UTC
-    let userTimezone = bookingDetails.user_timezone;
-    
-    // Try to get timezone from the cookie if not provided in booking details
     if (!userTimezone && typeof window !== 'undefined') {
       const cookieTimezone = getTimezoneCookie();
       if (cookieTimezone) {
         userTimezone = cookieTimezone;
-        console.log('Using timezone from cookie for user email:', userTimezone);
       }
     }
     
@@ -124,7 +101,6 @@ export async function sendBookingConfirmation(
         
       if (bookingData?.user_timezone) {
         userTimezone = bookingData.user_timezone;
-        console.log('Using timezone from database for user email:', userTimezone);
       }
     }
     
@@ -154,21 +130,6 @@ export async function sendBookingConfirmation(
     console.log(`[MAILER] User confirmation email sent to ${to} for coach ${selectedCoach}`);
 
     // 4. Send email to coach if configured
-    const coachConfig = COACHES_CONFIG[selectedCoach];
-    const coachEmail = coachConfig.email;
-    const coachTimezone = coachConfig.timezone;
-    let reliableUserTimezoneForCoachEmail = bookingDetails.user_timezone;
-    if (!reliableUserTimezoneForCoachEmail && typeof window !== 'undefined') {
-      const cookieTimezone = getTimezoneCookie();
-      if (cookieTimezone) reliableUserTimezoneForCoachEmail = cookieTimezone;
-    }
-    if (!reliableUserTimezoneForCoachEmail && bookingDetails.booking_id) {
-      const { data: bookingData } = await supabase.from('gvt_coach_meetings_bookings').select('user_timezone').eq('id', bookingDetails.booking_id).single();
-      if (bookingData?.user_timezone) reliableUserTimezoneForCoachEmail = bookingData.user_timezone;
-    }
-    reliableUserTimezoneForCoachEmail = reliableUserTimezoneForCoachEmail || 'UTC';
-    console.log("[MAILER] Using user timezone for coach email info:", reliableUserTimezoneForCoachEmail);
-
     if (coachEmail) {
       // Initial basic booking data
       const bookingInfo = {
@@ -202,9 +163,6 @@ export async function sendBookingConfirmation(
         }
       }
 
-      // Log coach timezone for debugging
-      console.log('Sending email to coach with timezone:', coachTimezone);
-
       console.log(`[MAILER] Attempting to send confirmation to coach ${selectedCoach} at ${coachEmail}`);
       const coachEmailContent = getCoachConfirmationEmail({
         start_time: bookingDetails.start_time,
@@ -212,7 +170,7 @@ export async function sendBookingConfirmation(
         zoom_link: bookingDetails.zoom_link,
         user_name: userName,
         user_email: to,
-        user_timezone: reliableUserTimezoneForCoachEmail,
+        user_timezone: userTimezone,
         booking_id: bookingDetails.booking_id || 'Unknown',
         checkout_order_id: bookingInfo.checkout_order_id,
         payment_status: PaymentOrderStatus.Paid,
@@ -244,7 +202,6 @@ export async function sendBookingConfirmation(
           .from('gvt_coach_meetings_bookings')
           .update({ confirmation_email_sent: false })
           .eq('id', bookingDetails.booking_id);
-        console.log('Flag unmarked in DB due to error in sending');
       } catch (dbError) {
         console.error('Could not unmark the flag:', dbError);
       }

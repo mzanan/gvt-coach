@@ -1,18 +1,17 @@
 'use client'
 
-import React, { useState, useMemo, useCallback } from 'react'
+import React from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { BookingFrequency } from '@/types/enums/booking'
 import { Button } from '@/app/components/ui-kit/button'
 import { DateTime } from 'luxon'
-import { Coach, COACHES_CONFIG } from '@/app/config/coaches'
+import { Coach } from '@/config/coaches'
+import { useCalendar } from './useCalendar'
 
 interface CalendarProps {
   onSelectDate: (date: Date) => void
   selectedDate: Date | null
   bookedDates: Array<{ date: Date, fullyBooked: boolean }>
-  frequency?: BookingFrequency
   suggestedDate?: Date | null
   selectedTimezone: string
   selectedCoach: Coach
@@ -60,131 +59,20 @@ const CalendarDay = React.memo(({
 ));
 CalendarDay.displayName = 'CalendarDay';
 
-export function Calendar({ 
-  onSelectDate, 
-  selectedDate, 
-  bookedDates,
-  suggestedDate,
-  selectedTimezone,
-  selectedCoach
-}: CalendarProps) {
-  // Initialize current month based purely on user's perspective
-  const [currentMonth, setCurrentMonth] = useState(() => {
-    // Get current date in user's timezone
-    const userNow = DateTime.now().setZone(selectedTimezone);
-    return userNow;
-  });
-
-  // Memoize days calculation to avoid unnecessary recalculations
-  const days = useMemo(() => getDaysInMonth(currentMonth), [currentMonth]);
-  
-  const goToPreviousMonth = useCallback(() => {
-    setCurrentMonth(prev => prev.minus({ months: 1 }));
-  }, []);
-
-  const goToNextMonth = useCallback(() => {
-    setCurrentMonth(prev => prev.plus({ months: 1 }));
-  }, []);
-
-  // Calculate the earliest month the user can navigate back to (current month)
-  const earliestMonth = useMemo(() => {
-    return DateTime.now().setZone(selectedTimezone).startOf('month');
-  }, [selectedTimezone]);
-
-  const isPreviousMonthDisabled = useMemo(() => {
-    return currentMonth.startOf('month') <= earliestMonth;
-  }, [currentMonth, earliestMonth]);
-
-  const isSelected = useCallback((date: DateTime) => {
-    if (!selectedDate) return false;
-    const selected = DateTime.fromJSDate(selectedDate)
-      .setZone(selectedTimezone)
-      .startOf('day');
-    const compareDate = date.startOf('day');
-    
-    return selected.hasSame(compareDate, 'day');
-  }, [selectedDate, selectedTimezone]);
-
-  const isSuggestedDate = useCallback((date: DateTime) => {
-    if (!suggestedDate) return false;
-    const suggested = DateTime.fromJSDate(suggestedDate).setZone(selectedTimezone).startOf('day');
-    return date.hasSame(suggested, 'day');
-  }, [suggestedDate, selectedTimezone]);
-
-  const isFullyBooked = useCallback((date: DateTime) => {
-    return bookedDates.some(bookedDate => {
-      const bookedDateTime = DateTime.fromJSDate(bookedDate.date)
-        .setZone(selectedTimezone)
-        .startOf('day');
-      return date.hasSame(bookedDateTime, 'day');
-    });
-  }, [bookedDates, selectedTimezone]);
-
-  const isDisabled = useCallback((date: DateTime) => {
-    // Get current time in coach's timezone (with time, not just date)
-    const coachTimezone = COACHES_CONFIG[selectedCoach].timezone;
-    const coachNow = DateTime.now().setZone(coachTimezone);
-    
-    // Convert the calendar date to a datetime in coach timezone for comparison
-    const calendarDateInUserTZ = date.setZone(selectedTimezone).startOf('day');
-    const calendarDateInCoachTZ = calendarDateInUserTZ.setZone(coachTimezone);
-    
-    // Check if the date is fully booked
-    const isBooked = isFullyBooked(date);
-    
-    // For any future date beyond today in coach's timezone, it should be enabled
-    // This ensures we compare dates properly across timezone boundaries
-    const coachToday = coachNow.startOf('day');
-    
-    // If the date is tomorrow or later in coach timezone, it's bookable (unless booked)
-    if (calendarDateInCoachTZ > coachToday) {
-      return isBooked;
-    }
-    
-    // Disable today and past dates in coach timezone
-    return true;
-  }, [selectedTimezone, selectedCoach, isFullyBooked]);
-
-  const isCurrentMonth = useCallback((date: DateTime) => {
-    return date.month === currentMonth.month;
-  }, [currentMonth]);
-
-  const handleDateSelect = useCallback((date: DateTime) => {
-    if (!isDisabled(date)) {
-      onSelectDate(date.toJSDate());
-    }
-  }, [isDisabled, onSelectDate]);
-
-  function getDaysInMonth(date: DateTime) {
-    const year = date.year;
-    const month = date.month;
-    
-    const firstDayOfMonth = DateTime.local(year, month, 1);
-    const lastDayOfMonth = DateTime.local(year, month, 1).endOf('month');
-    
-    const daysInMonth = lastDayOfMonth.day;
-    const dayOfWeek = firstDayOfMonth.weekday % 7;
-    
-    const days: DateTime[] = [];
-    
-    // Add days from previous month
-    for (let i = 0; i < dayOfWeek; i++) {
-      days.push(firstDayOfMonth.minus({ days: dayOfWeek - i }));
-    }
-    
-    // Add days from current month
-    for (let i = 0; i < daysInMonth; i++) {
-      days.push(firstDayOfMonth.plus({ days: i }));
-    }
-    
-    // Add days from next month to complete the grid
-    const remainingDays = 42 - days.length;
-    for (let i = 0; i < remainingDays; i++) {
-      days.push(lastDayOfMonth.plus({ days: i + 1 }));
-    }
-    
-    return days;
-  }
+export function Calendar(props: CalendarProps) {
+  // Use the hook to get state and callbacks
+  const {
+    currentMonth,
+    days,
+    goToPreviousMonth,
+    goToNextMonth,
+    isPreviousMonthDisabled,
+    isSelected,
+    isSuggestedDate,
+    isDisabled,
+    isCurrentMonth,
+    handleDateSelect
+  } = useCalendar(props); // Pass all props to the hook
 
   return (
     <div className="space-y-4">
@@ -234,15 +122,4 @@ export function Calendar({
       </div>
     </div>
   )
-}
-
-// Get coach timezone in a specific format
-export function getCoachTimezone() {
-  const COACH_TIMEZONE = process.env.NEXT_PUBLIC_COACH_TIMEZONE || 'Asia/Saigon';
-  return COACH_TIMEZONE;
-}
-
-// Format date without time
-export function formatDateWithoutTime(date: Date): string {
-  return DateTime.fromJSDate(date).toFormat('yyyy-MM-dd');
 } 

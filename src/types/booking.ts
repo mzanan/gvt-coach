@@ -1,5 +1,5 @@
-import { BookingFrequency, PaymentOrderStatus } from './enums/booking';
-import { Coach } from './enums/coach';
+import { BookingFrequency, PaymentOrderStatus } from './enums';
+import { CoachId } from '@/config/coaches';
 
 export interface Booking {
   id: string
@@ -25,8 +25,8 @@ export interface GroupedTimeSlots {
 }
 
 export interface BookingPlan {
-  coach?: Coach;
-  frequency: BookingFrequency;
+  coach?: CoachId;
+  frequency: BookingFrequency | null;
   duration: number;
   price?: number;
   hasDiscount?: boolean;
@@ -34,8 +34,8 @@ export interface BookingPlan {
   productId?: string;
   variantId?: string;
   bookingId?: string;
-  firstSlot?: TimeSlot;
-  secondSlot?: TimeSlot;
+  firstSlot?: TimeSlot | null;
+  secondSlot?: TimeSlot | null;
 }
 
 export interface BookingDB {
@@ -58,5 +58,10 @@ export interface BookingDB {
   checkout_order_id?: string;
   confirmation_email_sent?: boolean;
   session_minutes?: number;
-  coach?: Coach;
+  coach?: CoachId;
+}
+
+export interface DayGroup {
+  date: Date;
+  slots: TimeSlot[];
 } 

@@ -1,30 +1,21 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { TimeSlot, BookingPlan } from '@/types/booking'
-import { UserProfile } from '@/types/user'
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { TimeSlot, BookingPlan, DayGroup } from '@/types/booking'
 import { DateTime } from 'luxon'
 import { bookingService } from '@/services/bookingService'
 import { paymentService } from '@/services/payments'
-import { BookingFrequency } from '@/types/enums/booking'
+import { BookingFrequency } from '@/types/enums'
 import { setClientCookie, setTimezoneCookie, getTimezoneCookie } from '@/lib/utils/cookies'
 import { userService } from '@/services/userService'
 import { useToast } from '@/app/components/ui-kit/use-toast'
-import { Coach } from '@/app/config/coaches'
+import type { CoachId } from "@/config/coaches"
+import { UserProfile } from '@/types/user'
 
 interface Section {
   id: 'coach' | 'frequency' | 'date' | 'time' | 'summary'
   title: string
   completed: boolean
-}
-
-interface InternalGroupedTimeSlots {
-  date: Date;
-  available: boolean;
-  slot: TimeSlot | null;
-}
-
-interface DayGroup {
-  date: Date;
-  slots: InternalGroupedTimeSlots[];
 }
 
 export function useBookingCalendar() {
@@ -50,11 +41,6 @@ export function useBookingCalendar() {
   const [isBookingLoading, setIsBookingLoading] = useState(false)
   const [isLoadingSlots, setIsLoadingSlots] = useState(false)
 
-  // Caching user profile to avoid unnecessary localStorage reads
-  const cachedUserProfile = useMemo(() => {
-    if (typeof window === 'undefined') return null;
-    return bookingService.getUserProfile();
-  }, []);
 
   // Initialize with timezone from cookie or browser
   const [selectedTimezone, setSelectedTimezone] = useState<string>(() => {
@@ -72,7 +58,7 @@ export function useBookingCalendar() {
       }
       
       // If no cookie, check cached profile
-      const profileTimezone = cachedUserProfile?.timezone;
+      const profileTimezone = userProfile?.timezone;
       
       if (profileTimezone) {
         setTimezoneCookie(profileTimezone); // Ensure cookie is set if profile had it
@@ -95,23 +81,19 @@ export function useBookingCalendar() {
       try {
         const userData = await userService.getUserFromAuthUsers();
         if (userData) {
-          // Asegurarse de que el objeto tenga todos los campos requeridos para UserProfile
           const userProfileData: UserProfile = {
             id: userData.id || '',
             email: userData.email,
             first_name: userData.first_name,
             last_name: userData.last_name,
-            phone: '', // Añadir el campo phone que falta
+            phone: '',
             timezone: userData.timezone,
             full_name: `${userData.first_name} ${userData.last_name}`
           };
           
           setUserProfile(userProfileData);
-          
-          // Ya no necesitamos establecer la timezone aquí, useState lo hace al inicio
-          // El código que estaba aquí fue eliminado para evitar sobrescrituras.
         }
-      } catch (error) {
+      } catch {
         toast({
           title: "Error",
           description: "Could not load user data.",
@@ -121,9 +103,8 @@ export function useBookingCalendar() {
     };
     
     loadUserData();
-  }, [toast]); // Mantenemos toast como dependencia si se usa
+  }, [toast]);
 
-  // Memoizar loadBookedDates para evitar recrear la función en cada renderizado
   const loadBookedDates = useCallback(async () => {
     try {
       const dates = await bookingService.getFullyBookedDates(new Date());
@@ -137,73 +118,47 @@ export function useBookingCalendar() {
     loadBookedDates();
   }, [loadBookedDates]);
 
-  // Memoizar loadSlots para evitar recrear la función en cada renderizado
-  const loadSlots = useCallback(async (date: Date, timezone: string) => {
+  // Define fetchAvailableSlots HERE, before handleDateSelect
+  const fetchAvailableSlots = useCallback(async (date: Date, timezone: string, coach: CoachId) => {
     try {
       setIsLoadingSlots(true);
-      
+      // Call bookingService which now returns GroupedTimeSlots[] using TimeSlot[] directly
       const groupedSlots = await bookingService.getAvailableSlots(
-        date, 
+        date,
         timezone,
-        bookingPlan?.coach || Coach.Matias
+        coach
       );
       
-      // Transform received slots to the DayGroup format
-      const transformedSlots: DayGroup[] = groupedSlots.map(group => ({
-        date: group.date,
-        slots: group.slots.map(slot => {
-          // Confiar en que los slots ya vienen con la timezone correcta del servicio
-          return {
-            date: slot.date,
-            available: slot.available,
-            slot: slot // Pasar el slot original tal cual
-          };
-        })
-      }));
-      
-      setAvailableSlots(transformedSlots);
-    } catch {
-      console.error('Error loading slots:');
+      setAvailableSlots(groupedSlots);
+
+    } catch (error: unknown) {
+      console.error('Error fetching available slots:', error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to fetch available time slots. Please try again.";
       toast({
         title: "Error",
-        description: "Failed to load available time slots. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
       setIsLoadingSlots(false);
     }
-  }, [bookingPlan?.coach, toast]);
+  }, [toast, setIsLoadingSlots]); 
 
-  useEffect(() => {
-    if (selectedDate) {
-      loadSlots(selectedDate, selectedTimezone);
-    }
-  }, [selectedDate, selectedTimezone, loadSlots]);
-
-  // Memoizar funciones de manejo para evitar recrearlas en cada renderizado
-  const handleProfileComplete = useCallback(() => {
-    // No hace nada, ya que no hay edición de perfil
-  }, []);
 
   const handleTimezoneChange = useCallback((timezone: string) => {
-    // Update state
     setSelectedTimezone(timezone);
-    
-    // Update cookie
     setTimezoneCookie(timezone);
     
-    // Reset all selected values except coach
     setSelectedDate(null);
     setSuggestedDate(null);
     setSelectedSlot(null);
     setAvailableSlots([]);
     
-    // Preserve only coach selection in booking plan
     setBookingPlan(prev => ({
       ...prev,
-      coach: prev?.coach,
+      coach: prev?.coach as CoachId || 'MATIAS',
       frequency: BookingFrequency.Once,
-      duration: 1 // Valor por defecto para evitar null
+      duration: 1 
     }));
     
     // Make coach and date sections available, but mark time and summary as not completed
@@ -223,73 +178,41 @@ export function useBookingCalendar() {
       title: "Timezone Updated",
       description: `Your timezone has been updated to ${timezone}.`,
     });
-  }, []);
+  }, [toast]);
 
   const handleDateSelect = useCallback(async (date: Date) => {
-    // Show loading indicator immediately
     setIsLoadingSlots(true);
-    
-    // Keep the same date that was visually selected
-    const selectedLocalDate = DateTime.fromJSDate(date)
-      .startOf('day')
-      .setZone(selectedTimezone, { keepLocalTime: true });
-    
-    // Set selected date immediately to improve UX
+    const selectedLocalDate = DateTime.fromJSDate(date).startOf('day').setZone(selectedTimezone, { keepLocalTime: true });
     setSelectedDate(selectedLocalDate.toJSDate());
     
     if (bookingPlan?.frequency === BookingFrequency.TwiceWeekly) {
       const suggested = selectedLocalDate.plus({ days: 3 }).toJSDate();
       setSuggestedDate(suggested);
-      setIsLoadingSlots(false); // We don't load slots for twice-weekly
+      setIsLoadingSlots(false); 
     } else {
       setSuggestedDate(null);
       try {
-        // Move to the next step immediately while slots are loading
-        setSections(prev => prev.map(s => 
-          s.id === 'date' ? { ...s, completed: true } : s
-        ));
+        setSections(prev => prev.map(s => s.id === 'date' ? { ...s, completed: true } : s));
+        console.log('[handleDateSelect] Setting active section to: time');
         setActiveSection('time');
         
-        // Load slots after updating the UI
-        const groupedSlots = await bookingService.getAvailableSlots(
+        // Now this call is valid as fetchAvailableSlots is defined above
+        fetchAvailableSlots(
           selectedLocalDate.toJSDate(), 
           selectedTimezone,
-          bookingPlan?.coach || Coach.Matias
+          bookingPlan?.coach as CoachId || 'MATIAS'
         );
-        
-        // If no slots, show empty message
-        if (groupedSlots.length === 0) {
-          setAvailableSlots([]);
-          setIsLoadingSlots(false);
-          return;
-        }
-        
-        // Transform received slots to the DayGroup format
-        const transformedSlots: DayGroup[] = groupedSlots.map(group => ({
-          date: group.date,
-          slots: group.slots.map(slot => {
-            // Confiar en que los slots ya vienen con la timezone correcta del servicio
-            return {
-              date: slot.date,
-              available: slot.available,
-              slot: slot // Pasar el slot original tal cual
-            };
-          })
-        }));
-        
-        setAvailableSlots(transformedSlots);
       } catch (error: unknown) {
         console.error('Error loading slots:', error);
+        const errorMessage = error instanceof Error ? error.message : "Failed to load available time slots. Please try again.";
         toast({
           title: "Error",
-          description: error?.message || "Failed to load available time slots. Please try again.",
+          description: errorMessage,
           variant: "destructive"
         });
-      } finally {
-        setIsLoadingSlots(false);
       }
     }
-  }, [bookingPlan, selectedTimezone, setActiveSection, setSections, toast]);
+  }, [selectedTimezone, bookingPlan?.coach, bookingPlan?.frequency, fetchAvailableSlots, setSections, setActiveSection, toast, setIsLoadingSlots, setSelectedDate, setSuggestedDate]); // Added missing dependency bookingPlan?.frequency
 
   const handleSlotSelect = useCallback((slot: TimeSlot) => {
     if (!slot.available) return;
@@ -382,7 +305,7 @@ export function useBookingCalendar() {
   );
 
   // New function to handle coach selection
-  const handleCoachSelect = useCallback((coach: Coach) => {
+  const handleCoachSelect = useCallback((coach: CoachId) => {
     // Update booking plan with selected coach and always set ONCE frequency
     setBookingPlan(prev => ({
       ...prev,
@@ -453,9 +376,10 @@ export function useBookingCalendar() {
       
       window.location.href = checkoutUrl;
     } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Error creating booking.";
       toast({
         title: "Error",
-        description: error?.message || "Error creating booking.",
+        description: errorMessage,
         variant: "destructive"
       });
       setIsBookingLoading(false);
@@ -477,38 +401,6 @@ export function useBookingCalendar() {
     handleNextSection();
   }, [handleNextSection]);
 
-  const fetchAvailableSlots = useCallback(async (date: Date) => {
-    try {
-      setIsLoadingSlots(true);
-      const groupedSlots = await bookingService.getAvailableSlots(
-        date,
-        selectedTimezone,
-        bookingPlan?.coach || Coach.Matias
-      );
-      
-      // Transformar los slots para que coincidan con el tipo DayGroup[]
-      const transformedSlots: DayGroup[] = groupedSlots.map(group => ({
-        date: group.date,
-        slots: group.slots.map(slot => ({
-          date: slot.date,
-          available: slot.available,
-          slot: slot
-        }))
-      }));
-      
-      setAvailableSlots(transformedSlots);
-    } catch (error: unknown) {
-      console.error('Error fetching available slots:', error);
-      toast({
-        title: "Error",
-        description: error?.message || "Failed to fetch available time slots. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoadingSlots(false);
-    }
-  }, [selectedTimezone, bookingPlan?.coach, toast]);
-
   return {
     sections,
     activeSection,
@@ -522,7 +414,6 @@ export function useBookingCalendar() {
     isBookingLoading,
     isLoadingSlots,
     selectedTimezone,
-    handleProfileComplete,
     handleEditProfile: handleTimezoneChange,
     handleDateSelect,
     handleSlotSelect,

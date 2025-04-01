@@ -1,5 +1,5 @@
-import { BookingFrequency as SuperbaseBookingFrequency } from '@/types/enums/booking'
-import { BookingFrequency as AppBookingFrequency } from '@/types/enums/booking'
+import { BookingFrequency as SuperbaseBookingFrequency } from '@/types/enums'
+import { BookingFrequency as AppBookingFrequency } from '@/types/enums'
 
 // Helper function to convert between BookingFrequency types
 export function convertBookingFrequency(frequency: SuperbaseBookingFrequency): AppBookingFrequency {

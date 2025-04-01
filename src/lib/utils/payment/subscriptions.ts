@@ -1,5 +1,5 @@
-import { supabase } from '@/lib/supabase/client'
-import { PaymentStatusPayload } from '@/types/payment-status'
+import { createClient } from '@supabase/supabase-js'
+import { PaymentStatusPayload } from '@/types/payment'
 
 /**
  * Set up a Supabase channel to listen for payment status updates
@@ -18,7 +18,10 @@ export function setupPaymentStatusChannel(
   }
   
   // Create the channel
-  const channel = supabase.channel(`payment_updates_${orderId}`);
+  const channel = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  ).channel(`payment_updates_${orderId}`);
   
   // Listen for payment status changes
   channel.on(

@@ -1,3 +1,9 @@
+// Enum defining available coaches
+export enum Coach {
+  MATIAS = 'MATIAS',
+  GABRIEL = 'GABRIEL',
+}
+
 /**
  * Frequency options for booking appointments
  */

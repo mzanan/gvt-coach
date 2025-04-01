@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createLemonSqueezyCheckout } from './lemonsqueezy';
 import { createPolarCheckout } from './polar';
 import { createClient } from '@/lib/supabase/server';
-import { BookingFrequency, PaymentOrderStatus } from '@/types/enums/booking';
+import { BookingFrequency, PaymentOrderStatus } from '@/types/enums';
 import { DateTime } from 'luxon';
 
 export async function POST(request: NextRequest) {

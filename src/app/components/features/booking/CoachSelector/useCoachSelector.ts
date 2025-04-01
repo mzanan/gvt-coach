@@ -1,13 +1,13 @@
 'use client';
 
-import { Coach } from '@/app/config/coaches';
+import { CoachId } from '@/config/coaches';
 
 interface UseCoachSelectorProps {
-  onCoachSelect: (coach: Coach) => void;
+  onCoachSelect: (coach: CoachId) => void;
 }
 
 export const useCoachSelector = ({ onCoachSelect }: UseCoachSelectorProps) => {
-  const handleCoachCardClick = (coach: Coach) => {
+  const handleCoachCardClick = (coach: CoachId) => {
     onCoachSelect(coach);
   };
 
