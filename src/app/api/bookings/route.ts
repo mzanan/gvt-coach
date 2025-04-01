@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse, NextRequest } from 'next/server';
-import { PaymentOrderStatus } from '@/app/types/enums/booking';
+import { PaymentOrderStatus } from '@/types/enums/booking';
 
 export async function POST(request: NextRequest) {
   try {

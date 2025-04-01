@@ -5,9 +5,9 @@ import { Check } from 'lucide-react'
 import { DateTime } from 'luxon'
 import { Calendar } from '../../booking/Calendar/Calendar'
 import { TimezoneDropdown } from '../../../features/user/TimezoneDropdown/TimezoneDropdown'
-import { TimeSlot, BookingPlan } from '@/app/types/booking'
+import { TimeSlot, BookingPlan } from '@/types/booking'
 import { useDateSelectionSection } from './useDateSelectionSection'
-import { BookingFrequency } from '@/app/types/enums/booking'
+import { BookingFrequency } from '@/types/enums/booking'
 import { Coach } from '@/app/config/coaches'
 
 interface SlotInfo {

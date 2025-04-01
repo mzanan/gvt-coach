@@ -1,4 +1,4 @@
-import { BookingFrequency, PaymentOrderStatus } from '@/app/types/enums/booking';
+import { BookingFrequency, PaymentOrderStatus } from '@/types/enums/booking';
 
 export interface UserProfile {
   id: string;

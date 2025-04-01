@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase/client';
 import { getUserConfirmationEmail } from './email-templates/confirmation-email-user';
 import { getCoachConfirmationEmail } from './email-templates/confirmation-email-coach';
-import { PaymentOrderStatus } from '@/app/types/enums/booking';
+import { PaymentOrderStatus } from '@/types/enums/booking';
 import { getTimezoneCookie } from '@/lib/utils/cookies';
 import { COACHES_CONFIG } from '@/app/config/coaches';
 import { Coach } from '@/app/config/coaches';

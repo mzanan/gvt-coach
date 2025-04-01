@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase/client'
-import { PaymentStatusPayload } from '@/app/types/payment-status'
+import { PaymentStatusPayload } from '@/types/payment-status'
 
 /**
  * Set up a Supabase channel to listen for payment status updates

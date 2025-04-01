@@ -2,7 +2,7 @@
 
 import { Card } from '@/app/components/ui-kit/card'
 import { Button } from '@/app/components/ui-kit/button'
-import { UserProfile } from '@/app/types/user'
+import { UserProfile } from '@/types/user'
 import { useToast } from '@/app/components/ui-kit/use-toast'
 
 interface UserProfileSectionProps {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BookingDB } from '@/app/types/booking';
+import { BookingDB } from '@/types/booking';
 import { toast } from "@/components/ui/use-toast";
 import { getTimezoneCookie } from '@/lib/utils/cookies';
 

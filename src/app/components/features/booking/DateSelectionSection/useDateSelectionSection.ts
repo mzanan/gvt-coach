@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon'
-import { TimeSlot } from '@/app/types/booking'
+import { TimeSlot } from '@/types/booking'
 
 interface UseDateSelectionSectionProps {
   onSlotSelect: (slot: TimeSlot) => void

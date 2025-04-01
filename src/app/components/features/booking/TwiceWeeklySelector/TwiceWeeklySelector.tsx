@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { DateTime } from 'luxon'
-import { TimeSlot } from '@/app/types/booking'
+import { TimeSlot } from '@/types/booking'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui-kit/select'
 import { Button } from '@/app/components/ui-kit/button'
 import { bookingService } from '@/services/bookingService'

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { BookingFrequency } from '@/app/types/enums/booking';
+import { BookingFrequency } from '@/types/enums/booking';
 
 interface BookingData {
   userEmail: string;

@@ -1,4 +1,4 @@
-import { BookingFrequency } from "@/app/types/booking"
+import { BookingFrequency } from "@/types/booking"
 
 interface UseFrequencySectionProps {
   onFrequencySelect: (frequency: BookingFrequency, duration?: number) => void

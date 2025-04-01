@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { BookingFrequency, PaymentOrderStatus } from '@/app/types/enums/booking';
+import { BookingFrequency, PaymentOrderStatus } from '@/types/enums/booking';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   console.log('API: /booking/create: Processing request');

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { BookingFrequency, PaymentOrderStatus } from '@/app/types/enums/booking';
+import { BookingFrequency, PaymentOrderStatus } from '@/types/enums/booking';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { orderId, bookingData, provider } = body;
 
-    console.log('POST /api/payments/status - Received request:', { orderId, provider });
+    console.log('POST /api/polar/payment-status - Received request:', { orderId, provider });
 
     if (!orderId) {
       return NextResponse.json(

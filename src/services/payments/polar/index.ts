@@ -1,7 +1,7 @@
-import { BookingPlan } from '@/app/types/booking';
-import { UserProfile } from '@/app/types/user';
+import { BookingPlan } from '@/types/booking';
+import { UserProfile } from '@/types/user';
 import { CheckoutResponse, PaymentProviderService } from '../types';
-import { BookingFrequency } from '@/app/types/enums/booking';
+import { BookingFrequency } from '@/types/enums/booking';
 import { DateTime } from 'luxon';
 import { getClientCookie, setClientCookie } from '@/lib/utils/cookies';
 

@@ -1,7 +1,7 @@
 // Payment service types shared across different providers
 
-import { BookingPlan } from '@/app/types/booking';
-import { UserProfile } from '@/app/types/user';
+import { BookingPlan } from '@/types/booking';
+import { UserProfile } from '@/types/user';
 
 export interface CheckoutResponse {
   checkoutUrl: string;

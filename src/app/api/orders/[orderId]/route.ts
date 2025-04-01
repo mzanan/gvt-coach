@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { PaymentOrderStatus } from '@/app/types/enums/booking';
+import { PaymentOrderStatus } from '@/types/enums/booking';
 
 // Type for route parameters in Next.js
 type RouteParams = {

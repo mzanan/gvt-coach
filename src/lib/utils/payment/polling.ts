@@ -1,6 +1,6 @@
-import { PaymentPollState } from '@/app/types/payment-status'
+import { PaymentPollState } from '@/types/payment-status'
 import { fetchBookingByOrderId, fetchPaymentMapping, fetchPaymentStatus } from './queries'
-import { BookingDB } from '@/app/types/booking'
+import { BookingDB } from '@/types/booking'
 
 interface PaymentStatusHandlers {
   onBookingFound: (booking: BookingDB) => void;

@@ -3,9 +3,9 @@
 import { Card } from '@/app/components/ui-kit/card'
 import { cn } from '@/lib/utils'
 import { Check } from 'lucide-react'
-import { BookingPlan } from '@/app/types/booking'
+import { BookingPlan } from '@/types/booking'
 import { useFrequencySection } from './useFrequencySection'
-import { BookingFrequency } from '@/app/types/enums/booking'
+import { BookingFrequency } from '@/types/enums/booking'
 import { Coach, COACHES_CONFIG } from '@/app/config/coaches'
 
 interface FrequencySectionProps {

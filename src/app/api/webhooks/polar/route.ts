@@ -4,7 +4,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { sendBookingConfirmation } from '@/services/mailer'
 import { Coach } from '@/app/config/coaches'
-import { PaymentOrderStatus } from '@/app/types/enums/booking'
+import { PaymentOrderStatus } from '@/types/enums/booking'
 
 export async function POST(request: Request) {
   try {

@@ -1,7 +1,7 @@
 'use client'
 
 import { Button } from "@/app/components/ui-kit/button"
-import { BookingFrequency } from "@/app/types/enums/booking"
+import { BookingFrequency } from "@/types/enums/booking"
 import { useState, useEffect } from "react"
 import { Label } from "@/app/components/ui-kit/label"
 import {

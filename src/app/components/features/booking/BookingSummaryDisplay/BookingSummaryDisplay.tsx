@@ -1,6 +1,6 @@
 'use client'
 
-import { BookingFrequency } from '@/app/types/enums/booking'
+import { BookingFrequency } from '@/types/enums/booking'
 import { getBookingSummary } from '@/lib/utils'
 import { Badge } from '@/app/components/ui-kit/badge'
 import { DateTime } from 'luxon'

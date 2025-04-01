@@ -1,9 +1,9 @@
 import { DateTime } from 'luxon'
 import { supabase, getToken } from '@/lib/supabase/client'
-import { UserProfile } from '@/app/types/user'
-import { BookingDB } from '@/app/types/booking'
-import { GroupedTimeSlots, TimeSlot } from '@/app/types/booking'
-import { BookingFrequency } from '@/app/types/enums/booking'
+import { UserProfile } from '@/types/user'
+import { BookingDB } from '@/types/booking'
+import { GroupedTimeSlots, TimeSlot } from '@/types/booking'
+import { BookingFrequency } from '@/types/enums/booking'
 import { Coach, COACHES_CONFIG } from '@/app/config/coaches'
 
 // Cache to store results and reduce unnecessary calls

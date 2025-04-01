@@ -11,7 +11,7 @@ import { FrequencySelector } from '../FrequencySelector'
 import { CoachSelector } from '../CoachSelector'
 import { TimeZoneSelector } from '../TimeZoneSelector/TimeZoneSelector'
 import { getBookingSummary, cn } from '@/lib/utils'
-import { BookingFrequency } from '@/app/types/enums/booking'
+import { BookingFrequency } from '@/types/enums/booking'
 import { COACHES_CONFIG, Coach } from '@/app/config/coaches'
 import { BookingSection } from '../BookingSection/BookingSection'
 
