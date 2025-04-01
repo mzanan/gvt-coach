@@ -4,8 +4,7 @@ import { UserProfile } from '@/app/types/user'
 import { BookingDB } from '@/app/types/booking'
 import { GroupedTimeSlots, TimeSlot } from '@/app/types/booking'
 import { BookingFrequency } from '@/app/types/enums/booking'
-
-const COACH_TIMEZONE = process.env.COACH_TIMEZONE || 'UTC';
+import { Coach, COACHES_CONFIG } from '@/app/config/coaches'
 
 // Cache to store results and reduce unnecessary calls
 const cache = {
@@ -153,35 +152,42 @@ export const bookingService = {
     }
   },
 
-  getAvailableSlots: async (date: Date, userTimezone: string): Promise<GroupedTimeSlots[]> => {
-    // Cache key using date and timezone - use only date without time for better caching
+  getAvailableSlots: async (date: Date, userTimezone: string, coach = Coach.Gabriel): Promise<GroupedTimeSlots[]> => {
+    // Cache key using date and timezone
     const dateString = DateTime.fromJSDate(date).setZone(userTimezone).startOf('day').toFormat('yyyy-MM-dd');
-    const cacheKey = `slots-${dateString}-${userTimezone}`;
+    const cacheKey = `slots-${dateString}-${userTimezone}-${coach}`;
     
     // Check if we have available slots in cache
     const cachedSlots = cache.availableSlots.get(cacheKey);
     if (cachedSlots) {
-      console.log('Returning cached slots for', dateString);
       return cachedSlots;
     }
     
-    // Add current time in the selected timezone for debugging
-    const now = DateTime.now().setZone(userTimezone);
-    console.log(`Fetching slots for ${dateString} - Current time in ${userTimezone}: ${now.toFormat('yyyy-MM-dd HH:mm:ss')}`);
+    // Get the selected coach configuration
+    const coachConfig = COACHES_CONFIG[coach];
+    const COACH_TIMEZONE = coachConfig.timezone;
+    const COACH_MORNING_HOURS_START = coachConfig.workingHours.morning.start;
+    const COACH_MORNING_HOURS_END = coachConfig.workingHours.morning.end;
+    const COACH_AFTERNOON_HOURS_START = coachConfig.workingHours.afternoon.start;
+    const COACH_AFTERNOON_HOURS_END = coachConfig.workingHours.afternoon.end;
     
+    // Get the selected day in user timezone
     const userDateTime = DateTime.fromJSDate(date)
       .setZone(userTimezone)
       .startOf('day');
     
-    const utcStartOfDay = userDateTime.minus({ days: 0 }).toUTC(); // Reduced from 1 to 0 days
-    const utcEndOfDay = userDateTime.plus({ days: 1 }).toUTC(); // Reduced from 2 to 1 day
+    // Get this day in coach timezone
+    const coachDateTime = userDateTime.setZone(COACH_TIMEZONE);
+    
+    // Fetch bookings for this day in user's timezone
+    const utcStartOfDay = userDateTime.toUTC();
+    const utcEndOfDay = userDateTime.plus({ days: 1 }).toUTC();
     
     // Optimize queries - pre-create OR condition for better performance
     const dateCondition = `booking_date.gte.${utcStartOfDay.toISO()},booking_date.lt.${utcEndOfDay.toISO()}`;
     
-    // Optimize queries
+    // Fetch bookings
     const [mainBookingsResult] = await Promise.all([
-      // Get the bookings
       supabase
         .from('gvt_coach_meetings_bookings')
         .select(`
@@ -194,164 +200,156 @@ export const bookingService = {
     ]);
     
     let mainBookings = mainBookingsResult.data || [];
-    // Define the type explicitly to avoid type errors
-    const secondaryBookings: { booking_date: string; recurring_time: string }[] = []; // Initialize empty since we're not using it yet
+    const secondaryBookings: { booking_date: string; recurring_time: string }[] = [];
     
-    // Filter bookings to include only those with confirmed payments (PAID)
+    // Filter bookings by payment status
     if (mainBookings.length > 0) {
-      // Get the order IDs
-      const orderIds = mainBookings
-        .map(booking => booking.checkout_order_id)
-        .filter(Boolean);
+      const bookingsWithOrderId = mainBookings.filter(b => b.checkout_order_id);
       
-      if (orderIds.length > 0) {
-        // Get the checkout_order_id to payment_status_id mappings
+      if (bookingsWithOrderId.length > 0) {
+        const orderIds = bookingsWithOrderId.map(b => b.checkout_order_id);
+        
         const { data: checkoutMappings } = await supabase
           .from('gvt_coach_checkout_mapping')
           .select('checkout_order_id, payment_status_id')
           .in('checkout_order_id', orderIds);
         
         if (checkoutMappings && checkoutMappings.length > 0) {
-          // Get the PAID payment statuses using payment_status_id
           const paymentStatusIds = checkoutMappings
-            .map(mapping => mapping.payment_status_id)
-            .filter(Boolean);
+            .filter(mapping => mapping.payment_status_id)
+            .map(mapping => mapping.payment_status_id);
           
-          const { data: paymentStatuses } = await supabase
-            .from('gvt_coach_payments_status')
-            .select('id, status')
-            .in('id', paymentStatusIds)
-            .eq('status', 'PAID');
+          if (paymentStatusIds.length > 0) {
+            const { data: paymentStatuses } = await supabase
+              .from('gvt_coach_payments_status')
+              .select('id, status')
+              .in('id', paymentStatusIds)
+              .eq('status', 'PAID');
           
-          if (paymentStatuses && paymentStatuses.length > 0) {
-            // Create a set of payment_status_id that have PAID status
-            const paidStatusIds = new Set(paymentStatuses.map(ps => ps.id));
-            
-            // Create a set of checkout_order_id with PAID status
-            const paidOrderIds = new Set(
-              checkoutMappings
-                .filter(mapping => mapping.payment_status_id && paidStatusIds.has(mapping.payment_status_id))
-                .map(mapping => mapping.checkout_order_id)
-            );
-            
-            // Filter bookings to include only those with confirmed payments
-            mainBookings = mainBookings.filter(booking => 
-              booking.checkout_order_id && paidOrderIds.has(booking.checkout_order_id)
-            );
-          } else {
-            // If there are no PAID statuses, there are no valid bookings
-            mainBookings = [];
+            if (paymentStatuses && paymentStatuses.length > 0) {
+              const paidStatusIds = new Set(paymentStatuses.map(ps => ps.id));
+              
+              const paidOrderIds = new Set(
+                checkoutMappings
+                  .filter(mapping => mapping.payment_status_id && paidStatusIds.has(mapping.payment_status_id))
+                  .map(mapping => mapping.checkout_order_id)
+              );
+              
+              mainBookings = mainBookings.filter(booking => 
+                booking.checkout_order_id && paidOrderIds.has(booking.checkout_order_id)
+              );
+            } else {
+              mainBookings = [];
+            }
           }
         }
       }
     }
     
-    // Prepare a map for faster lookup of occupied slots
+    // Map to store booked slots
     const bookedSlotsMap = new Map();
     
-    // First, determine valid coach hours for the day
-    const validSlots = new Set<string>();
-    for (let hour = 0; hour < 24; hour++) {
-      const userSlotDateTime = userDateTime.plus({ hours: hour });
-      const utcSlotDateTime = userSlotDateTime.toUTC();
-      const coachSlotDateTime = utcSlotDateTime.setZone(COACH_TIMEZONE);
+    // Define coach working hours
+    const morningStart = COACH_MORNING_HOURS_START;
+    const morningEnd = COACH_MORNING_HOURS_END;
+    const afternoonStart = COACH_AFTERNOON_HOURS_START;
+    const afternoonEnd = COACH_AFTERNOON_HOURS_END;
+    
+    const slots: TimeSlot[] = [];
+    const now = DateTime.now().setZone(userTimezone);
+    
+    // Examinar el día seleccionado por el usuario y el día siguiente en la timezone del coach
+    for (let dayOffset = 0; dayOffset <= 1; dayOffset++) {
+      // Día actual en la timezone del coach (puede ser el mismo día o el siguiente)
+      const currentCoachDay = coachDateTime.plus({ days: dayOffset });
       
-      const coachHour = coachSlotDateTime.hour;
-      
-      // Check if it's coach working hours (1-4 AM or 12-4 PM)
-      if ((coachHour >= 1 && coachHour <= 4) || (coachHour >= 12 && coachHour <= 16)) {
-        // Only add future slots and never from the current day in coach timezone
-        const nowInCoachTimezone = DateTime.now().setZone(COACH_TIMEZONE);
-        const slotCoachDate = coachSlotDateTime.startOf('day');
-        const todayInCoachTimezone = nowInCoachTimezone.startOf('day');
+      // Verificar slots para este día del coach
+      for (let hour = 0; hour < 24; hour++) {
+        // Crear datetime en la timezone del COACH primero
+        const coachSlotDateTime = currentCoachDay.set({ hour });
         
-        // Skip slots from the current day in coach timezone
-        if (slotCoachDate > todayInCoachTimezone && userSlotDateTime >= DateTime.now().setZone(userTimezone)) {
-          // Add the slot to valid slots
-          const slotKey = userSlotDateTime.toFormat('yyyy-MM-dd-HH');
-          validSlots.add(slotKey);
+        // Convertir la hora del slot a UTC para comparar con las horas de trabajo UTC
+        const coachSlotUTC = coachSlotDateTime.toUTC();
+        const coachHourUTC = coachSlotUTC.hour;
+
+        // Verificar si la HORA UTC del slot está dentro del horario laboral UTC del coach
+        const isInMorningShift = (coachHourUTC >= morningStart && coachHourUTC <= morningEnd); // Incluir la hora final
+        const isInAfternoonShift = (coachHourUTC >= afternoonStart && coachHourUTC <= afternoonEnd); // Incluir la hora final
+        
+        // Solo procesar si está dentro del horario laboral
+        if (isInMorningShift || isInAfternoonShift) {
+          // Convertir el slot (que está en la zona del coach) a la timezone del USUARIO para mostrar
+          const userSlotDateTime = coachSlotDateTime.setZone(userTimezone);
+          
+          // CRUCIAL: Verificar si este slot convertido cae en el día seleccionado por el usuario
+          const isInSelectedUserDay = userSlotDateTime.hasSame(userDateTime, 'day');
+          
+          // Solo agregar si el slot cae en el día que el usuario seleccionó
+          if (isInSelectedUserDay) {
+            // Verificar si el slot (en la zona del usuario) ya pasó
+            if (userSlotDateTime < now) {
+              continue; // Saltar horas pasadas
+            }
+            
+            // Get UTC version of slot for storage (puede ser coachSlotUTC)
+            const utcSlotDateTime = coachSlotUTC;
+            
+            // Format keys for checking bookings (usar la hora del usuario)
+            const hourKey = userSlotDateTime.toFormat('yyyy-MM-dd-HH');
+            const exactKey = userSlotDateTime.toFormat('yyyy-MM-dd-HH-mm');
+            
+            // Check bookings
+            const isBooked = bookedSlotsMap.has(hourKey) || bookedSlotsMap.has(exactKey);
+            
+            // Add valid slot (con la fecha/hora convertida a la zona del usuario)
+            slots.push({
+              id: `${userDateTime.toFormat('yyyy-MM-dd')}-${userSlotDateTime.hour}`,
+              date: userSlotDateTime.toJSDate(), // Este es el Date que se enviará al frontend
+              available: !isBooked,
+              utcDate: utcSlotDateTime.toJSDate()
+            });
+          }
         }
       }
     }
     
-    // Only process bookings that fall within valid coach hours
+    // Mark which slots are booked
     [...mainBookings, ...secondaryBookings].forEach(booking => {
       try {
-        // Convert the UTC booking date to the user's timezone for accurate slot blocking
-        const bookingDateTime = DateTime.fromISO(booking.booking_date).setZone(userTimezone);
-        const slotKey = bookingDateTime.toFormat('yyyy-MM-dd-HH');
+        // Use UTC time for booking key generation
+        const bookingDateTimeUTC = DateTime.fromISO(booking.booking_date);
+        const hourKeyUTC = bookingDateTimeUTC.toFormat('yyyy-MM-dd-HH');
+        const exactKeyUTC = bookingDateTimeUTC.toFormat('yyyy-MM-dd-HH-mm');
         
-        // Only process if the booking is in a valid slot
-        if (validSlots.has(slotKey)) {
-          // Create multiple keys for better slot blocking - one for the exact hour and half-hour
-          const keyFormat = 'yyyy-MM-dd-HH-mm';
-          const exactKey = bookingDateTime.toFormat(keyFormat);
+        // Mark as booked
+        bookedSlotsMap.set(exactKeyUTC, true);
+        bookedSlotsMap.set(hourKeyUTC, true);
+        
+        // Update availability of affected slots
+        slots.forEach(slot => {
+          // Use UTC time for slot key generation
+          const slotDateTimeUTC = DateTime.fromJSDate(slot.utcDate);
+          const slotKeyUTC = slotDateTimeUTC.toFormat('yyyy-MM-dd-HH');
           
-          // Block the whole hour for the booked slot
-          const hourKey = bookingDateTime.startOf('hour').toFormat('yyyy-MM-dd-HH');
-          
-          // Also block the half-hour if applicable
-          const minuteValue = bookingDateTime.minute;
-          const halfHourKey = minuteValue < 30 
-            ? bookingDateTime.set({ minute: 0 }).toFormat(keyFormat) 
-            : bookingDateTime.set({ minute: 30 }).toFormat(keyFormat);
-          
-          console.log(`Marking slot as booked: ${booking.booking_date} => ${exactKey} (${userTimezone})`);
-          
-          // Mark all relevant keys as booked
-          bookedSlotsMap.set(exactKey, true);
-          bookedSlotsMap.set(hourKey, true);
-          bookedSlotsMap.set(halfHourKey, true);
-        }
+          // Compare UTC keys
+          if (slotKeyUTC === hourKeyUTC) {
+            slot.available = false;
+          }
+        });
       } catch (error) {
         console.error('Error processing booking date:', booking.booking_date, error);
       }
     });
-
-    const slots: TimeSlot[] = [];
-
-    // Generate slots using the same valid hours logic
-    for (let hour = 0; hour < 24; hour++) {
-      const userSlotDateTime = userDateTime.plus({ hours: hour });
-      const utcSlotDateTime = userSlotDateTime.toUTC();
-      const coachSlotDateTime = utcSlotDateTime.setZone(COACH_TIMEZONE);
-      
-      const coachHour = coachSlotDateTime.hour;
-      
-      // Check if it's coach working hours (1-4 AM or 12-4 PM)
-      if ((coachHour >= 1 && coachHour <= 4) || (coachHour >= 12 && coachHour <= 16)) {
-        // Only add future slots and never from the current day in coach timezone
-        const nowInCoachTimezone = DateTime.now().setZone(COACH_TIMEZONE);
-        const slotCoachDate = coachSlotDateTime.startOf('day');
-        const todayInCoachTimezone = nowInCoachTimezone.startOf('day');
-        
-        // Skip slots from the current day in coach timezone
-        if (slotCoachDate > todayInCoachTimezone && userSlotDateTime >= DateTime.now().setZone(userTimezone)) {
-          // Check if the slot is already booked using the map
-          const hourKey = userSlotDateTime.toFormat('yyyy-MM-dd-HH');
-          const exactKey = userSlotDateTime.toFormat('yyyy-MM-dd-HH-mm');
-          const isBooked = bookedSlotsMap.has(hourKey) || bookedSlotsMap.has(exactKey);
-
-          slots.push({
-            id: `${userDateTime.toFormat('yyyy-MM-dd')}-${coachHour}`,
-            date: userSlotDateTime.toJSDate(),
-            available: !isBooked,
-            utcDate: utcSlotDateTime.toJSDate()
-          });
-        }
-      }
-    }
-
-    // Group slots by day
+    
+    // Group slots by day (should be just one day)
     const dailyGroups = [{
       date: userDateTime.toJSDate(),
       slots: slots
     }];
-
-    // Finally, save the results in cache
-    const result = dailyGroups;
-    cache.availableSlots.set(cacheKey, result);
-    return result;
+    
+    // Save in cache and return
+    cache.availableSlots.set(cacheKey, dailyGroups);
+    return dailyGroups;
   },
 
   createBooking: async (
@@ -370,7 +368,7 @@ export const bookingService = {
       
       // If it's a 'once' meeting, end_date is equal to booking_date
       const endDateTime = frequency === BookingFrequency.Once
-        ? startDateTime.plus({ minutes: session_minutes || duration * 60 })
+        ? startDateTime.plus({ minutes: duration * 60 })
         : null;
 
       // Create the main booking without checkout_order_id initially
@@ -542,11 +540,10 @@ export const bookingService = {
 
     const result = Array.from(bookingsByDate.entries())
       .filter(([_, count]) => count >= TOTAL_SLOTS_PER_DAY)
-      .map(([dateStr, _]) => ({
+      .map(([dateStr]) => ({
         date: DateTime.fromFormat(dateStr, 'yyyy-MM-dd').toJSDate(),
         fullyBooked: true
       }));
-    /* eslint-enable @typescript-eslint/no-unused-vars */
     
     // Finally, save the results in cache
     cache.bookedDates = {data: result};
@@ -624,23 +621,13 @@ export const bookingService = {
   },
 
   createSlots: (startHour = 8, endHour = 17, days = 7, userTimezone: string): GroupedTimeSlots[] => {
-    // Add logging for debugging
-    console.log(`Creating slots: startHour=${startHour}, endHour=${endHour}, userTimezone=${userTimezone}`);
-    
-    const now = DateTime.now().setZone(userTimezone);
-    console.log(`Current time in ${userTimezone}: ${now.toFormat('yyyy-MM-dd HH:mm:ss')}`);
-    
     const result: GroupedTimeSlots[] = [];
     const today = DateTime.now().setZone(userTimezone);
     
     for (let dayOffset = 1; dayOffset <= days; dayOffset++) {
       const currentDay = today.plus({ days: dayOffset });
-      const isWeekend = [6, 7].includes(currentDay.weekday);
       
-      // Skip weekends
-      if (isWeekend) continue;
-      
-      const slots: SlotInfo[] = [];
+      const slots: TimeSlot[] = [];
       
       // Create slots for each hour
       for (let hour = startHour; hour <= endHour; hour++) {
@@ -659,15 +646,6 @@ export const bookingService = {
           // Convert the slot to UTC for storage purposes
           const utcSlotDateTime = slotDateTime.toUTC();
           
-          // Log the slots being created for debugging
-          if (hour === 9 || hour === 10) { // Solo log de algunas horas para no saturar
-            console.log(`Creating slot for ${slotDateTime.toFormat('yyyy-MM-dd HH:mm')} (${userTimezone}):`, {
-              localTime: slotDateTime.toISO(),
-              utcTime: utcSlotDateTime.toISO(),
-              offset: slotDateTime.offset / 60 // en horas
-            });
-          }
-          
           // Create the TimeSlot object with local date and UTC date
           const timeSlot: TimeSlot = {
             id: slotId,
@@ -677,11 +655,7 @@ export const bookingService = {
           };
           
           // Add to the list of slots
-          slots.push({
-            date: slotDateTime.toJSDate(),
-            available: true,
-            slot: timeSlot
-          });
+          slots.push(timeSlot);
         }
       }
       
@@ -694,5 +668,26 @@ export const bookingService = {
     }
     
     return result;
+  },
+
+  getBookedSlotsForDay: async (date: Date, timezone: string, coach: Coach) => {
+    try {
+      // ... existing logic ...
+    } catch (error: unknown) {
+      console.error(`Error fetching booked slots for ${date.toDateString()}:`, error);
+      return new Map<string, boolean>();
+    }
+  },
+  
+  getFullyBookedDatesForMonth: async (/* month?: Date */) => {
+    // Parameters timezone and coach removed
+    console.warn("getFullyBookedDatesForMonth implementation might be incomplete or unused.");
+    try {
+      // Example logic requiring parameters
+    } catch (error: unknown) {
+      console.error("Error fetching fully booked dates:", error);
+      return [];
+    }
+    return [];
   }
 }

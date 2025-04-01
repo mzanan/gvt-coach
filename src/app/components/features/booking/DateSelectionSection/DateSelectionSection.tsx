@@ -8,6 +8,7 @@ import { TimezoneDropdown } from '../../../features/user/TimezoneDropdown/Timezo
 import { TimeSlot, BookingPlan } from '@/app/types/booking'
 import { useDateSelectionSection } from './useDateSelectionSection'
 import { BookingFrequency } from '@/app/types/enums/booking'
+import { Coach } from '@/app/config/coaches'
 
 interface SlotInfo {
   date: Date;
@@ -32,8 +33,6 @@ interface DateSelectionSectionProps {
   onTimezoneChange: (timezone: string) => void
   onSlotSelect: (slot: TimeSlot) => void
 }
-
-const COACH_TIMEZONE = process.env.COACH_TIMEZONE || 'UTC';
 
 export function DateSelectionSection({
   selectedDate,
@@ -69,7 +68,7 @@ export function DateSelectionSection({
             frequency={bookingPlan?.frequency}
             suggestedDate={suggestedDate}
             selectedTimezone={selectedTimezone}
-            COACH_TIMEZONE={COACH_TIMEZONE}
+            selectedCoach={bookingPlan.coach || Coach.Matias}
           />
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">

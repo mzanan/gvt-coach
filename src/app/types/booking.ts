@@ -1,4 +1,5 @@
 import { BookingFrequency, PaymentOrderStatus } from './enums/booking';
+import { Coach } from './enums/coach';
 
 export interface Booking {
   id: string
@@ -24,6 +25,7 @@ export interface GroupedTimeSlots {
 }
 
 export interface BookingPlan {
+  coach?: Coach;
   frequency: BookingFrequency;
   duration: number;
   price?: number;
@@ -56,4 +58,5 @@ export interface BookingDB {
   checkout_order_id?: string;
   confirmation_email_sent?: boolean;
   session_minutes?: number;
+  coach?: Coach;
 } 

@@ -4,18 +4,18 @@ import React, { useMemo } from 'react'
 import { useBookingCalendar } from './useBookingCalendar'
 import { Calendar } from '../Calendar/Calendar'
 import { Button } from '@/app/components/ui-kit/button'
-import { ChevronDown, ChevronUp, Check, Edit2, Loader2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, Check, Loader2, Globe, User, DollarSign, Clock, CreditCard, CalendarIcon } from 'lucide-react'
 import { Card } from '@/app/components/ui-kit/card'
 import { DateTime } from 'luxon'
-import { FrequencySelector } from '../FrequencySelector/FrequencySelector'
+import { FrequencySelector } from '../FrequencySelector'
+import { CoachSelector } from '../CoachSelector'
+import { TimeZoneSelector } from '../TimeZoneSelector/TimeZoneSelector'
 import { getBookingSummary, cn } from '@/lib/utils'
 import { BookingFrequency } from '@/app/types/enums/booking'
-import { userService } from '@/services/userService'
+import { COACHES_CONFIG, Coach } from '@/app/config/coaches'
+import { BookingSection } from '../BookingSection/BookingSection'
 
-// Definir la constante COACH_TIMEZONE con el mismo valor que se usa en el servicio
-const COACH_TIMEZONE = process.env.COACH_TIMEZONE || 'UTC';
-
-// Componente para el botón de proceder al pago, memoizado para reducir renderizados
+// Memoized payment button component to reduce renders
 const PaymentButton = React.memo(({ onClick, isLoading }: { onClick: () => void, isLoading: boolean }) => (
   <Button 
     onClick={onClick} 
@@ -30,8 +30,8 @@ const PaymentButton = React.memo(({ onClick, isLoading }: { onClick: () => void,
 ));
 PaymentButton.displayName = 'PaymentButton';
 
-// Componente para renderizar una sección, memoizado para evitar renderizados innecesarios
-const BookingSection = React.memo(({ 
+// Memoized component to render a section to avoid unnecessary renders
+const MemoizedBookingSection = React.memo(({ 
   section, 
   activeSection, 
   isAvailable, 
@@ -70,7 +70,7 @@ const BookingSection = React.memo(({
     )}
   </Card>
 ));
-BookingSection.displayName = 'BookingSection';
+MemoizedBookingSection.displayName = 'MemoizedBookingSection';
 
 export function BookingCalendar() {
   const {
@@ -81,22 +81,20 @@ export function BookingCalendar() {
     selectedSlot,
     availableSlots,
     bookingPlan,
-    userProfile,
     bookedDates,
     isBookingLoading,
     isLoadingSlots,
     selectedTimezone,
-    handleProfileComplete,
-    handleEditProfile,
     handleDateSelect,
     handleSlotSelect,
     handleSectionClick,
     handleFrequencySelect,
-    formatSlotTime,
+    handleCoachSelect,
+    handleTimezoneChange,
     handleBookingConfirm
   } = useBookingCalendar()
 
-  // Memoizamos el renderizado del resumen para evitar cálculos repetidos
+  // Memoize summary rendering to avoid repeated calculations
   const summaryContent = useMemo(() => {
     if (!bookingPlan || !selectedSlot) return null;
     
@@ -106,8 +104,11 @@ export function BookingCalendar() {
   
       if (!firstSlotDate || !secondSlotDate) return null
   
-      // Calcular precio total (meses x precio por mes)
-      const totalPrice = bookingPlan.duration * 100;
+      // Calculate total price (months x price per month)
+      const coach = bookingPlan.coach;
+      const totalPrice = coach && bookingPlan.duration 
+        ? bookingPlan.duration * COACHES_CONFIG[coach as Coach].prices.twiceWeekly 
+        : 0;
   
       return (
         <div className="flex justify-center">
@@ -121,6 +122,7 @@ export function BookingCalendar() {
                 selectedTimezone,
                 secondSlotDate
               )}</p>
+              <p>Coach: {coach ? COACHES_CONFIG[coach as Coach].displayName : ''}</p>
               <p>Duration: {bookingPlan.duration} {bookingPlan.duration === 1 ? 'month' : 'months'}</p>
               <p className="mt-4">Starting from {DateTime.fromJSDate(firstSlotDate).toFormat('MMMM d, yyyy')}</p>
               <p>Ending on {DateTime.fromJSDate(secondSlotDate)
@@ -136,29 +138,119 @@ export function BookingCalendar() {
       )
     }
   
+    // Get price based on coach and frequency
+    let price = 0;
+    const coach = bookingPlan.coach;
+    if (coach) {
+      if (bookingPlan.frequency === BookingFrequency.Once) {
+        price = COACHES_CONFIG[coach as Coach].prices.singleSession;
+      } else if (bookingPlan.frequency === BookingFrequency.Weekly) {
+        price = COACHES_CONFIG[coach as Coach].prices.weekly;
+      }
+    }
+  
     return (
-      <div className="space-y-4 text-center">
-        <p className="text-xl">
-          {getBookingSummary(selectedSlot.date, bookingPlan.frequency || BookingFrequency.Once, bookingPlan.duration, true, selectedTimezone)}
-        </p>
-        <p className="font-medium">Price: $100</p>
-        <div className="flex justify-center">
-          <PaymentButton onClick={handleBookingConfirm} isLoading={isBookingLoading} />
+      <div className="space-y-6">
+        <div className="p-6 border rounded-lg bg-card shadow-sm">
+          <div className="flex flex-col space-y-4">
+            {/* Session details */}
+            <div className="space-y-4">
+              <div className="flex items-start space-x-3">
+                <div className="mt-1 p-2 bg-primary/10 rounded-full">
+                  <CalendarIcon className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-medium">Session Details</h3>
+                  <p className="text-muted-foreground">
+                    {getBookingSummary(selectedSlot.date, bookingPlan.frequency || BookingFrequency.Once, bookingPlan.duration, true, selectedTimezone)}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Coach info */}
+              {coach && (
+                <div className="flex items-start space-x-3">
+                  <div className="mt-1 p-2 bg-blue-50 rounded-full dark:bg-blue-900/20">
+                    <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium">Coach</h3>
+                    <p className="text-muted-foreground">{COACHES_CONFIG[coach as Coach].displayName}</p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Price */}
+              <div className="flex items-start space-x-3">
+                <div className="mt-1 p-2 bg-green-50 rounded-full dark:bg-green-900/20">
+                  <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-medium">Price</h3>
+                  <p className="text-xl font-semibold">${price}</p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Time and timezone */}
+            <div className="pt-4 border-t border-muted">
+              <div className="flex items-center text-sm text-muted-foreground">
+                <Clock className="h-4 w-4 mr-1" />
+                <span>Session time shown in timezone: {selectedTimezone}</span>
+              </div>
+            </div>
+          </div>
         </div>
+        
+        {/* Payment button */}
+        <Button 
+          onClick={handleBookingConfirm} 
+          disabled={isBookingLoading}
+          className="w-full h-12 text-lg font-medium"
+        >
+          {isBookingLoading ? (
+            <>
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            <>
+              <CreditCard className="mr-2 h-5 w-5" />
+              Proceed to Payment
+            </>
+          )}
+        </Button>
       </div>
     )
   }, [bookingPlan, selectedSlot, selectedTimezone, handleBookingConfirm, isBookingLoading]);
 
-  // Función para renderizar el contenido específico de cada sección
+  // Function to render specific content for each section
   const renderSectionContent = (sectionId: string) => {
     switch (sectionId) {
+      case 'coach':
+        return (
+          <CoachSelector
+            selectedCoach={bookingPlan.coach}
+            onCoachSelect={handleCoachSelect}
+          />
+        )
       case 'frequency':
+        // Get the price based on selected coach or default to 100
+        const coach = bookingPlan.coach;
+        const singleSessionPrice = coach 
+          ? COACHES_CONFIG[coach as Coach].prices.singleSession 
+          : 100;
+          
+        // This section is currently skipped in the flow
+        // Future implementation will allow users to select different frequencies
+        // Currently, only "Single Session" (ONCE) frequency is supported
         return (
           <FrequencySelector 
             onFrequencySelect={handleFrequencySelect} 
             selectedFrequency={bookingPlan?.frequency}
             disableWeekly={true}
             disableTwiceWeekly={true}
+            singleSessionPrice={singleSessionPrice}
           />
         )
       case 'date':
@@ -170,11 +262,11 @@ export function BookingCalendar() {
             frequency={bookingPlan?.frequency}
             suggestedDate={suggestedDate}
             selectedTimezone={selectedTimezone}
-            COACH_TIMEZONE={COACH_TIMEZONE}
+            selectedCoach={bookingPlan.coach || Coach.Matias}
           />
         )
       case 'time':
-        // Mostrar indicador de carga mientras se cargan los slots
+        // Show loading indicator while slots are loading
         if (isLoadingSlots) {
           return (
             <div className="flex justify-center items-center py-8">
@@ -183,56 +275,51 @@ export function BookingCalendar() {
           );
         }
         
-        // Memoizamos el renderizado de las ranuras de tiempo disponibles
+        // Display time slots with coach info
         return (
           <>
-            {availableSlots.length === 0 ? (
-              <div className="text-center py-4">
-                <p>No available slots for this date. Please select another date.</p>
-              </div>
-            ) : (
-              availableSlots.map((dayGroup) => {
-                return (
-                  <div key={dayGroup.date.toString()} className="mb-4">
-                    <h3 className="font-medium mb-2">
-                      {DateTime.fromJSDate(dayGroup.date).setZone(selectedTimezone).toFormat('EEEE, MMMM d')}
-                    </h3>
-                    <div className="grid grid-cols-3 gap-2">
-                      {dayGroup.slots.map((slot, index) => {
-                        return (
-                          <Button
-                            key={`${slot.date.toString()}-${index}`}
-                            variant={selectedSlot?.date.toString() === slot.date.toString() ? 'default' : 'outline'}
-                            disabled={!slot.available}
-                            onClick={() => {
-                              // Add debug logging to trace slot information
-                              console.log('Clicked on time slot:', {
-                                index,
-                                slotDate: slot.date,
-                                slotDateISO: slot.date.toISOString(),
-                                slotTime: formatSlotTime(slot.date),
-                                slotInfo: slot.slot,
-                                slotId: slot.slot?.id,
-                                slotHour: DateTime.fromJSDate(slot.date).hour,
-                                slotMinute: DateTime.fromJSDate(slot.date).minute,
-                                selectedTimezone
-                              });
-                              handleSlotSelect(slot.slot!);
-                            }}
-                            className={cn(
-                              "whitespace-nowrap",
-                              !slot.available && "opacity-60 cursor-not-allowed dark:bg-gray-800 bg-gray-100 dark:text-gray-400 text-gray-500"
-                            )}
-                          >
-                            {formatSlotTime(slot.date)}
-                          </Button>
-                        );
-                      })}
-                    </div>
+            {/* Available time slots */}
+            {availableSlots.map((dayGroup) => {
+              return (
+                <div key={dayGroup.date.toString()} className="mb-4">
+                  <h3 className="font-medium mb-2">
+                    {DateTime.fromJSDate(dayGroup.date).setZone(selectedTimezone).toFormat('EEEE, MMMM d')}
+                  </h3>
+                  <div className="grid grid-cols-3 gap-2">
+                    {dayGroup.slots.map((slot, index) => {
+                      return (
+                        <Button
+                          key={`${slot.date.toString()}-${index}`}
+                          variant={selectedSlot?.date.toString() === slot.date.toString() ? 'default' : 'outline'}
+                          disabled={!slot.available}
+                          onClick={() => {
+                            handleSlotSelect(slot.slot!);
+                          }}
+                          className={cn(
+                            "whitespace-nowrap",
+                            !slot.available && "opacity-60 cursor-not-allowed dark:bg-gray-800 bg-gray-100 dark:text-gray-400 text-gray-500"
+                          )}
+                        >
+                          {DateTime.fromJSDate(slot.date).setZone(selectedTimezone).toFormat('h:mm a')}
+                        </Button>
+                      );
+                    })}
                   </div>
+                </div>
+              );
+            })}
+            
+            {/* Coach working hours explanation - shown AFTER the time slots */}
+            <div className="mt-6 p-4 bg-muted/30 rounded-lg">
+              {(() => {
+                const coach = bookingPlan.coach || Coach.Matias;
+                return (
+                  <p className="text-sm text-muted-foreground">
+                    These time slots are available based on {COACHES_CONFIG[coach as Coach].displayName}&apos;s working hours in their timezone ({COACHES_CONFIG[coach as Coach].timezone}, UTC{DateTime.now().setZone(COACHES_CONFIG[coach as Coach].timezone).toFormat('ZZ')}).
+                  </p>
                 );
-              })
-            )}
+              })()}
+            </div>
           </>
         )
       case 'summary':
@@ -248,32 +335,34 @@ export function BookingCalendar() {
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
-      <div className="flex justify-between">
-        <h2 className="text-2xl font-semibold mb-4">Book a Consultation</h2>
-        {userProfile && (
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-semibold">Book a Consultation</h2>
           <div className="flex items-center space-x-2">
-            <span>Welcome, {userProfile.first_name}!</span>
-            <Button 
-              onClick={handleEditProfile}
-              variant="ghost" 
-              size="sm"
-            >
-              <Edit2 className="h-4 w-4 mr-1" />
-              Edit Profile
-            </Button>
+            <Globe className="h-4 w-4 text-muted-foreground" />
+            <TimeZoneSelector 
+              currentTimezone={selectedTimezone}
+              onTimezoneChange={handleTimezoneChange}
+            />
           </div>
-        )}
       </div>
       
-      {sections.map((section) => {
+      {sections
+        // Filter out the frequency section as it's not needed in current implementation
+        .filter(section => section.id !== 'frequency')
+        .map((section) => {
         const sectionIndex = sections.findIndex(s => s.id === section.id)
         const previousSectionsCompleted = sections
           .slice(0, sectionIndex)
           .every(s => s.completed)
-        const isAvailable = previousSectionsCompleted
+          
+        // Make date section always available when coach is selected
+        const isAvailable = 
+          section.id === 'date' && bookingPlan?.coach 
+            ? true 
+            : previousSectionsCompleted
 
         return (
-          <BookingSection 
+          <MemoizedBookingSection 
             key={section.id} 
             section={section}
             activeSection={activeSection}

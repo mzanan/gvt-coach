@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { BookingDB } from '@/app/types/booking';
 import { toast } from "@/components/ui/use-toast";
+import { getTimezoneCookie } from '@/lib/utils/cookies';
 
 interface EmailNotificationOptions {
   to?: string;
@@ -58,16 +59,34 @@ export const useEmailNotifications = () => {
   
   const sendBookingConfirmation = async (booking: BookingDB, userEmail?: string, userName?: string) => {
     try {
-      await sendBookingConfirmation(
-        userEmail || booking.user_email,
-        {
-          start_time: booking.booking_date,
-          end_time: new Date(new Date(booking.booking_date).getTime() + (booking.session_minutes || 60) * 60000),
-          zoom_link: booking.meet_link,
-          user_name: userName || booking.user_name,
-          booking_id: booking.id
-        }
-      );
+      // Get user timezone from cookie or booking data
+      const userTimezone = booking.user_timezone || getTimezoneCookie() || 'UTC';
+      
+      console.log('Sending booking confirmation with timezone:', userTimezone);
+      
+      const response = await fetch('/api/email/booking-confirmation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: userEmail || booking.user_email,
+          bookingDetails: {
+            start_time: booking.booking_date,
+            end_time: new Date(new Date(booking.booking_date).getTime() + (booking.session_minutes || 60) * 60000),
+            zoom_link: booking.meet_link,
+            user_name: userName || booking.user_name,
+            booking_id: booking.id,
+            user_timezone: userTimezone
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send booking confirmation email');
+      }
+      
       toast({
         title: "Email sent",
         description: "Booking confirmation email sent successfully",

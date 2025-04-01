@@ -8,6 +8,7 @@ import { bookingService } from '@/services/bookingService'
 import { supabase } from '@/lib/supabase/client'
 import { PaymentOrderStatus } from '@/app/types/enums/booking'
 import { sendBookingConfirmation } from '@/services/mailer'
+import { getTimezoneCookie } from '@/lib/utils/cookies'
 
 export const usePaymentSuccess = () => {
   const [isLoading, setIsLoading] = useState(true)
@@ -34,8 +35,6 @@ export const usePaymentSuccess = () => {
   const sendConfirmationEmailOnce = async (bookingData: BookingDB) => {
     // Comprobar si el email ya fue enviado usando el ref (persistente entre renderizados)
     if (emailSentRef.current) {
-      console.log("Email ya enviado según ref (omitiendo envío)");
-      setIsEmailSent(true); // Actualizar estado UI
       return;
     }
     
@@ -45,7 +44,6 @@ export const usePaymentSuccess = () => {
     // Actualizar UI - Iniciando envío de email
     setIsEmailSending(true);
     
-    console.log("Enviando email de confirmación...");
     try {
       await sendBookingConfirmation(
         bookingData.user_email,
@@ -55,11 +53,11 @@ export const usePaymentSuccess = () => {
           zoom_link: bookingData.meet_link,
           user_name: bookingData.user_name,
           booking_id: bookingData.id,
-          user_timezone: bookingData.user_timezone
+          user_timezone: bookingData.user_timezone,
+          coach: bookingData.coach
         }
       );
       
-      console.log("Correo enviado y marcado en base de datos");
       // Actualizar UI - Email enviado con éxito
       setIsEmailSending(false);
       setIsEmailSent(true);
@@ -82,12 +80,18 @@ export const usePaymentSuccess = () => {
   // Función para manejar la confirmación del booking - envuelta en useCallback
   const handleBookingConfirmation = useCallback(async (bookingData: BookingDB) => {
     try {
+      // Get the timezone from cookie to ensure it's properly passed through the booking process
+      const cookieTimezone = getTimezoneCookie();
+      const bookingWithUserTimezone = {
+        ...bookingData,
+        user_timezone: cookieTimezone || bookingData.user_timezone
+      };
+      
       // Si el booking ya está confirmado completamente, no hacer nada más
-      if (bookingData.meet_link && bookingData.confirmation_email_sent) {
-        console.log("Booking ya completamente confirmado con meet_link y correo enviado");
+      if (bookingWithUserTimezone.meet_link && bookingWithUserTimezone.confirmation_email_sent) {
         emailSentRef.current = true; // Marcar como enviado en el ref
         setIsEmailSent(true); // Actualizar estado UI
-        return bookingData;
+        return bookingWithUserTimezone;
       }
 
       // 1. Actualizar estado del booking
@@ -96,9 +100,10 @@ export const usePaymentSuccess = () => {
         .update({
           payment_status: PaymentOrderStatus.Paid,
           checkout_completed: true,
-          payment_confirmed: true
+          payment_confirmed: true,
+          user_timezone: bookingWithUserTimezone.user_timezone // Ensure timezone is saved
         })
-        .eq('id', bookingData.id)
+        .eq('id', bookingWithUserTimezone.id)
         .select()
         .single();
 
@@ -107,14 +112,19 @@ export const usePaymentSuccess = () => {
         return null;
       }
 
-      const updatedBooking = data || bookingData;
+      const updatedBooking = data || bookingWithUserTimezone;
+      
+      // Ensure user_timezone is correctly set
+      const finalBooking = {
+        ...updatedBooking,
+        user_timezone: cookieTimezone || updatedBooking.user_timezone || bookingWithUserTimezone.user_timezone
+      };
 
       // 2. Generar enlace de Zoom si es necesario
-      if (!updatedBooking.meet_link) {
-        console.log("Generando reunión en Zoom...");
-        const meetingTime = new Date(updatedBooking.booking_date);
-        const meetingTopic = `GVT Coaching Session with ${updatedBooking.user_email}`;
-        const duration = updatedBooking.duration || 60;
+      if (!finalBooking.meet_link) {
+        const meetingTime = new Date(finalBooking.booking_date);
+        const meetingTopic = `GVT Coaching Session with ${finalBooking.user_email}`;
+        const duration = finalBooking.duration || 60;
         
         const response = await fetch('/api/zoom/meeting', {
           method: 'POST',
@@ -125,7 +135,7 @@ export const usePaymentSuccess = () => {
             meetingTopic,
             meetingTime: meetingTime.toISOString(),
             duration,
-            timezone: updatedBooking.user_timezone || 'UTC'
+            timezone: finalBooking.user_timezone || 'UTC'
           })
         });
 
@@ -135,25 +145,25 @@ export const usePaymentSuccess = () => {
             const { error: updateError } = await supabase
               .from('gvt_coach_meetings_bookings')
               .update({ meet_link: zoomData.join_url })
-              .eq('id', updatedBooking.id);
+              .eq('id', finalBooking.id);
 
             if (!updateError) {
-              updatedBooking.meet_link = zoomData.join_url;
+              finalBooking.meet_link = zoomData.join_url;
             }
           }
         }
       }
 
       // Actualizar estado UI
-      setBooking(updatedBooking);
+      setBooking(finalBooking);
       setPaymentStatus(PaymentOrderStatus.Paid);
       isCompletedRef.current = true;
       setIsLoading(false);
 
       // 3. Enviar correo de confirmación (centralizado) - solo si no está marcado como enviado
-      if (!bookingData.confirmation_email_sent && !emailSentRef.current) {
-        await sendConfirmationEmailOnce(updatedBooking);
-      } else if (bookingData.confirmation_email_sent) {
+      if (!bookingWithUserTimezone.confirmation_email_sent && !emailSentRef.current) {
+        await sendConfirmationEmailOnce(finalBooking);
+      } else if (bookingWithUserTimezone.confirmation_email_sent) {
         // Si ya se había enviado anteriormente, actualizar estado UI
         setIsEmailSent(true);
       }
@@ -161,7 +171,7 @@ export const usePaymentSuccess = () => {
       // 4. Limpiar caché de slots de tiempo
       bookingService.clearTimeSlotsCache();
 
-      return updatedBooking;
+      return finalBooking;
     } catch (error) {
       console.error("Error en handleBookingConfirmation:", error);
       return null;
@@ -173,7 +183,6 @@ export const usePaymentSuccess = () => {
     try {
       // Omitir si ya está completado
       if (isCompletedRef.current) {
-        console.log("Pago ya completado, omitiendo verificación");
         return true;
       }
       
@@ -181,32 +190,36 @@ export const usePaymentSuccess = () => {
       const bookingData = await fetchBookingByOrderId(checkoutOrderId);
       
       if (bookingData) {
-        console.log("Booking encontrado:", bookingData);
+        // Ensure the user_timezone is correctly set from the cookie
+        const cookieTimezone = getTimezoneCookie();
+        const updatedBookingData = {
+          ...bookingData,
+          user_timezone: cookieTimezone || bookingData.user_timezone
+        };
         
         // Si el booking ya tiene el flag de correo enviado, actualizar estado ref
-        if (bookingData.confirmation_email_sent) {
+        if (updatedBookingData.confirmation_email_sent) {
           emailSentRef.current = true;
         }
         
         // Si el booking ya está confirmado, hemos terminado
-        if (bookingData.payment_status === PaymentOrderStatus.Paid || 
-            bookingData.payment_confirmed === true ||
-            bookingData.checkout_completed === true) {
-          console.log("Booking confirmado, estableciendo estado de pago como PAID y deteniendo polling");
+        if (updatedBookingData.payment_status === PaymentOrderStatus.Paid || 
+            updatedBookingData.payment_confirmed === true ||
+            updatedBookingData.checkout_completed === true) {
           
           // Actualizar UI primero
-          setBooking(bookingData);
+          setBooking(updatedBookingData);
           setPaymentStatus(PaymentOrderStatus.Paid);
           isCompletedRef.current = true;
           setIsLoading(false);
 
           // Luego manejar confirmación (correos, etc.)
-          await handleBookingConfirmation(bookingData);
+          await handleBookingConfirmation(updatedBookingData);
           return true;
         }
 
         // Si no está confirmado, actualizar estado del booking en UI
-        setBooking(bookingData);
+        setBooking(updatedBookingData);
       }
       
       // Si el booking no está confirmado, verificar estado de pago
@@ -222,28 +235,17 @@ export const usePaymentSuccess = () => {
         const paymentStatusData = await fetchPaymentStatus(mappingData.payment_status_id);
         
         if (paymentStatusData) {
-          console.log("Estado de pago encontrado:", paymentStatusData);
-          
           const statusFromRecord = paymentStatusData.status;
-          console.log("Usando campo de estado principal para determinar:", statusFromRecord);
           
           setPaymentStatus(statusFromRecord);
           
-          // Si el estado es PAID/ACTIVE, confirmar el booking
+          // Actualizar el estado del pago según respuesta
           if (statusFromRecord === PaymentOrderStatus.Paid || statusFromRecord === PaymentOrderStatus.Active) {
-            console.log("Estado de pago es PAID/ACTIVE, confirmando booking");
-            
-            if (bookingData) {
-              // Actualizar UI primero
-              setBooking(bookingData);
-              setPaymentStatus(PaymentOrderStatus.Paid);
-              isCompletedRef.current = true;
-              setIsLoading(false);
-
-              // Luego manejar confirmación (correos, etc.)
-              await handleBookingConfirmation(bookingData);
-              return true;
-            }
+            // Si estamos en estado paid/active, marcamos como completo y actualizamos UI
+            isCompletedRef.current = true;
+            setBooking(bookingData);
+            // Actualizar estado con handle completo
+            await handleBookingConfirmation(bookingData as BookingDB);
           }
         }
       }
@@ -256,11 +258,10 @@ export const usePaymentSuccess = () => {
   }, [handleBookingConfirmation]);
 
   // Función para buscar booking por email para LemonSqueezy donde no tenemos checkout_order_id en URL
-  const fetchLatestBookingByEmail = async (email: string): Promise<BookingDB | null> => {
+  const fetchLatestBookingByEmail = useCallback(async (email: string): Promise<BookingDB | null> => {
     try {
       if (!email) return null
       
-      console.log(`Buscando booking más reciente con email: ${email}`)
       const { data, error } = await supabase
         .from('gvt_coach_meetings_bookings')
         .select('*')
@@ -274,16 +275,15 @@ export const usePaymentSuccess = () => {
       }
       
       if (data && data.length > 0) {
-        console.log(`Booking encontrado para email ${email}:`, data[0])
         return data[0] as BookingDB
       }
       
       return null
-    } catch (error) {
-      console.error("Error en fetchLatestBookingByEmail:", error)
+    } catch {
+      console.error("Error en fetchLatestBookingByEmail:")
       return null
     }
-  }
+  }, [supabase]);
 
   // Obtener ID de orden desde URL y cargar datos
   useEffect(() => {
@@ -297,11 +297,23 @@ export const usePaymentSuccess = () => {
         // Intentar obtener checkout order ID desde URL (para Polar)
         const checkoutOrderIdFromUrl = searchParams.get('checkout_order_id')
         
-        // Cargar datos de usuario desde cookies
+        // IMPORTANTE: Priorizar timezone de la cookie sobre cualquier otra fuente
+        const cookieTimezone = getTimezoneCookie()
+        if (cookieTimezone && isMounted) {
+          setUserTimezone(cookieTimezone)
+        } else {
+          // Fallback: cargar datos de usuario desde cookies
+          const userData = getUserDataFromCookies()
+          if (userData && isMounted) {
+            if (userData.timezone) setUserTimezone(userData.timezone)
+            if (userData.userEmail) setUserEmail(userData.userEmail)
+          }
+        }
+
+        // Solo establecer email desde cookies (no afecta la timezone)
         const userData = getUserDataFromCookies()
-        if (userData && isMounted) {
-          if (userData.timezone) setUserTimezone(userData.timezone)
-          if (userData.userEmail) setUserEmail(userData.userEmail)
+        if (userData && userData.userEmail && isMounted) {
+          setUserEmail(userData.userEmail)
         }
 
         if (!checkoutOrderIdFromUrl) {
@@ -311,28 +323,32 @@ export const usePaymentSuccess = () => {
             const bookingByEmail = await fetchLatestBookingByEmail(userData.userEmail)
             
             if (bookingByEmail) {
-              setBooking(bookingByEmail)
+              // Update booking with correct timezone from cookie
+              const updatedBooking = {
+                ...bookingByEmail,
+                user_timezone: cookieTimezone || userData.timezone || bookingByEmail.user_timezone
+              };
+              
+              setBooking(updatedBooking)
               // Asignar el checkout_order_id solo si existe
-              checkoutOrderIdRef.current = bookingByEmail.checkout_order_id || null
+              checkoutOrderIdRef.current = updatedBooking.checkout_order_id || null
               
               // Si el booking ya está confirmado, hemos terminado
-              if (bookingByEmail.payment_status === PaymentOrderStatus.Paid || 
-                  bookingByEmail.payment_confirmed === true ||
-                  bookingByEmail.payment_status === PaymentOrderStatus.Completed) {
-                console.log("Booking confirmado encontrado para pago de LemonSqueezy")
+              if (updatedBooking.payment_status === PaymentOrderStatus.Paid || 
+                  updatedBooking.payment_confirmed === true ||
+                  updatedBooking.payment_status === PaymentOrderStatus.Completed) {
                 
                 // Actualizar UI primero
-                setBooking(bookingByEmail)
+                setBooking(updatedBooking)
                 setPaymentStatus(PaymentOrderStatus.Paid)
                 isCompletedRef.current = true
                 setIsLoading(false)
                 
                 // Luego manejar confirmación (correos, etc.)
-                await handleBookingConfirmation(bookingByEmail);
-              } else if (bookingByEmail.checkout_order_id) {
+                await handleBookingConfirmation(updatedBooking);
+              } else if (updatedBooking.checkout_order_id) {
                 // Si encontramos un booking con checkout_order_id, iniciar polling de su estado
-                console.log("Booking pendiente encontrado, iniciando polling con checkout_order_id:", bookingByEmail.checkout_order_id)
-                const isComplete = await loadPaymentData(bookingByEmail.checkout_order_id)
+                const isComplete = await loadPaymentData(updatedBooking.checkout_order_id)
                 
                 // Iniciar polling si no está completo
                 if (!isComplete && !isCompletedRef.current && isMounted) {
@@ -345,7 +361,6 @@ export const usePaymentSuccess = () => {
                     retryCountRef.current += 1
                     
                     if (retryCountRef.current > MAX_RETRIES) {
-                      console.log(`Máximo de reintentos alcanzado (${MAX_RETRIES}), deteniendo polling`)
                       clearInterval(pollInterval)
                       pollingTimeoutRef.current = null
                       if (isMounted) setIsLoading(false)
@@ -353,18 +368,16 @@ export const usePaymentSuccess = () => {
                     }
                     
                     // Comprobación explícita de que checkout_order_id existe y no es undefined
-                    if (!bookingByEmail.checkout_order_id) {
-                      console.error("No hay checkout_order_id para polling");
+                    if (!updatedBooking.checkout_order_id) {
                       clearInterval(pollInterval);
                       pollingTimeoutRef.current = null;
                       if (isMounted) setIsLoading(false);
                       return;
                     }
                     
-                    const isComplete = await loadPaymentData(bookingByEmail.checkout_order_id)
+                    const isComplete = await loadPaymentData(updatedBooking.checkout_order_id)
                     
                     if (isComplete || isCompletedRef.current || paymentStatus !== PaymentOrderStatus.Pending) {
-                      console.log("Estado de pago cambiado, deteniendo polling")
                       clearInterval(pollInterval)
                       pollingTimeoutRef.current = null
                       if (isMounted) setIsLoading(false)
@@ -378,7 +391,6 @@ export const usePaymentSuccess = () => {
                 }
               }
             } else {
-              console.log("No se encontró booking para email:", userData.userEmail)
               if (isMounted) setIsLoading(false)
             }
           } else {
@@ -413,7 +425,6 @@ export const usePaymentSuccess = () => {
             retryCountRef.current += 1
             
             if (retryCountRef.current > MAX_RETRIES) {
-              console.log(`Máximo de reintentos alcanzado (${MAX_RETRIES}), deteniendo polling`)
               clearInterval(pollInterval)
               pollingTimeoutRef.current = null
               if (isMounted) setIsLoading(false)
@@ -423,7 +434,6 @@ export const usePaymentSuccess = () => {
             const isComplete = await loadPaymentData(checkoutOrderIdFromUrl)
             
             if (isComplete || isCompletedRef.current || paymentStatus !== PaymentOrderStatus.Pending) {
-              console.log("Estado de pago cambiado, deteniendo polling")
               clearInterval(pollInterval)
               pollingTimeoutRef.current = null
               if (isMounted) setIsLoading(false)
@@ -436,7 +446,6 @@ export const usePaymentSuccess = () => {
           setIsLoading(false)
         }
       } catch (error) {
-        console.error("Error cargando datos de pago:", error)
         if (isMounted) {
           toast({
             title: "Error",

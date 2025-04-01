@@ -4,9 +4,29 @@ import {
   sendSessionReminder,
   sendCancellationNotification
 } from '@/services/mailer';
+import { cookies } from 'next/headers';
+import { USER_DATA_COOKIE_NAME } from '@/lib/utils/cookies';
 
 // Available notification types
 type NotificationType = 'confirmation' | 'reminder' | 'cancellation';
+
+// Helper to get timezone from cookies in server components
+function getTimezoneFromServerCookies(): string | null {
+  const cookieStore = cookies();
+  const userDataCookie = cookieStore.get(USER_DATA_COOKIE_NAME);
+  
+  if (userDataCookie?.value) {
+    try {
+      const userData = JSON.parse(decodeURIComponent(userDataCookie.value));
+      return userData.timezone || null;
+    } catch (error) {
+      console.error('Error parsing user_data cookie:', error);
+      return null;
+    }
+  }
+  
+  return null;
+}
 
 // Endpoint for sending booking-related notifications
 export async function POST(req: NextRequest) {
@@ -52,6 +72,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Get timezone from cookie if available, otherwise use provided timezone
+    let timezone = userTimezone;
+    
+    if (!timezone) {
+      // Try to get from server-side cookie
+      timezone = getTimezoneFromServerCookies();
+      
+      if (timezone) {
+        console.log('Using timezone from server cookie:', timezone);
+      } else if (bookingDetails.user_timezone) {
+        timezone = bookingDetails.user_timezone;
+        console.log('Using timezone from booking details:', timezone);
+      } else {
+        console.log('No timezone found in cookie or booking details, using default');
+      }
+    }
+
     // Send notification based on type
     let result;
     
@@ -59,19 +96,19 @@ export async function POST(req: NextRequest) {
       case 'confirmation':
         result = await sendBookingConfirmation(to, {
           ...bookingDetails,
-          user_timezone: userTimezone
+          user_timezone: timezone || bookingDetails.user_timezone
         });
         break;
       case 'reminder':
         result = await sendSessionReminder(to, {
           ...bookingDetails,
-          user_timezone: userTimezone
+          user_timezone: timezone || bookingDetails.user_timezone
         });
         break;
       case 'cancellation':
         result = await sendCancellationNotification(to, {
           ...bookingDetails,
-          user_timezone: userTimezone
+          user_timezone: timezone || bookingDetails.user_timezone
         });
         break;
     }
@@ -83,9 +120,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ success: true, data: result.data });
+    return NextResponse.json({
+      success: true,
+      message: `${type} notification sent successfully`
+    });
   } catch (error) {
-    console.error('Error in booking notification endpoint:', error);
+    console.error('Error processing notification request:', error);
     return NextResponse.json(
       { error: 'Error processing request' },
       { status: 500 }

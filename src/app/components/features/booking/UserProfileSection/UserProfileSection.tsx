@@ -7,18 +7,12 @@ import { useToast } from '@/app/components/ui-kit/use-toast'
 
 interface UserProfileSectionProps {
   userProfile: UserProfile | null
-  isEditingProfile: boolean
   selectedTimezone: string
-  onProfileComplete: () => void
-  onEditProfile: () => void
 }
 
 export function UserProfileSection({
   userProfile,
-  isEditingProfile,
-  selectedTimezone,
-  onProfileComplete,
-  onEditProfile
+  selectedTimezone
 }: UserProfileSectionProps) {
   const { toast } = useToast()
 

@@ -14,13 +14,13 @@ export async function createLemonSqueezyCheckout(
   bookingData: BookingData
 ): Promise<{ checkoutUrl: string; orderId: string }> {
   // Check required environment variables
-  const storeId = process.env.GVT_COACH_LEMONSQUEEZY_STORE_ID;
+  const storeId = process.env.NEXT_PUBLIC_GVT_COACH_LEMONSQUEEZY_STORE_ID;
   const apiKey = process.env.GVT_COACH_LEMONSQUEEZY_API_KEY;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
   const apiBaseUrl = process.env.GVT_COACH_LEMONSQUEEZY_API_URL;
   
   if (!storeId) {
-    console.error('Checkout API: Missing GVT_COACH_LEMONSQUEEZY_STORE_ID environment variable');
+    console.error('Checkout API: Missing NEXT_PUBLIC_GVT_COACH_LEMONSQUEEZY_STORE_ID environment variable');
     throw new Error('Server configuration error');
   }
   

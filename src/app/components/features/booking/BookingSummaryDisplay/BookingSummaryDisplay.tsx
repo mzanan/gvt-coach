@@ -44,73 +44,50 @@ export function BookingSummaryDisplay({ booking, timezone }: BookingSummaryDispl
           ? booking.booking_date 
           : booking.booking_date.toISOString();
 
-        // Get the appropriate timezone - use booking timezone if available, otherwise use provided timezone
+        // PRIORITY: Always use the user's timezone from props or booking
         const userTimezone = booking.user_timezone || timezone;
         
-        // Log de diagnóstico detallado
-        console.log('🔍 BookingSummaryDisplay - datos recibidos:', {
-          fecha_original: bookingDate,
-          timezone_usuario: userTimezone,
-          esUTC: bookingDate.endsWith('Z'),
-          tieneOffset: bookingDate.includes('+') || bookingDate.includes('-')
-        });
-        
-        // CORREGIDO: Primero verificar si la fecha ya tiene información de zona horaria
+        // Parse date with improved detection for all formats
         let localDateTime;
         
-        // Si la fecha ya está en formato UTC (termina en Z)
-        if (bookingDate.endsWith('Z')) {
-          const utcDateTime = DateTime.fromISO(bookingDate);
-          localDateTime = utcDateTime.setZone(userTimezone);
-          console.log('🔄 Convirtiendo desde UTC:', {
-            fecha_utc: utcDateTime.toString(),
-            fecha_local: localDateTime.toString()
-          });
-        } 
-        // Si la fecha tiene un offset explícito (como +07:00)
-        else if (bookingDate.includes('+') || (bookingDate.includes('-') && bookingDate.indexOf('T') < bookingDate.lastIndexOf('-'))) {
+        try {
+          // First attempt: handle with DateTime.fromISO which handles most ISO formats
           const dateTime = DateTime.fromISO(bookingDate);
-          // Primero convertir a UTC, luego a la zona del usuario para manejar DST correctamente
-          localDateTime = dateTime.toUTC().setZone(userTimezone);
-          console.log('🔄 Convirtiendo desde fecha con offset:', {
-            fecha_original: dateTime.toString(),
-            fecha_utc: dateTime.toUTC().toString(),
-            fecha_local: localDateTime.toString()
-          });
-        } 
-        // Si la fecha no tiene información de zona horaria, asumimos que está en UTC
-        else {
-          const dateTime = DateTime.fromISO(bookingDate);
-          localDateTime = dateTime.toUTC().setZone(userTimezone);
-          console.log('🔄 Convirtiendo desde fecha sin zona horaria (asumiendo UTC):', {
-            fecha_original: dateTime.toString(),
-            fecha_local: localDateTime.toString()
-          });
+          
+          if (dateTime.isValid) {
+            // If it parsed correctly and has zone info, convert to user timezone
+            localDateTime = dateTime.setZone(userTimezone);
+          } else {
+            // Second attempt: try SQL format with offset "2025-04-01 18:00:00+00"
+            const sqlDateTime = DateTime.fromSQL(bookingDate);
+            
+            if (sqlDateTime.isValid) {
+              localDateTime = sqlDateTime.setZone(userTimezone);
+            } else {
+              // Third attempt: try parsing as UTC and then convert
+              const utcDateTime = DateTime.fromFormat(bookingDate, "yyyy-MM-dd HH:mm:ss+00", { zone: "UTC" });
+              localDateTime = utcDateTime.setZone(userTimezone);
+            }
+          }
+        } catch {
+          // Final fallback: just parse it as a regular JS date and hope for the best
+          const jsDate = new Date(bookingDate);
+          localDateTime = DateTime.fromJSDate(jsDate).setZone(userTimezone);
         }
         
         if (!localDateTime || !localDateTime.isValid) {
-          throw new Error(`Fecha inválida: ${bookingDate}`);
+          throw new Error(`Invalid date: ${bookingDate}`);
         }
         
-        // Formatear la fecha y hora usando la zona horaria del usuario
+        // Format date and time in user's timezone
         formattedDate = localDateTime.toFormat('EEEE, MMMM d, yyyy');
         // Check if it's midnight and use "00:00hs" instead of "12:00 AM"
         formattedTime = localDateTime.hour === 0 && localDateTime.minute === 0 
           ? "00:00hs" 
           : localDateTime.toFormat('h:mm a');
-        
-        console.log('✅ BookingSummaryDisplay - fecha procesada:', {
-          fecha_original: bookingDate,
-          timezone: userTimezone,
-          fecha_formateada: formattedDate,
-          hora_formateada: formattedTime,
-          unix_timestamp: localDateTime.toMillis()
-        });
       }
-    } catch (error) {
-      console.error('Error formatting booking date:', error);
-      
-      // Fallback a la implementación anterior
+    } catch {
+      // Fallback to the previous implementation
       try {
         const bookingDate = typeof booking.booking_date === 'string' 
           ? booking.booking_date 
@@ -130,8 +107,8 @@ export function BookingSummaryDisplay({ booking, timezone }: BookingSummaryDispl
           formattedDate = dateParts[0].replace('One-time meeting on ', '');
           formattedTime = dateParts[1];
         }
-      } catch (error) {
-        console.error('Error in fallback formatting:', error);
+      } catch {
+        // Silent error handling
       }
     }
     
@@ -140,12 +117,12 @@ export function BookingSummaryDisplay({ booking, timezone }: BookingSummaryDispl
         <div className="flex flex-col space-y-2">
           <div className="flex">
             <div className="min-w-32 font-medium">Date:</div>
-            <div>{formattedDate || 'Date not available'}</div>
+            <div data-testid="booking-date">{formattedDate || 'Date not available'}</div>
           </div>
           
           <div className="flex">
             <div className="min-w-32 font-medium">Time:</div>
-            <div>{formattedTime || 'Time not available'}</div>
+            <div data-testid="booking-time">{formattedTime || 'Time not available'}</div>
           </div>
 
           {booking.frequency && (
@@ -185,7 +162,7 @@ export function BookingSummaryDisplay({ booking, timezone }: BookingSummaryDispl
           {!booking.user_timezone && (
             <div className="flex">
               <div className="min-w-32 font-medium">Timezone:</div>
-              <div>
+              <div data-testid="booking-timezone">
                 {timezone || 'Couldn&apos;t determine timezone'}
               </div>
             </div>
@@ -194,7 +171,7 @@ export function BookingSummaryDisplay({ booking, timezone }: BookingSummaryDispl
           {booking.user_timezone && (
             <div className="flex">
               <div className="min-w-32 font-medium">Timezone:</div>
-              <div>
+              <div data-testid="booking-timezone">
                 {booking.user_timezone || 'Couldn&apos;t determine timezone'}
               </div>
             </div>

@@ -1,7 +1,8 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client'
-import { setClientCookie, getClientCookie } from '@/lib/utils/cookies'
+// import { setClientCookie } from '@/lib/utils/cookies'
+import { getClientCookie } from '@/lib/utils/cookies'
 
 const supabase = createClient()
 
@@ -13,6 +14,7 @@ export const userService = {
   getUserFromAuthUsers: async () => {
     try {
       // TODO: Replace with tradernaut user dataa
+      // also enable RLS security on GVT_COACH tables
       const email = 'matiaszanan@gmail.com';
       const userId = '6e17f4ff-2351-4250-a360-eb8a4bdfeafe';
       const timezone = typeof window !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC';
@@ -44,11 +46,6 @@ export const userService = {
           orderId
         };
         
-        // Store user data in cookie
-        if (typeof window !== 'undefined') {
-          setClientCookie('user_data', profileData);
-        }
-        
         return profileData;
       }
       
@@ -65,13 +62,8 @@ export const userService = {
         orderId
       };
       
-      // Store hardcoded data in cookie for testing
-      if (typeof window !== 'undefined') {
-        setClientCookie('user_data', hardcodedData);
-      }
-      
       return hardcodedData;
-    } catch (error) {
+    } catch {
       const timezone = typeof window !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC';
       
       // Try to get orderId from pending cookie even in case of error
@@ -94,11 +86,6 @@ export const userService = {
         timezone,
         orderId
       };
-      
-      // Store hardcoded data in cookie
-      if (typeof window !== 'undefined') {
-        setClientCookie('user_data', hardcodedData);
-      }
       
       return hardcodedData;
     }

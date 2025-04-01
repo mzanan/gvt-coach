@@ -77,7 +77,6 @@ export async function POST(request: NextRequest) {
       try {
         const bookingDate = new Date(bookingData.selectedDate);
         const bookingFrequency = bookingData.bookingPlan?.frequency || BookingFrequency.Once;
-        const bookingDuration = bookingFrequency === BookingFrequency.Once ? null : (bookingData.bookingPlan?.duration || 1);
         const userTimezone = bookingData.selectedTimezone || 'UTC';
         
         // Create booking record

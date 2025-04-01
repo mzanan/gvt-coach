@@ -4,7 +4,7 @@ import axios from 'axios';
 export async function GET() {
   try {
     // Get basic configuration
-    const storeId = process.env.GVT_COACH_LEMONSQUEEZY_STORE_ID;
+    const storeId = process.env.NEXT_PUBLIC_GVT_COACH_LEMONSQUEEZY_STORE_ID;
     const apiKey = process.env.GVT_COACH_LEMONSQUEEZY_API_KEY;
     const apiBaseUrl = process.env.GVT_COACH_LEMONSQUEEZY_API_URL;
     const appUrl = process.env.NEXT_PUBLIC_APP_URL;

@@ -14,7 +14,7 @@ export async function getServerCookie(name: string) {
     
     try {
       return JSON.parse(cookie.value);
-    } catch (e) {
+    } catch {
       // If we can't parse JSON, return the raw value
       return cookie.value;
     }
@@ -44,7 +44,7 @@ export async function setServerCookie(name: string, value: unknown, options: {
     }
     
     // Default to Secure in production
-    if (process.env.NODE_ENV === 'production' && options.secure === undefined) {
+    if (process.env.NEXT_PUBLIC_ENV === 'production' && options.secure === undefined) {
       options.secure = true;
     }
     

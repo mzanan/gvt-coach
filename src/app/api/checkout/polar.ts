@@ -1,6 +1,17 @@
 import { getRequestOrigin } from '@/lib/utils';
 import { NextRequest, NextResponse } from 'next/server';
 import { Polar } from '@polar-sh/sdk';
+import { supabase } from '@/lib/supabase/client';
+
+// Define a type for the booking data structure
+interface BookingData {
+  userEmail?: string;
+  booking?: {
+    id?: string | number;
+  };
+  customFields?: Record<string, any>;
+  // Add other potential fields if known
+}
 
 /**
  * Get a configured Polar client
@@ -15,7 +26,8 @@ function getPolarClient(apiKey: string, sandbox: boolean = true): Polar {
 
 export async function POST(req: NextRequest) {
   try {
-    const { variantId, bookingData } = await req.json();
+    // Apply the specific type here
+    const { variantId, bookingData }: { variantId: string, bookingData: BookingData } = await req.json();
     
     if (!variantId) {
       return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
@@ -41,7 +53,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function createPolarCheckout(productId: string, bookingData: any): Promise<{ checkoutUrl: string, orderId: string }> {
+export async function createPolarCheckout(productId: string, bookingData: BookingData): Promise<{ checkoutUrl: string, orderId: string }> {
   // Usar las variables de entorno existentes
   const isSandbox = process.env.NEXT_PUBLIC_ENV !== 'production';
   const polarAccessToken = isSandbox 
@@ -76,20 +88,33 @@ export async function createPolarCheckout(productId: string, bookingData: any): 
     // Preparar metadatos evitando tipos problemáticos
     const safeMetadata: Record<string, string> = {
       product_id: productId,
-      user_email: bookingData?.userEmail || '',
+      // Use optional chaining and nullish coalescing for safety
+      user_email: bookingData?.userEmail ?? '', 
     };
     
     // Si hay ID de booking, asegurarse que sea string con al menos un carácter
-    if (bookingData?.booking?.id) {
+    // Use optional chaining and check if id exists and is not null/undefined
+    if (bookingData?.booking?.id != null) { 
       safeMetadata.booking_id = String(bookingData.booking.id);
+    }
+    
+    // Add custom metadata if needed
+    const customMetadata: Record<string, string> = {};
+    if (bookingData.customFields) {
+        for (const _key in bookingData.customFields) {
+            if (Object.prototype.hasOwnProperty.call(bookingData.customFields, _key)) {
+                // const value = bookingData.customFields[_key]; // If value is unused too, remove
+            }
+        }
     }
     
     const checkout = await polarClient.checkouts.create({
       successUrl: successUrlTemplate,
       productId: productId,
       allowDiscountCodes: false,
-      customerEmail: bookingData?.userEmail || '',
-      metadata: safeMetadata
+      // Use optional chaining and nullish coalescing
+      customerEmail: bookingData?.userEmail ?? '',
+      metadata: { ...safeMetadata, ...customMetadata }
     });
 
     // Obtener el ID y URL del checkout
@@ -99,9 +124,42 @@ export async function createPolarCheckout(productId: string, bookingData: any): 
     console.log('Polar checkout created with ID:', polarOrderId);
     console.log('Returning checkout URL:', checkoutUrl);
     
-    // IMPORTANTE: No crear registros de pago aquí, se debe hacer en /api/booking/create
-    // para evitar duplicados
-    
+    // Add mapping to supabase
+    try {
+      const { data: paymentStatus, error: paymentStatusError } = await supabase
+        .from('gvt_coach_payments_status')
+        .insert({
+          status: 'PENDING',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          json_data: { polar_order_id: polarOrderId, provider: 'polar' }
+        })
+        .select('id')
+        .single();
+
+      if (paymentStatusError) throw paymentStatusError;
+
+      const { error: mappingError } = await supabase
+        .from('gvt_coach_checkout_mapping')
+        .insert({
+          checkout_order_id: polarOrderId,
+          payment_status_id: paymentStatus.id,
+          provider: 'polar'
+        });
+
+      if (mappingError) throw mappingError;
+      
+      // Optionally create pending booking here if needed for Polar
+      // Example: You might call a function similar to how LemonSqueezy does
+      // await createPendingBookingRecord(supabase, polarOrderId, bookingData, paymentStatus.id, 'polar');
+      
+      // console.log('Database records created for Polar order:', polarOrderId);
+
+    } catch (dbError) {
+      console.error('Error creating DB records for Polar order:', dbError);
+      // Decide if this should prevent checkout creation
+    }
+
     return {
       checkoutUrl,
       orderId: polarOrderId
@@ -143,7 +201,7 @@ export async function createPolarCheckoutSession({
     const safeMetadata: Record<string, string> = {
       product_id: productId,
       ...Object.fromEntries(
-        Object.entries(metadata).filter(([_, v]) => typeof v === 'string' && v.length > 0)
+        Object.entries(metadata).filter(([_key, v]) => typeof v === 'string' && v.length > 0)
       )
     };
     

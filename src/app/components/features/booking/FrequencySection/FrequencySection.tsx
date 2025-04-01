@@ -6,19 +6,27 @@ import { Check } from 'lucide-react'
 import { BookingPlan } from '@/app/types/booking'
 import { useFrequencySection } from './useFrequencySection'
 import { BookingFrequency } from '@/app/types/enums/booking'
+import { Coach, COACHES_CONFIG } from '@/app/config/coaches'
 
 interface FrequencySectionProps {
   bookingPlan: BookingPlan | null
   onFrequencySelect: (frequency: BookingFrequency, duration?: number) => void
+  selectedCoach?: Coach
 }
 
 export function FrequencySection({
   bookingPlan,
-  onFrequencySelect
+  onFrequencySelect,
+  selectedCoach = Coach.Matias // Default to Matias if no coach selected
 }: FrequencySectionProps) {
   const {
     handleFrequencyCardClick
   } = useFrequencySection({ onFrequencySelect })
+  
+  // Get prices based on selected coach
+  const singleSessionPrice = selectedCoach ? COACHES_CONFIG[selectedCoach].prices.singleSession : 0;
+  const weeklyPrice = selectedCoach ? COACHES_CONFIG[selectedCoach].prices.weekly : 0;
+  const twiceWeeklyPrice = selectedCoach ? COACHES_CONFIG[selectedCoach].prices.twiceWeekly : 0;
   
   return (
     <div className="space-y-4">
@@ -33,7 +41,7 @@ export function FrequencySection({
               <div className="text-sm text-muted-foreground">One-time coaching call</div>
               <div className="text-sm">60 minutes</div>
             </div>
-            <div className="font-semibold text-lg">$250</div>
+            <div className="font-semibold text-lg">${singleSessionPrice}</div>
             {bookingPlan?.frequency === BookingFrequency.Once && (
               <div className="ml-2">
                 <Check className="h-5 w-5 text-primary" />
@@ -51,7 +59,7 @@ export function FrequencySection({
               <div className="text-sm text-muted-foreground">Regular weekly sessions</div>
               <div className="text-sm">60 minutes</div>
             </div>
-            <div className="font-semibold text-lg">$850 <span className="text-sm font-normal text-muted-foreground">/month</span></div>
+            <div className="font-semibold text-lg">${weeklyPrice} <span className="text-sm font-normal text-muted-foreground">/month</span></div>
             {bookingPlan?.frequency === BookingFrequency.Weekly && (
               <div className="ml-2">
                 <Check className="h-5 w-5 text-primary" />
@@ -69,7 +77,7 @@ export function FrequencySection({
               <div className="text-sm text-muted-foreground">Intensive coaching</div>
               <div className="text-sm">60 minutes</div>
             </div>
-            <div className="font-semibold text-lg">$1,500 <span className="text-sm font-normal text-muted-foreground">/month</span></div>
+            <div className="font-semibold text-lg">${twiceWeeklyPrice} <span className="text-sm font-normal text-muted-foreground">/month</span></div>
             {bookingPlan?.frequency === BookingFrequency.TwiceWeekly && (
               <div className="ml-2">
                 <Check className="h-5 w-5 text-primary" />

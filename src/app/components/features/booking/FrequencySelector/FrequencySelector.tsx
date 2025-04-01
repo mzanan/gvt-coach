@@ -19,13 +19,15 @@ interface FrequencySelectorProps {
   selectedFrequency?: BookingFrequency
   disableWeekly?: boolean
   disableTwiceWeekly?: boolean
+  singleSessionPrice?: number
 }
 
 export function FrequencySelector({ 
   onFrequencySelect, 
   selectedFrequency,
   disableWeekly = false,
-  disableTwiceWeekly = false
+  disableTwiceWeekly = false,
+  singleSessionPrice = 100
 }: FrequencySelectorProps) {
   const [selectedFrequencyState, setSelectedFrequency] = useState<BookingFrequency | null>(selectedFrequency || BookingFrequency.Once)
   const [duration, setDuration] = useState<string>("1")
@@ -36,7 +38,8 @@ export function FrequencySelector({
       setSelectedFrequency(BookingFrequency.Once)
       onFrequencySelect(BookingFrequency.Once)
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Dependencies removed as this should only run once on mount
 
   const handleSelect = (frequency: BookingFrequency) => {
     // Only allow BookingFrequency.Once frequency for now
@@ -76,7 +79,7 @@ export function FrequencySelector({
         >
           <h3 className="text-xl font-semibold mb-2">Single Session</h3>
           <p className="text-muted-foreground">Book a one-time consultation session</p>
-          <p className="mt-2 font-medium">$100</p>
+          <p className="mt-2 font-medium">${singleSessionPrice}</p>
         </Card>
 
         <Card 

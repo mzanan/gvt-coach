@@ -11,7 +11,7 @@ const nextConfig = {
     NEXT_PUBLIC_CLIENT_SECRET: process.env.NEXT_PUBLIC_CLIENT_SECRET,
   },
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error', 'warn'] } : false,
+    removeConsole: process.env.NEXT_PUBLIC_ENV === 'production' ? { exclude: ['error', 'warn'] } : false,
   },
   webpack(config) {
     // Configurar SVGs para ser importados como módulos

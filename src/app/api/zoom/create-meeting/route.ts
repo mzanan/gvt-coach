@@ -77,7 +77,6 @@ export async function POST(request: NextRequest) {
     
     // Crear la reunión en Zoom
     const meetingTime = DateTime.fromISO(booking.booking_date).toJSDate();
-    const durationMinutes = booking.duration ? booking.duration * 60 : 60;
     
     const meetingData = {
       topic: `GVT Coaching Session with ${booking.user_email}`,

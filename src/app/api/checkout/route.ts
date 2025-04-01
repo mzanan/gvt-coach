@@ -5,43 +5,6 @@ import { createClient } from '@/lib/supabase/server';
 import { BookingFrequency, PaymentOrderStatus } from '@/app/types/enums/booking';
 import { DateTime } from 'luxon';
 
-// Helper function for consistent date handling
-function processBookingDate(dateString: string, userTimezone: string): Date {
-  console.log(`Processing date: ${dateString} with timezone: ${userTimezone}`);
-  
-  const dateTime = DateTime.fromISO(dateString);
-  
-  if (!dateTime.isValid) {
-    console.log(`Invalid date format: ${dateString}`);
-    return new Date();
-  }
-  
-  // Handle dates with 'Z' suffix (already in UTC)
-  if (dateString.endsWith('Z')) {
-    console.log(`Date is already in UTC format with Z suffix: ${dateString}`);
-    return new Date(dateString);
-  }
-  
-  // Check if the string has explicit timezone info in ISO format
-  const hasTimezoneOffset = dateString.includes('+') || dateString.includes('-') && dateString.indexOf('T') < dateString.indexOf('-');
-  
-  if (hasTimezoneOffset || dateTime.zoneName) {
-    console.log(`Date has timezone info, using it directly: ${dateString}`);
-    const utcDateTime = dateTime.toUTC();
-    console.log(`Converted to UTC: ${utcDateTime.toString()}`);
-    return utcDateTime.toJSDate();
-  } 
-  
-  // Otherwise, assume it's in the user's timezone
-  // This ensures we correctly handle the user's local time selection
-  console.log(`Date has no timezone info, assuming ${userTimezone}: ${dateString}`);
-  const localDateTime = dateTime.setZone(userTimezone);
-  const utcDateTime = localDateTime.toUTC();
-  
-  console.log(`Converted local time to UTC: ${utcDateTime.toString()}`);
-  return utcDateTime.toJSDate();
-}
-
 export async function POST(request: NextRequest) {
   try {
     // Parse request body
@@ -84,7 +47,6 @@ export async function POST(request: NextRequest) {
           // Extract booking data
           const userEmail = bookingData.userEmail;
           const frequency = bookingData.bookingPlan?.frequency || BookingFrequency.Once;
-          const userTimezone = bookingData.selectedTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
           
           console.log('Checkout API: Creating pending booking record for LemonSqueezy', {
             userEmail,
@@ -127,14 +89,39 @@ export async function POST(request: NextRequest) {
             
             // Only create a booking record if we have a booking date
             if (bookingData.selectedDate) {
-              // Handle date conversion in a consistent way
               let bookingDateTime: Date;
+              
+              // --- TIMEZONE DETERMINATION: Read from user_data cookie --- 
+              let timezoneFromCookie: string | undefined;
+              try {
+                // Try reading the user_data cookie
+                const userDataCookie = request.cookies.get('user_data')?.value;
+                if (userDataCookie) {
+                  const parsedData = JSON.parse(userDataCookie);
+                  timezoneFromCookie = parsedData?.timezone; // Extract timezone field
+                }
+              } catch (cookieError) {
+                console.error("🍪 [API /checkout] Error accessing or parsing user_data cookie:", cookieError);
+                timezoneFromCookie = undefined;
+              }
+              
+              // Prioritize cookie timezone if successfully read, otherwise fallback to server default.
+              const serverDefaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+              const userTimezone = timezoneFromCookie || serverDefaultTimezone;
+              
+              console.log('⏰ [API /checkout] Determined userTimezone (Cookie Priority):', { 
+                cookie_value_read: timezoneFromCookie, // Log the actual value read
+                server_default: serverDefaultTimezone,
+                final: userTimezone 
+              });
+              // --- END TIMEZONE DETERMINATION ---
               
               // Logging detallado para diagnóstico
               console.log('🔎 Checkout API - Datos de fecha recibidos:', {
                 selectedDate: bookingData.selectedDate,
                 utcDate: bookingData.utcDate,
                 timezone: userTimezone,
+                timezoneFuente: bookingData.selectedTimezone ? 'Cookie/User' : 'Browser Default',
                 formato_selectedDate: bookingData.selectedDate ? 
                   (bookingData.selectedDate.endsWith('Z') ? 'UTC' : 
                    (bookingData.selectedDate.includes('+') || bookingData.selectedDate.includes('-') ? 'Con offset' : 'Sin zona')
@@ -227,6 +214,10 @@ export async function POST(request: NextRequest) {
               // Ensure the ISO string ends with 'Z' to explicitly indicate UTC
               const bookingDateISOString = bookingDateTime.toISOString();
               
+              // --- DEBUG LOG START ---
+              console.log('💾 [API /checkout] Final UTC ISO string to save:', bookingDateISOString);
+              // --- DEBUG LOG END ---
+              
               const { error: bookingError } = await supabase
                 .from('gvt_coach_meetings_bookings')
                 .insert({
@@ -238,6 +229,7 @@ export async function POST(request: NextRequest) {
                   checkout_completed: false,
                   payment_confirmed: false,
                   user_timezone: userTimezone,
+                  coach: bookingData.bookingPlan?.coach
                 });
                 
               if (bookingError) {

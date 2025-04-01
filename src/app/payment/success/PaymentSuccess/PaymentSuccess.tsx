@@ -64,11 +64,12 @@ export function PaymentSuccess() {
         <div className="space-y-6">
           <div className="border-b pb-4">
             <h2 className="font-medium text-lg mb-3">Schedule Details</h2>
-            <div className="space-y-2 text-muted-foreground">
+            <div className="space-y-2 text-muted-foreground" data-testid="booking-details">
               <BookingSummaryDisplay 
                 booking={booking ? {
                   ...booking,
-                  frequency: convertBookingFrequency(booking.frequency)
+                  frequency: convertBookingFrequency(booking.frequency),
+                  user_timezone: userTimezone
                 } : null}
                 timezone={userTimezone}
               />

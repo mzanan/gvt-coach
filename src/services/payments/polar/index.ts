@@ -32,7 +32,7 @@ export const polarService: PaymentProviderService = {
       console.log('Polar env check:', {
         accessToken: process.env.GVT_COACH_POLAR_SANDBOX_ACCESS_TOKEN ? 'Set' : 'Not set',
         productIds: {
-          single: process.env.GVT_COACH_POLAR_SINGLE_SESSION_PRODUCT_ID ? 'Set' : 'Not set',
+          single: process.env.NEXT_PUBLIC_GVT_COACH_POLAR_SINGLE_SESSION_PRODUCT_ID ? 'Set' : 'Not set',
           weekly: process.env.GVT_COACH_POLAR_WEEKLY_PRODUCT_ID ? 'Set' : 'Not set',
           twiceWeekly: process.env.GVT_COACH_POLAR_TWICE_WEEKLY_PRODUCT_ID ? 'Set' : 'Not set'
         },
@@ -152,6 +152,8 @@ export const polarService: PaymentProviderService = {
             orderId,
             bookingData: {
               userEmail,
+              // Pass the entire bookingPlan object received by createCheckout
+              bookingPlan: bookingPlan,
               // Make sure we always have a valid selectedDate
               selectedDate: bookingPlan.firstSlot?.date ? 
                 DateTime.fromJSDate(bookingPlan.firstSlot.date)
@@ -210,12 +212,10 @@ export const polarService: PaymentProviderService = {
     
     switch (frequency) {
       case BookingFrequency.Once:
-        // First try server-side environment variable, then fall back to public one
-        const singleSessionProductId = process.env.GVT_COACH_POLAR_SINGLE_SESSION_PRODUCT_ID || 
-                        process.env.NEXT_PUBLIC_GVT_COACH_POLAR_SINGLE_SESSION_PRODUCT_ID;
+        const singleSessionProductId = process.env.NEXT_PUBLIC_GVT_COACH_POLAR_SINGLE_SESSION_PRODUCT_ID;
         
         if (!singleSessionProductId) {
-          console.error('Missing GVT_COACH_POLAR_SINGLE_SESSION_PRODUCT_ID environment variable');
+          console.error('Missing NEXT_PUBLIC_GVT_COACH_POLAR_SINGLE_SESSION_PRODUCT_ID environment variable');
           return null;
         }
         return singleSessionProductId;

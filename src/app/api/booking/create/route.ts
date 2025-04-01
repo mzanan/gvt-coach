@@ -128,7 +128,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       // Create checkout mapping
       console.log(`API: /booking/create: Creating new checkout mapping for order: ${orderId}`);
 
-      const mappingData: Record<string, any> = {
+      const mappingData: Record<string, string | number | null> = {
         checkout_order_id: orderId,
         payment_status_id: paymentStatusId,
         provider: provider,
@@ -209,9 +209,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       if (!existingBooking) {
         console.log('API: /booking/create: Creating new booking, full bookingData received:', bookingData);
 
-        // Simplificamos la lógica de fecha: usamos selectedDate, bookingDate o fecha actual
-        const userTimezone = bookingData.selectedTimezone || bookingData.userTimezone || 'UTC';
-        console.log("API: /booking/create: Using user timezone:", userTimezone);
+        // --- TIMEZONE DETERMINATION: Read from user_data cookie --- 
+        let timezoneFromCookie: string | undefined;
+        try {
+          const userDataCookie = req.cookies.get('user_data')?.value;
+          if (userDataCookie) {
+            const parsedData = JSON.parse(userDataCookie);
+            timezoneFromCookie = parsedData?.timezone;
+          }
+        } catch (cookieError) {
+          console.error("🍪 [API /booking/create] Error accessing or parsing user_data cookie:", cookieError);
+          timezoneFromCookie = undefined;
+        }
+        
+        // Prioritize cookie timezone, fallback to frontend data (as last resort), then server default
+        const serverDefaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const userTimezone = timezoneFromCookie || bookingData.selectedTimezone || bookingData.userTimezone || serverDefaultTimezone;
+        console.log("API: /booking/create: Using user timezone:", userTimezone, `(Source: ${timezoneFromCookie ? 'Cookie' : (bookingData.selectedTimezone || bookingData.userTimezone ? 'Frontend' : 'Server Default')})`);
+        // --- END TIMEZONE DETERMINATION ---
         
         // Extraer fecha en un solo paso con fallbacks claros
         let bookingDateValue = null;
@@ -246,9 +261,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             user_email: bookingData.userEmail,
             booking_date: bookingDateValue,
             frequency: bookingData.bookingPlan?.frequency || BookingFrequency.Once,
+            coach: bookingData.bookingPlan?.coach,
             payment_status: PaymentOrderStatus.Pending,
-            checkout_order_id: orderId,
+            checkout_completed: false,
+            payment_confirmed: false,
             user_timezone: userTimezone,
+            checkout_order_id: orderId
           }])
           .select()
           .single();

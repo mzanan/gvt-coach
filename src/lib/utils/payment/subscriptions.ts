@@ -66,7 +66,7 @@ export function setupPaymentStatusChannel(
     (payload) => {
       console.log("📅 New booking created:", payload);
       
-      const newBooking = payload.new as any;
+      const newBooking = payload.new as Record<string, unknown>;
       if (newBooking && newBooking.checkout_order_id === orderId) {
         onPaymentConfirmed(orderId);
       }

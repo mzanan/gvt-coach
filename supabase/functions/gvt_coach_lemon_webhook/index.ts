@@ -330,7 +330,7 @@ serve(async (req: Request): Promise<Response> => {
     const { error: mappingError } = await supabase
       .from("gvt_coach_checkout_mapping")
       .upsert({
-        checkout_order_id: checkoutOrderId || `lemon_order_${paymentOrderId}`, // Use a placeholder if no real checkout_order_id
+        checkout_order_id: checkoutOrderId || paymentOrderId,
         payment_order_id: paymentOrderId,
         payment_identifier_id: paymentIdentifierId,
         payment_status_id: paymentStatusId,
@@ -343,7 +343,7 @@ serve(async (req: Request): Promise<Response> => {
       console.error("Error updating mapping table:", mappingError);
       // Don't throw - we want to continue even if mapping update fails
     } else {
-      console.log(`Updated mapping table for checkout_order_id: ${checkoutOrderId || `lemon_order_${paymentOrderId}`}`);
+      console.log(`Updated mapping table for checkout_order_id: ${checkoutOrderId || paymentOrderId}`);
     }
 
     // If payment is successful (PAID/ACTIVE), create Zoom meeting and update booking
@@ -357,9 +357,9 @@ serve(async (req: Request): Promise<Response> => {
         .eq("checkout_order_id", checkoutOrderId)
         .maybeSingle();
 
-      // If no direct match, and we're using a placeholder ID, try finding by user email
-      if (!booking && userEmail && checkoutOrderId?.startsWith("lemon_order_")) {
-        console.log(`No direct match for placeholder ID, looking for booking by user email: ${userEmail}`);
+      // If no direct match, try finding by user email
+      if (!booking && userEmail) {
+        console.log(`No direct match for ID, looking for booking by user email: ${userEmail}`);
         
         const { data: bookingByEmail, error: emailError } = await supabase
           .from("gvt_coach_meetings_bookings")
@@ -484,7 +484,7 @@ serve(async (req: Request): Promise<Response> => {
           console.log("Booking already has a Zoom link:", booking.meet_link);
         }
       } else {
-        console.log("No booking found for this order ID:", checkoutOrderId || `lemon_order_${paymentOrderId}`);
+        console.log("No booking found for this order ID:", checkoutOrderId || paymentOrderId);
         // We don't create a booking here anymore, as it should be created during checkout
       }
     }
@@ -492,7 +492,7 @@ serve(async (req: Request): Promise<Response> => {
     return new Response(JSON.stringify({ 
       success: true,
       message: "Payment processed successfully",
-      checkout_order_id: checkoutOrderId || `lemon_order_${paymentOrderId}`
+      checkout_order_id: checkoutOrderId || paymentOrderId
     }), {
       status: 200,
       headers: { "Content-Type": "application/json" },

@@ -42,34 +42,36 @@ export const lemonSqueezyService: PaymentProviderService = {
         } : null
       });
       
+      // --- RELIABLE TIMEZONE FROM CLIENT COOKIE --- 
+      const reliableUserTimezone = getClientCookie('user_timezone') || 
+                                   userProfile?.timezone || 
+                                   Intl.DateTimeFormat().resolvedOptions().timeZone;
+      console.log("🍋 [LemonSqueezy Service] Determined reliable user timezone:", reliableUserTimezone);
+      // --- END RELIABLE TIMEZONE ---
+      
       // Convertir fechas de manera simplificada
       let localTimeString = null;
       let utcTimeString = null;
       
       try {
         if (slotTime) {
-          const userTimezone = userProfile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-          
-          // Obtener tiempo local y UTC en un solo paso
           const slotDateTime = DateTime.fromJSDate(new Date(slotTime));
-          localTimeString = slotDateTime.setZone(userTimezone).toISO();
+          localTimeString = slotDateTime.setZone(reliableUserTimezone).toISO(); // Use reliable timezone
           utcTimeString = utcDate ? 
             DateTime.fromJSDate(new Date(utcDate)).toISO() : 
             slotDateTime.toUTC().toISO();
         }
       } catch (e) {
-        console.error('Error procesando fecha/hora:', e);
+        console.error('Error processing date/time in LemonSqueezy service:', e);
       }
       
-      // Prepare booking data - simplified version to avoid potential issues
+      // Prepare booking data - Pass the reliable timezone
       const bookingData = {
         userEmail,
-        bookingPlan: {
-          frequency: bookingPlan.frequency
-        },
+        bookingPlan: bookingPlan, // Keep the full booking plan
         selectedDate: localTimeString || null,
         utcDate: utcTimeString || null,
-        selectedTimezone: userProfile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
+        selectedTimezone: reliableUserTimezone // <-- Pass the reliable timezone
       };
       
       // Store booking data in cookie for reference with complete details
@@ -78,7 +80,7 @@ export const lemonSqueezyService: PaymentProviderService = {
         bookingPlan,
         selectedDate: localTimeString || (slotTime ? new Date(slotTime).toISOString() : null),
         utcDate: utcTimeString || (utcDate ? new Date(utcDate).toISOString() : null),
-        selectedTimezone: userProfile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
+        selectedTimezone: reliableUserTimezone // Store reliable timezone in cookie too
       });
       
       // Call the checkout API

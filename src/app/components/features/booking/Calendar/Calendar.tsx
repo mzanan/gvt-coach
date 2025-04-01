@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { BookingFrequency } from '@/app/types/enums/booking'
 import { Button } from '@/app/components/ui-kit/button'
 import { DateTime } from 'luxon'
+import { Coach, COACHES_CONFIG } from '@/app/config/coaches'
 
 interface CalendarProps {
   onSelectDate: (date: Date) => void
@@ -14,7 +15,7 @@ interface CalendarProps {
   frequency?: BookingFrequency
   suggestedDate?: Date | null
   selectedTimezone: string
-  COACH_TIMEZONE: string
+  selectedCoach: Coach
 }
 
 // Componente de día memoizado para evitar renderizados innecesarios
@@ -36,15 +37,23 @@ const CalendarDay = React.memo(({
   <button
     className={cn(
       "h-9 w-9 rounded-md p-0 font-normal flex items-center justify-center mx-auto",
-      !isCurrentMonth && "text-muted-foreground opacity-50",
+      // Base styles for days from other months
+      !isCurrentMonth && "text-muted-foreground",
+      // Additional opacity for disabled days from other months
+      !isCurrentMonth && isDisabled && "opacity-50",
+      // Keep hover effects for enabled days from other months
+      !isCurrentMonth && !isDisabled && "hover:bg-accent hover:text-accent-foreground",
+      // Selected state overrides other styles
       isSelected && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
       isSuggestedDate && "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+      // Disabled state
       isDisabled && "pointer-events-none opacity-50",
+      // Hover for current month enabled days
       !isSelected && !isSuggestedDate && !isDisabled && isCurrentMonth && "hover:bg-accent hover:text-accent-foreground"
     )}
     disabled={isDisabled}
     onClick={onClick}
-    tabIndex={!isCurrentMonth || isDisabled ? -1 : 0}
+    tabIndex={isDisabled ? -1 : 0} // Allow focus on days outside current month if selectable
   >
     {date.day}
   </button>
@@ -57,15 +66,18 @@ export function Calendar({
   bookedDates,
   suggestedDate,
   selectedTimezone,
-  COACH_TIMEZONE
+  selectedCoach
 }: CalendarProps) {
-  const [currentMonth, setCurrentMonth] = useState(() => 
-    DateTime.now().setZone(selectedTimezone)
-  );
+  // Initialize current month based purely on user's perspective
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    // Get current date in user's timezone
+    const userNow = DateTime.now().setZone(selectedTimezone);
+    return userNow;
+  });
 
-  // Memoizar el cálculo de días del mes para evitar recálculos innecesarios
+  // Memoize days calculation to avoid unnecessary recalculations
   const days = useMemo(() => getDaysInMonth(currentMonth), [currentMonth]);
-
+  
   const goToPreviousMonth = useCallback(() => {
     setCurrentMonth(prev => prev.minus({ months: 1 }));
   }, []);
@@ -73,6 +85,15 @@ export function Calendar({
   const goToNextMonth = useCallback(() => {
     setCurrentMonth(prev => prev.plus({ months: 1 }));
   }, []);
+
+  // Calculate the earliest month the user can navigate back to (current month)
+  const earliestMonth = useMemo(() => {
+    return DateTime.now().setZone(selectedTimezone).startOf('month');
+  }, [selectedTimezone]);
+
+  const isPreviousMonthDisabled = useMemo(() => {
+    return currentMonth.startOf('month') <= earliestMonth;
+  }, [currentMonth, earliestMonth]);
 
   const isSelected = useCallback((date: DateTime) => {
     if (!selectedDate) return false;
@@ -100,20 +121,29 @@ export function Calendar({
   }, [bookedDates, selectedTimezone]);
 
   const isDisabled = useCallback((date: DateTime) => {
-    // Usar la zona horaria del COACH para determinar si la fecha es hoy
-    const todayInCoachTimezone = DateTime.now()
-      .setZone(COACH_TIMEZONE)
-      .startOf('day');
+    // Get current time in coach's timezone (with time, not just date)
+    const coachTimezone = COACHES_CONFIG[selectedCoach].timezone;
+    const coachNow = DateTime.now().setZone(coachTimezone);
     
-    // La fecha del calendario en la zona horaria del coach
-    const dateInCoachTimezone = date
-      .setZone(selectedTimezone)
-      .startOf('day')
-      .setZone(COACH_TIMEZONE);
+    // Convert the calendar date to a datetime in coach timezone for comparison
+    const calendarDateInUserTZ = date.setZone(selectedTimezone).startOf('day');
+    const calendarDateInCoachTZ = calendarDateInUserTZ.setZone(coachTimezone);
     
-    // Deshabilitar si la fecha es hoy o en el pasado, o si está completamente reservada
-    return dateInCoachTimezone <= todayInCoachTimezone || isFullyBooked(date);
-  }, [selectedTimezone, isFullyBooked, COACH_TIMEZONE]);
+    // Check if the date is fully booked
+    const isBooked = isFullyBooked(date);
+    
+    // For any future date beyond today in coach's timezone, it should be enabled
+    // This ensures we compare dates properly across timezone boundaries
+    const coachToday = coachNow.startOf('day');
+    
+    // If the date is tomorrow or later in coach timezone, it's bookable (unless booked)
+    if (calendarDateInCoachTZ > coachToday) {
+      return isBooked;
+    }
+    
+    // Disable today and past dates in coach timezone
+    return true;
+  }, [selectedTimezone, selectedCoach, isFullyBooked]);
 
   const isCurrentMonth = useCallback((date: DateTime) => {
     return date.month === currentMonth.month;
@@ -137,17 +167,17 @@ export function Calendar({
     
     const days: DateTime[] = [];
     
-    // Añadir días del mes anterior
+    // Add days from previous month
     for (let i = 0; i < dayOfWeek; i++) {
       days.push(firstDayOfMonth.minus({ days: dayOfWeek - i }));
     }
     
-    // Añadir días del mes actual
+    // Add days from current month
     for (let i = 0; i < daysInMonth; i++) {
       days.push(firstDayOfMonth.plus({ days: i }));
     }
     
-    // Añadir días del mes siguiente hasta completar la cuadrícula
+    // Add days from next month to complete the grid
     const remainingDays = 42 - days.length;
     for (let i = 0; i < remainingDays; i++) {
       days.push(lastDayOfMonth.plus({ days: i + 1 }));
@@ -162,7 +192,7 @@ export function Calendar({
         <Button
           variant="ghost"
           onClick={goToPreviousMonth}
-          disabled={currentMonth.startOf('month') <= DateTime.now().startOf('month')}
+          disabled={isPreviousMonthDisabled}
           className="h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -204,4 +234,15 @@ export function Calendar({
       </div>
     </div>
   )
+}
+
+// Get coach timezone in a specific format
+export function getCoachTimezone() {
+  const COACH_TIMEZONE = process.env.NEXT_PUBLIC_COACH_TIMEZONE || 'Asia/Saigon';
+  return COACH_TIMEZONE;
+}
+
+// Format date without time
+export function formatDateWithoutTime(date: Date): string {
+  return DateTime.fromJSDate(date).toFormat('yyyy-MM-dd');
 } 

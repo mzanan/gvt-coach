@@ -207,7 +207,7 @@ export function getRequestOrigin(server = ''): string {
   }
   
   // Default to localhost in development
-  return process.env.NODE_ENV === 'production'
+  return process.env.NEXT_PUBLIC_ENV === 'production'
     ? 'https://gvt.academy'
     : 'http://localhost:3000';
 } 

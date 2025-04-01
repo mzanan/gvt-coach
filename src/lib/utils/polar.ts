@@ -48,8 +48,7 @@ export const createPolarClient = (isProduction = false): Polar => {
 };
 
 // Determine if we're in a sandbox environment
-const isSandbox = process.env.NEXT_PUBLIC_ENV !== 'production' || 
-                  process.env.NODE_ENV !== 'production';
+const isSandbox = process.env.NEXT_PUBLIC_ENV !== 'production';
 
 // Export the initialized Polar client
 export const polarApi = new Polar({

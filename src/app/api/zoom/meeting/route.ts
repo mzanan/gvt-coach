@@ -39,7 +39,7 @@ async function getZoomToken() {
 export async function POST(request: NextRequest) {
   try {
     // Parse request body
-    const { meetingTopic, meetingTime, duration, timezone } = await request.json();
+    const { meetingTopic, meetingTime, timezone } = await request.json();
 
     if (!meetingTopic || !meetingTime) {
       return NextResponse.json({

@@ -1,7 +1,10 @@
 import { supabase } from '@/lib/supabase/client';
 import { getUserConfirmationEmail } from './email-templates/confirmation-email-user';
 import { getCoachConfirmationEmail } from './email-templates/confirmation-email-coach';
-import { BookingFrequency, PaymentOrderStatus } from '@/app/types/enums/booking';
+import { PaymentOrderStatus } from '@/app/types/enums/booking';
+import { getTimezoneCookie } from '@/lib/utils/cookies';
+import { COACHES_CONFIG } from '@/app/config/coaches';
+import { Coach } from '@/app/config/coaches';
 
 // Interface for email data
 export interface EmailData {
@@ -60,9 +63,22 @@ export async function sendBookingConfirmation(
     user_name?: string;
     booking_id?: string;
     user_timezone?: string;
+    coach?: Coach;
   }
 ) {
   try {
+    // Verificar si el coach viene en los detalles
+    if (!bookingDetails.coach) {
+      console.error('[MAILER ERROR] Coach missing in bookingDetails! Cannot determine correct coach.', bookingDetails);
+      // Considerar lanzar un error o retornar para evitar enviar al coach equivocado
+      // Por ahora, usaremos un fallback pero lo loguearemos fuertemente
+      console.warn('[MAILER WARNING] Defaulting to Coach.Gabriel due to missing coach in bookingDetails.');
+      bookingDetails.coach = Coach.Gabriel; // Mantener fallback temporalmente con warning
+    }
+    
+    const selectedCoach = bookingDetails.coach;
+    console.log(`[MAILER] Determined selectedCoach: ${selectedCoach}`);
+
     // 1. Check/Mark flag in DB to prevent duplicates
     if (bookingDetails.booking_id) {
       // Check if email was already sent
@@ -86,7 +102,39 @@ export async function sendBookingConfirmation(
       console.log('Flag marked in DB before actual sending');
     }
 
-    // 2. Prepare and send email to user
+    // 2. Get user timezone from booking data, cookie, or fall back to UTC
+    let userTimezone = bookingDetails.user_timezone;
+    
+    // Try to get timezone from the cookie if not provided in booking details
+    if (!userTimezone && typeof window !== 'undefined') {
+      const cookieTimezone = getTimezoneCookie();
+      if (cookieTimezone) {
+        userTimezone = cookieTimezone;
+        console.log('Using timezone from cookie for user email:', userTimezone);
+      }
+    }
+    
+    // If still no timezone, check the database if we have a booking ID
+    if (!userTimezone && bookingDetails.booking_id) {
+      const { data: bookingData } = await supabase
+        .from('gvt_coach_meetings_bookings')
+        .select('user_timezone')
+        .eq('id', bookingDetails.booking_id)
+        .single();
+        
+      if (bookingData?.user_timezone) {
+        userTimezone = bookingData.user_timezone;
+        console.log('Using timezone from database for user email:', userTimezone);
+      }
+    }
+    
+    // Fallback to UTC if no timezone found
+    if (!userTimezone) {
+      userTimezone = 'UTC';
+      console.log('No timezone found, defaulting to UTC for user email');
+    }
+
+    // 3. Prepare and send email to user
     const userName = bookingDetails.user_name || to;
     const userEmailContent = getUserConfirmationEmail({
       start_time: bookingDetails.start_time,
@@ -94,20 +142,34 @@ export async function sendBookingConfirmation(
       zoom_link: bookingDetails.zoom_link,
       user_name: userName,
       user_email: to,
-      user_timezone: bookingDetails.user_timezone
+      user_timezone: userTimezone,
+      coach: selectedCoach
     });
 
     await sendEmail({
       to,
-      subject: 'New GVT Coaching Session Confirmed! 🎉',
+      subject: `New GVT Coaching Session Confirmed with ${COACHES_CONFIG[selectedCoach].displayName}! 🎉`,
       html: userEmailContent.html
     });
+    console.log(`[MAILER] User confirmation email sent to ${to} for coach ${selectedCoach}`);
 
-    // 3. Send email to coach if configured
-    const coachEmail = process.env.NEXT_PUBLIC_GVT_COACH_COACH_EMAIL;
-    const coachTimezone = process.env.NEXT_PUBLIC_GVT_COACH_COACH_TIMEZONE;
+    // 4. Send email to coach if configured
+    const coachConfig = COACHES_CONFIG[selectedCoach];
+    const coachEmail = coachConfig.email;
+    const coachTimezone = coachConfig.timezone;
+    let reliableUserTimezoneForCoachEmail = bookingDetails.user_timezone;
+    if (!reliableUserTimezoneForCoachEmail && typeof window !== 'undefined') {
+      const cookieTimezone = getTimezoneCookie();
+      if (cookieTimezone) reliableUserTimezoneForCoachEmail = cookieTimezone;
+    }
+    if (!reliableUserTimezoneForCoachEmail && bookingDetails.booking_id) {
+      const { data: bookingData } = await supabase.from('gvt_coach_meetings_bookings').select('user_timezone').eq('id', bookingDetails.booking_id).single();
+      if (bookingData?.user_timezone) reliableUserTimezoneForCoachEmail = bookingData.user_timezone;
+    }
+    reliableUserTimezoneForCoachEmail = reliableUserTimezoneForCoachEmail || 'UTC';
+    console.log("[MAILER] Using user timezone for coach email info:", reliableUserTimezoneForCoachEmail);
 
-    if (coachEmail && coachTimezone) {
+    if (coachEmail) {
       // Initial basic booking data
       const bookingInfo = {
         provider: 'Unknown',
@@ -140,19 +202,23 @@ export async function sendBookingConfirmation(
         }
       }
 
-      // Generate and send email to coach
+      // Log coach timezone for debugging
+      console.log('Sending email to coach with timezone:', coachTimezone);
+
+      console.log(`[MAILER] Attempting to send confirmation to coach ${selectedCoach} at ${coachEmail}`);
       const coachEmailContent = getCoachConfirmationEmail({
         start_time: bookingDetails.start_time,
         end_time: bookingDetails.end_time,
         zoom_link: bookingDetails.zoom_link,
         user_name: userName,
         user_email: to,
-        user_timezone: coachTimezone,
+        user_timezone: reliableUserTimezoneForCoachEmail,
         booking_id: bookingDetails.booking_id || 'Unknown',
-        checkout_order_id: bookingInfo.checkout_order_id, // Use the retrieved checkout_order_id
-        payment_status: PaymentOrderStatus.Paid, // Usar el enum correcto en lugar de 'Confirmed'
-        payment_confirmed: true, // Simplified
-        payment_provider: bookingInfo.provider
+        checkout_order_id: bookingInfo.checkout_order_id,
+        payment_status: PaymentOrderStatus.Paid,
+        payment_confirmed: true,
+        payment_provider: bookingInfo.provider,
+        coach: selectedCoach
       });
 
       await sendEmail({
@@ -161,13 +227,15 @@ export async function sendBookingConfirmation(
         html: coachEmailContent.html
       });
 
-      console.log('Coach confirmation email sent successfully');
+      console.log(`[MAILER] Coach confirmation email sent successfully to ${coachEmail}`);
+    } else {
+      console.warn(`[MAILER] No email configured for coach ${selectedCoach}. Skipping coach email.`);
     }
 
-    console.log('All confirmation emails sent successfully');
+    console.log('[MAILER] All confirmation emails processed successfully');
     return { success: true };
   } catch (error) {
-    console.error('Error sending confirmation email:', error);
+    console.error('[MAILER] Error sending confirmation email:', error);
     
     // In case of error, try to unmark the flag to allow retries
     if (bookingDetails.booking_id) {

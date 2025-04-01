@@ -9,7 +9,6 @@ import { userService } from "@/services/userService"
 export default function Home() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
-  const [userProfile, setUserProfile] = useState<any>(null)
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -17,11 +16,7 @@ export default function Home() {
         // Get user data from tn_profiles
         const profile = await userService.getUserFromAuthUsers()
         
-        if (profile) {
-          // Update state with obtained profile
-          console.log("%c PROFILE IN PAGE ", "background: #222; color: #ff5a5a", profile);
-          setUserProfile(profile)
-        } else {
+        if (!profile) {
           console.error("Failed to load user profile")
         }
         

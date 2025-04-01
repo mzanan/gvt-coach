@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase/client'
-import { BookingDB } from '@/app/types/booking'
 
 /**
  * Fetch booking by checkout order ID

@@ -1,5 +1,9 @@
-import { createClient } from '@supabase/supabase-js'
-import { bookingService } from '@/services/bookingService'
+// import { NextRequest, NextResponse } from 'next/server' // Removed
+// import crypto from 'crypto' // Removed
+// import { Polar } from '@polar-sh/sdk' // Removed
+import { createClient } from '@/lib/supabase/server'
+import { sendBookingConfirmation } from '@/services/mailer'
+import { Coach } from '@/app/config/coaches'
 import { PaymentOrderStatus } from '@/app/types/enums/booking'
 
 export async function POST(request: Request) {
@@ -27,7 +31,7 @@ export async function POST(request: Request) {
   }
 }
 
-async function processWebhookEvent(body: any) {
+async function processWebhookEvent(body: Record<string, unknown>) {
   try {
     // Añadir timestamp y uid a los logs para rastreo
     const logId = Math.random().toString(36).substring(2, 8);
@@ -53,7 +57,6 @@ async function processWebhookEvent(body: any) {
     let orderId = '';
     let metadataCheckoutOrderId = '';
     let userEmail = '';
-    let metadataProductId = '';
     let paymentStatus = PaymentOrderStatus.Pending;
 
     if (eventType === 'checkout.created') {
@@ -61,7 +64,6 @@ async function processWebhookEvent(body: any) {
       checkoutId = data.id || '';
       metadataCheckoutOrderId = data.metadata?.checkoutOrderId || '';
       userEmail = data.customer_email || data.email || '';
-      metadataProductId = data.product_id || '';
       // Para checkout.created, verificar si el estado es 'open'
       if (data.status === 'open') {
         paymentStatus = PaymentOrderStatus.Pending;
@@ -73,7 +75,6 @@ async function processWebhookEvent(body: any) {
       checkoutId = data.checkout_id || '';
       metadataCheckoutOrderId = data.metadata?.checkoutOrderId || '';
       userEmail = data.customer?.email || data.email || '';
-      metadataProductId = data.product_id || '';
       // Para order.created, siempre configurar como PAID
       if (eventType === 'order.created') {
         console.log(`Setting status to ${PaymentOrderStatus.Paid} for event ${eventType}`);
@@ -229,7 +230,8 @@ async function processWebhookEvent(body: any) {
         if (typeof jsonData === 'string') {
           try {
             jsonData = JSON.parse(jsonData);
-          } catch (e) {
+          } catch {
+            // Ignorar error de parseo, jsonData será {}
             jsonData = {};
           }
         }
@@ -264,58 +266,13 @@ async function processWebhookEvent(body: any) {
           .single();
         
         if (updateError) {
-          console.error(`[${logId}] Polar Webhook - Error updating payment status`, updateError);
-        } else {
-          console.log(`[${logId}] Polar Webhook - Successfully updated payment status to ${paymentStatus}`);
-          
-          // Limpiar caché de time slots cuando un pago se confirma como PAID
-          if (paymentStatus === PaymentOrderStatus.Paid) {
-            try {
-              bookingService.clearTimeSlotsCache();
-              console.log(`[${logId}] Polar Webhook - Cleared time slots cache after payment confirmation`);
-            } catch (cacheError) {
-              console.error(`[${logId}] Polar Webhook - Error clearing cache:`, cacheError);
-            }
-          }
+          console.error(`[${logId}] Polar Webhook - Error updating payment record:`, updateError);
+          return;
         }
+        
+        console.log(`[${logId}] Polar Webhook - Payment record updated: ${paymentId} with status: ${paymentStatus}`);
       } else {
-        // Even if the main status hasn't changed, ensure json_data.status matches
-        if (existingPayment.json_data?.status !== paymentStatus) {
-          console.log(`[${logId}] Polar Webhook - Main status unchanged (${paymentStatus}) but json_data.status needs update`);
-          
-          // Parse the existing json_data
-          let jsonData = existingPayment.json_data || {};
-          if (typeof jsonData === 'string') {
-            try {
-              jsonData = JSON.parse(jsonData);
-            } catch (e) {
-              jsonData = {};
-            }
-          }
-          
-          // Update only json_data to ensure status is consistent
-          const updatedJsonData = {
-            ...jsonData,
-            status: paymentStatus,
-            updated_at: new Date().toISOString()
-          };
-          
-          const { error: updateJsonError } = await supabase
-            .from('gvt_coach_payments_status')
-            .update({
-              json_data: updatedJsonData,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existingPayment.id);
-          
-          if (updateJsonError) {
-            console.error(`[${logId}] Polar Webhook - Error updating json_data status`, updateJsonError);
-          } else {
-            console.log(`[${logId}] Polar Webhook - Successfully updated json_data.status to ${paymentStatus}`);
-          }
-        } else {
-          console.log(`[${logId}] Polar Webhook - Status already up to date (${paymentStatus}), no update needed`);
-        }
+        console.log(`[${logId}] Polar Webhook - Status unchanged for payment record: ${paymentId}`);
       }
       
       // Usar el ID existente
@@ -400,125 +357,58 @@ async function processWebhookEvent(body: any) {
       // Buscar por checkout_order_id
       const { data: bookings, error: bookingError } = await supabase
         .from('gvt_coach_meetings_bookings')
-        .select('*')
+        // Explicitly select required fields including 'coach'
+        .select(`
+          id,
+          user_email,
+          booking_date,
+          session_minutes, 
+          meet_link,
+          user_name,
+          user_timezone,
+          coach
+        `)
         .eq('checkout_order_id', checkoutOrderId);
         
       if (bookingError) {
-        console.error(`[${logId}] Polar Webhook - Error finding bookings by checkout_order_id`, bookingError);
+        console.error(`[${logId}] Polar Webhook - Error fetching booking for status update:`, bookingError);
       } else if (bookings && bookings.length > 0) {
-        console.log(`[${logId}] Polar Webhook - Found ${bookings.length} bookings by checkout_order_id to update`);
+        console.log(`[${logId}] Polar Webhook - Updated booking record(s) status to ${paymentStatus}`);
         
-        // Always update all related bookings to PAID status
-        for (const booking of bookings) {
-          const { error: updateBookingError } = await supabase
-            .from('gvt_coach_meetings_bookings')
-            .update({
-              payment_status: PaymentOrderStatus.Paid,
-              checkout_completed: true,
-              payment_confirmed: true,
-              status: PaymentOrderStatus.Paid,
-              user_timezone: booking.user_timezone || data.metadata?.timezone || 'UTC'
-            })
-            .eq('id', booking.id);
-            
-          if (updateBookingError) {
-            console.error(`[${logId}] Polar Webhook - Error updating booking ${booking.id}`, updateBookingError);
-          } else {
-            console.log(`[${logId}] Polar Webhook - Updated booking ${booking.id} to PAID status`);
-            
-            // Ahora que el pago está confirmado, crear el Zoom meeting si no existe
+        // Si el pago es PAID, intentar crear la reunión de Zoom
+        if (paymentStatus === PaymentOrderStatus.Paid) {
+          for (const booking of bookings) {
             await createZoomMeetingForBooking(booking, logId);
-            
-            // Verificar nuevamente si se creó el enlace de reunión
-            if (!booking.meet_link) {
-              console.log(`[${logId}] Polar Webhook - Double-checking Zoom meeting creation for booking ${booking.id}`);
-              
-              // Obtener la reserva actualizada para verificar si ya tiene meet_link
-              const { data: updatedBooking, error: fetchError } = await supabase
-                .from('gvt_coach_meetings_bookings')
-                .select('*')
-                .eq('id', booking.id)
-                .single();
-                
-              if (fetchError) {
-                console.error(`[${logId}] Polar Webhook - Error fetching updated booking: ${fetchError.message}`);
-              } else if (updatedBooking && !updatedBooking.meet_link) {
-                console.log(`[${logId}] Polar Webhook - Booking still has no meet_link, attempting creation again`);
-                // Intentar crear el meet_link nuevamente con un pequeño retraso
-                setTimeout(async () => {
-                  await createZoomMeetingForBooking(updatedBooking, logId);
-                }, 1000);
-              } else if (updatedBooking && updatedBooking.meet_link) {
-                console.log(`[${logId}] Polar Webhook - Zoom meeting link successfully created: ${updatedBooking.meet_link}`);
-              }
+
+            // Añadir llamada para enviar email de confirmación
+            console.log(`[${logId}] Attempting to send confirmation email for booking ID: ${booking.id}`);
+            try {
+              // Asegurarse que booking.coach es del tipo correcto o undefined
+              const coachValue = Object.values(Coach).includes(booking.coach as Coach) 
+                                 ? booking.coach as Coach 
+                                 : undefined;
+                                 
+              await sendBookingConfirmation(
+                booking.user_email,
+                {
+                  start_time: booking.booking_date,
+                  end_time: new Date(new Date(booking.booking_date).getTime() + (booking.session_minutes || 60) * 60000),
+                  zoom_link: booking.meet_link || 'Link not generated yet', // Proveer fallback si no existe
+                  user_name: booking.user_name, 
+                  booking_id: booking.id,
+                  user_timezone: booking.user_timezone,
+                  coach: coachValue // Pasar el coach validado
+                }
+              );
+              console.log(`[${logId}] Confirmation email call completed for booking ID: ${booking.id}`);
+            } catch (emailError) {
+              console.error(`[${logId}] Error sending confirmation email for booking ${booking.id}:`, emailError);
+              // Decidir si continuar con otros bookings o no
             }
           }
         }
       } else {
-        // Alternative search by email
-        console.log(`[${logId}] Polar Webhook - No bookings found with checkout_order_id, trying email: ${userEmail}`);
-        
-        const { data: emailBookings, error: emailBookingError } = await supabase
-          .from('gvt_coach_meetings_bookings')
-          .select('*')
-          .eq('user_email', userEmail)
-          .order('created_at', { ascending: false })
-          .limit(1);
-          
-        if (emailBookingError) {
-          console.error(`[${logId}] Polar Webhook - Error finding bookings by email`, emailBookingError);
-        } else if (emailBookings && emailBookings.length > 0) {
-          console.log(`[${logId}] Polar Webhook - Found booking via email: ${emailBookings[0].id}`);
-          
-          // Update booking and associate with checkoutOrderId
-          const booking = emailBookings[0];
-          const { error: updateEmailBookingError } = await supabase
-            .from('gvt_coach_meetings_bookings')
-            .update({ 
-              payment_status: PaymentOrderStatus.Paid, 
-              checkout_order_id: checkoutOrderId,
-              checkout_completed: true,
-              payment_confirmed: true,
-              status: PaymentOrderStatus.Paid,
-              user_timezone: booking.user_timezone || data.metadata?.timezone || 'UTC'
-            })
-            .eq('id', booking.id);
-            
-          if (updateEmailBookingError) {
-            console.error(`[${logId}] Polar Webhook - Error updating booking found by email`, updateEmailBookingError);
-          } else {
-            console.log(`[${logId}] Polar Webhook - Updated booking ${booking.id} via email lookup`);
-            
-            // Ahora que el pago está confirmado, crear el Zoom meeting si no existe
-            await createZoomMeetingForBooking(booking, logId);
-            
-            // Verificar nuevamente si se creó el enlace de reunión
-            if (!booking.meet_link) {
-              console.log(`[${logId}] Polar Webhook - Double-checking Zoom meeting creation for booking ${booking.id}`);
-              
-              // Obtener la reserva actualizada para verificar si ya tiene meet_link
-              const { data: updatedBooking, error: fetchError } = await supabase
-                .from('gvt_coach_meetings_bookings')
-                .select('*')
-                .eq('id', booking.id)
-                .single();
-                
-              if (fetchError) {
-                console.error(`[${logId}] Polar Webhook - Error fetching updated booking: ${fetchError.message}`);
-              } else if (updatedBooking && !updatedBooking.meet_link) {
-                console.log(`[${logId}] Polar Webhook - Booking still has no meet_link, attempting creation again`);
-                // Intentar crear el meet_link nuevamente con un pequeño retraso
-                setTimeout(async () => {
-                  await createZoomMeetingForBooking(updatedBooking, logId);
-                }, 1000);
-              } else if (updatedBooking && updatedBooking.meet_link) {
-                console.log(`[${logId}] Polar Webhook - Zoom meeting link successfully created: ${updatedBooking.meet_link}`);
-              }
-            }
-          }
-        } else {
-          console.log(`[${logId}] Polar Webhook - No bookings found for this email that need payment updates`);
-        }
+        console.log(`[${logId}] Polar Webhook - No booking record found with checkout_order_id ${checkoutOrderId}`);
       }
     } else {
       console.log(`[${logId}] Polar Webhook - Not processing bookings for event type ${eventType} or status ${paymentStatus}`);
@@ -529,7 +419,7 @@ async function processWebhookEvent(body: any) {
 }
 
 // Función auxiliar para crear Zoom meetings para reservas confirmadas
-async function createZoomMeetingForBooking(booking: any, logId: string) {
+async function createZoomMeetingForBooking(booking: Record<string, unknown>, logId: string) {
   try {
     console.log(`[${logId}] Zoom - Starting meeting creation process for booking ${booking.id}`);
     
