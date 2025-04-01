@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { sendSessionSummary } from '@/services/mailer';
 
 // Verificamos que la solicitud viene de una fuente autorizada
 async function validateRequest(req: NextRequest) {
@@ -61,16 +60,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Enviamos el resumen de la sesión
-    const result = await sendSessionSummary(to, sessionDetails);
-
-    if (!result.success) {
-      return NextResponse.json(
-        { error: 'Error al enviar el resumen de sesión', details: result.error },
-        { status: 500 }
-      );
-    }
-
     // Opcionalmente, guardamos el resumen en la base de datos
     try {
       const supabase = await createClient();
@@ -89,7 +78,8 @@ export async function POST(req: NextRequest) {
       // No fallamos la respuesta si solo falla el guardado en la base de datos
     }
 
-    return NextResponse.json({ success: true, data: result.data });
+    // Return success even if email wasn't sent (as it's not implemented)
+    return NextResponse.json({ success: true, message: "Summary processed, email sending skipped." });
   } catch (error) {
     console.error('Error en el endpoint de resumen de sesión:', error);
     return NextResponse.json(

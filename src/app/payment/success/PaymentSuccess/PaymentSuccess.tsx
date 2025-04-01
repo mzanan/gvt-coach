@@ -6,7 +6,6 @@ import { Card } from '@/app/components/ui-kit/card'
 import Link from 'next/link'
 import { ChevronLeft } from "lucide-react"
 import { BookingSummaryDisplay } from '@/app/components/features/booking/BookingSummaryDisplay'
-import { convertBookingFrequency } from '@/lib/utils/payment'
 import { usePaymentSuccess } from './usePaymentSuccess'
 import { PaymentProgress } from '@/app/components/features/payment/PaymentProgress/PaymentProgress'
 
@@ -67,7 +66,6 @@ export function PaymentSuccess() {
               <BookingSummaryDisplay 
                 booking={booking ? {
                   ...booking,
-                  frequency: convertBookingFrequency(booking.frequency),
                   user_timezone: userTimezone
                 } : null}
                 timezone={userTimezone}

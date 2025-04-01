@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     
     // Use the checkouts API to create a session
     const checkoutSession = await polarClient.checkouts.create({
-      products: [productId],
+      productId: productId,
       successUrl: `${new URL(request.url).origin}/payment/success`,
     });
     

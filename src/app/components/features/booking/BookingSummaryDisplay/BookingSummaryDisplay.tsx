@@ -95,8 +95,6 @@ export function BookingSummaryDisplay({ booking, timezone }: BookingSummaryDispl
           
         const bookingSummary = getBookingSummary(
           bookingDate,
-          (booking.frequency || BookingFrequency.Once) as BookingFrequency,
-          booking.duration,
           true,
           timezone
         );
@@ -128,15 +126,7 @@ export function BookingSummaryDisplay({ booking, timezone }: BookingSummaryDispl
           {booking.frequency && (
             <div className="flex">
               <div className="min-w-32 font-medium">Frequency:</div>
-              <div>
-                {booking.frequency === BookingFrequency.Once ? (
-                  <>One-time session</>
-                ) : booking.frequency === BookingFrequency.Weekly ? (
-                  <>Weekly sessions</>
-                ) : (
-                  <>Twice weekly sessions</>
-                )}
-              </div>
+              <div>One-time session</div>
             </div>
           )}
 
@@ -185,17 +175,10 @@ export function BookingSummaryDisplay({ booking, timezone }: BookingSummaryDispl
   return (
     <div className="space-y-2">
       <p>Your booking has been confirmed.</p>
+      {/* Simplify frequency display here too */}
       <div className="flex">
         <div className="min-w-32 font-medium">Frequency:</div>
-        <div>
-          {booking.frequency === BookingFrequency.Once ? (
-            <>One-time session</>
-          ) : booking.frequency === BookingFrequency.Weekly ? (
-            <>Weekly sessions</>
-          ) : (
-            <>Twice weekly sessions</>
-          )}
-        </div>
+        <div>One-time session</div>
       </div>
       <p>You&apos;ll receive details about your scheduled time via email.</p>
     </div>

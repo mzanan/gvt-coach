@@ -1,5 +1,5 @@
 import { BookingPlan } from '@/types/booking';
-import { UserProfile } from '@/types/user';
+import { UserProfile } from '../../../types/user';
 import { CheckoutResponse, PaymentProviderService } from '@/types/payment';
 import { BookingFrequency } from '@/types/enums';
 import { DateTime } from 'luxon';
@@ -174,42 +174,12 @@ export const polarService: PaymentProviderService = {
     }
   },
 
-  getVariantIdForBookingPlan(frequency: string): string | null {
-    switch (frequency) {
-      case BookingFrequency.Once:
-        const singleSessionProductId = process.env.NEXT_PUBLIC_GVT_COACH_POLAR_SINGLE_SESSION_PRODUCT_ID;
-        
-        if (!singleSessionProductId) {
-          console.error('Missing NEXT_PUBLIC_GVT_COACH_POLAR_SINGLE_SESSION_PRODUCT_ID environment variable');
-          return null;
-        }
-        return singleSessionProductId;
-        
-      case BookingFrequency.Weekly:
-        // First try server-side environment variable, then fall back to public one
-        const weeklyProductId = process.env.GVT_COACH_POLAR_WEEKLY_PRODUCT_ID || 
-                        process.env.NEXT_PUBLIC_GVT_COACH_POLAR_WEEKLY_PRODUCT_ID;
-        
-        if (!weeklyProductId) {
-          console.error('Missing GVT_COACH_POLAR_WEEKLY_PRODUCT_ID environment variable');
-          return null;
-        }
-        return weeklyProductId;
-        
-      case BookingFrequency.TwiceWeekly:
-        // First try server-side environment variable, then fall back to public one
-        const twiceWeeklyProductId = process.env.GVT_COACH_POLAR_TWICE_WEEKLY_PRODUCT_ID || 
-                        process.env.NEXT_PUBLIC_GVT_COACH_POLAR_TWICE_WEEKLY_PRODUCT_ID;
-        
-        if (!twiceWeeklyProductId) {
-          console.error('Missing GVT_COACH_POLAR_TWICE_WEEKLY_PRODUCT_ID environment variable');
-          return null;
-        }
-        return twiceWeeklyProductId;
-        
-      default:
-        console.error(`Unsupported booking frequency: ${frequency}`);
-        return null;
+  getVariantIdForBookingPlan: (frequency: BookingFrequency): string | null => {
+    const productId = process.env.NEXT_PUBLIC_GVT_COACH_POLAR_SINGLE_SESSION_PRODUCT_ID;
+    
+    if (frequency === BookingFrequency.Once && productId) {
+      return productId;
     }
+    return null;
   }
 }; 

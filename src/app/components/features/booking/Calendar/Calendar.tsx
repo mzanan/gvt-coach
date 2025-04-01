@@ -5,16 +5,15 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/app/components/ui-kit/button'
 import { DateTime } from 'luxon'
-import { Coach } from '@/config/coaches'
+import { CoachId } from '@/config/coaches'
 import { useCalendar } from './useCalendar'
 
 interface CalendarProps {
   onSelectDate: (date: Date) => void
   selectedDate: Date | null
   bookedDates: Array<{ date: Date, fullyBooked: boolean }>
-  suggestedDate?: Date | null
   selectedTimezone: string
-  selectedCoach: Coach
+  selectedCoach: CoachId
 }
 
 // Componente de día memoizado para evitar renderizados innecesarios

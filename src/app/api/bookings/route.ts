@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { PaymentOrderStatus } from '@/types/enums';
+import { PaymentOrderStatus, BookingFrequency } from '@/types/enums';
 import { NextResponse, NextRequest } from 'next/server';
 
 export async function POST(request: NextRequest) {
@@ -8,33 +8,27 @@ export async function POST(request: NextRequest) {
     const {
       email,
       date,
-      frequency,
-      endDate,
       orderId,
-      secondSlot,
       meetLink
     } = await request.json();
 
     console.log('[POST /api/bookings] Creating booking with data:', {
       email,
       date,
-      frequency,
       orderId
     });
 
     // Validate required fields
-    if (!email || !date || !frequency || !orderId) {
+    if (!email || !date || !orderId) {
       console.error('[POST /api/bookings] Missing required fields');
       return NextResponse.json(
-        { error: 'Missing required fields: email, date, frequency, orderId are required' },
+        { error: 'Missing required fields: email, date, orderId are required' },
         { status: 400 }
       );
     }
 
     // Convert date strings to Date objects if needed
     const bookingDate = typeof date === 'string' ? new Date(date) : date;
-    const endBookingDate = endDate ? (typeof endDate === 'string' ? new Date(endDate) : endDate) : null;
-    const secondSlotDate = secondSlot ? (typeof secondSlot === 'string' ? new Date(secondSlot) : secondSlot) : null;
 
     // STEP 1: First, check if a payment status record already exists
     const { data: existingPaymentStatus } = await supabase
@@ -86,12 +80,10 @@ export async function POST(request: NextRequest) {
     const bookingData = {
       user_email: email,
       booking_date: bookingDate.toISOString(),
-      frequency: frequency,
-      end_date: endBookingDate ? endBookingDate.toISOString() : null,
+      frequency: BookingFrequency.Once, // Always Once
       checkout_order_id: orderId,
       meet_link: meetLink,
-      second_slot_date: secondSlotDate ? secondSlotDate.toISOString() : null,
-      status: PaymentOrderStatus.Pending // Usando el enum de estado de pago
+      status: PaymentOrderStatus.Pending
     };
 
     console.log('[POST /api/bookings] Inserting booking with data:', bookingData);

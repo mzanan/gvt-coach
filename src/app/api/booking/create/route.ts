@@ -254,20 +254,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         // Ensure we have a valid user timezone
         console.log("API: /booking/create: Final booking date value:", bookingDateValue);
 
+        const bookingRecord = {
+          user_email: bookingData.userEmail,
+          booking_date: bookingDateValue,
+          user_timezone: userTimezone,
+          frequency: BookingFrequency.Once,
+          status: PaymentOrderStatus.Pending,
+          checkout_order_id: orderId,
+          session_minutes: 60,
+          coach: bookingData.bookingPlan?.coach || 'MATIAS'
+        };
+
         // Create the booking record
         const { data: newBooking, error: createError } = await supabase
           .from('gvt_coach_meetings_bookings')
-          .insert([{
-            user_email: bookingData.userEmail,
-            booking_date: bookingDateValue,
-            frequency: bookingData.bookingPlan?.frequency || BookingFrequency.Once,
-            coach: bookingData.bookingPlan?.coach,
-            payment_status: PaymentOrderStatus.Pending,
-            checkout_completed: false,
-            payment_confirmed: false,
-            user_timezone: userTimezone,
-            checkout_order_id: orderId
-          }])
+          .insert([bookingRecord])
           .select()
           .single();
           

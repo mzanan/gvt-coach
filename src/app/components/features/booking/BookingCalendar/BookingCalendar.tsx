@@ -2,18 +2,16 @@
 
 import React, { useMemo } from 'react'
 import { useBookingCalendar } from './useBookingCalendar'
-import { Calendar } from '../Calendar/Calendar'
+import { Calendar } from '../Calendar'
 import { Button } from '@/app/components/ui-kit/button'
 import { ChevronDown, ChevronUp, Check, Loader2, Globe, User, DollarSign, Clock, CreditCard, CalendarIcon } from 'lucide-react'
 import { Card } from '@/app/components/ui-kit/card'
 import { DateTime } from 'luxon'
-import { FrequencySelector } from '../FrequencySelector'
 import { CoachSelector } from '../CoachSelector'
-import { TimeZoneSelector } from '../TimeZoneSelector/TimeZoneSelector'
+import { TimeZoneSelector } from '../TimeZoneSelector'
 import { getBookingSummary, cn } from '@/lib/utils'
-import { BookingFrequency } from '@/types/enums'
 import { COACHES_CONFIG } from '@/config/coaches'
-import type { CoachId } from '@/config/coaches'
+
 
 // Memoized payment button component to reduce renders
 const PaymentButton = React.memo(({ onClick, isLoading }: { onClick: () => void, isLoading: boolean }) => (
@@ -77,7 +75,6 @@ export function BookingCalendar() {
     sections,
     activeSection,
     selectedDate,
-    suggestedDate,
     selectedSlot,
     availableSlots,
     bookingPlan,
@@ -88,66 +85,17 @@ export function BookingCalendar() {
     handleDateSelect,
     handleSlotSelect,
     handleSectionClick,
-    handleFrequencySelect,
     handleCoachSelect,
     handleTimezoneChange,
-    handleBookingConfirm
+    handleBookingConfirm,
   } = useBookingCalendar()
 
   // Memoize summary rendering to avoid repeated calculations
   const summaryContent = useMemo(() => {
-    if (!bookingPlan || !selectedSlot) return null;
-    
-    if (bookingPlan.frequency === BookingFrequency.TwiceWeekly) {
-      const firstSlotDate = bookingPlan?.firstSlot?.date
-      const secondSlotDate = bookingPlan?.secondSlot?.date
-  
-      if (!firstSlotDate || !secondSlotDate) return null
-  
-      // Calculate total price (months x price per month)
-      const coach = bookingPlan.coach as CoachId;
-      const totalPrice = coach && bookingPlan.duration 
-        ? bookingPlan.duration * COACHES_CONFIG[coach].prices.twiceWeekly 
-        : 0;
-  
-      return (
-        <div className="flex justify-center">
-          <div className="space-y-4 text-left">
-            <div className="space-y-2">
-              <p>{getBookingSummary(
-                firstSlotDate,
-                BookingFrequency.TwiceWeekly,
-                bookingPlan.duration,
-                true,
-                selectedTimezone,
-                secondSlotDate
-              )}</p>
-              <p>Coach: {coach ? COACHES_CONFIG[coach].displayName : ''}</p>
-              <p>Duration: {bookingPlan.duration} {bookingPlan.duration === 1 ? 'month' : 'months'}</p>
-              <p className="mt-4">Starting from {DateTime.fromJSDate(firstSlotDate).toFormat('MMMM d, yyyy')}</p>
-              <p>Ending on {DateTime.fromJSDate(secondSlotDate)
-                .plus({ months: bookingPlan.duration })
-                .toFormat('MMMM d, yyyy')}</p>
-              <p className="mt-2 font-medium">Total Price: ${totalPrice}</p>
-            </div>
-            <div className="flex justify-center mt-6">
-              <PaymentButton onClick={handleBookingConfirm} isLoading={isBookingLoading} />
-            </div>
-          </div>
-        </div>
-      )
-    }
-  
-    // Get price based on coach and frequency
-    let price = 0;
-    const coach = bookingPlan.coach as CoachId;
-    if (coach) {
-      if (bookingPlan.frequency === BookingFrequency.Once) {
-        price = COACHES_CONFIG[coach].prices.singleSession;
-      } else if (bookingPlan.frequency === BookingFrequency.Weekly) {
-        price = COACHES_CONFIG[coach].prices.weekly;
-      }
-    }
+    if (!bookingPlan || !selectedSlot || !bookingPlan.coach) return null;
+   
+    const coach = bookingPlan.coach;
+    const price = COACHES_CONFIG[coach].prices.singleSession;
   
     return (
       <div className="space-y-6">
@@ -162,7 +110,7 @@ export function BookingCalendar() {
                 <div>
                   <h3 className="text-lg font-medium">Session Details</h3>
                   <p className="text-muted-foreground">
-                    {getBookingSummary(selectedSlot.date, bookingPlan.frequency || BookingFrequency.Once, bookingPlan.duration, true, selectedTimezone)}
+                    {getBookingSummary(selectedSlot.date, true, selectedTimezone)}
                   </p>
                 </div>
               </div>
@@ -229,29 +177,9 @@ export function BookingCalendar() {
     switch (sectionId) {
       case 'coach':
         return (
-          <CoachSelector
-            selectedCoach={bookingPlan.coach as CoachId | undefined}
+          <CoachSelector 
             onCoachSelect={handleCoachSelect}
-          />
-        )
-      case 'frequency':
-        // Get the price based on selected coach or default to 100
-        const coachFreq = bookingPlan.coach as CoachId;
-        const singleSessionPrice = coachFreq 
-          ? COACHES_CONFIG[coachFreq].prices.singleSession 
-          : 100;
-          
-        // This section is currently skipped in the flow
-        // Future implementation will allow users to select different frequencies
-        // Currently, only "Single Session" (ONCE) frequency is supported
-        return (
-          <FrequencySelector 
-            onFrequencySelect={handleFrequencySelect} 
-            selectedFrequency={bookingPlan?.frequency}
-            disableWeekly={true}
-            disableTwiceWeekly={true}
-            singleSessionPrice={singleSessionPrice}
-            selectedCoach={coachFreq}
+            selectedCoach={bookingPlan.coach}
           />
         )
       case 'date':
@@ -260,10 +188,8 @@ export function BookingCalendar() {
             onSelectDate={handleDateSelect}
             selectedDate={selectedDate}
             bookedDates={bookedDates}
-            frequency={bookingPlan?.frequency}
-            suggestedDate={suggestedDate}
             selectedTimezone={selectedTimezone}
-            selectedCoach={bookingPlan.coach as CoachId || CoachId.Matias}
+            selectedCoach={bookingPlan.coach || 'MATIAS'}
           />
         )
       case 'time':
@@ -310,10 +236,10 @@ export function BookingCalendar() {
               );
             })}
             
-            {/* Coach working hours explanation - shown AFTER the time slots */}
+            {/* Coach working hours explanation */}
             <div className="mt-6 p-4 bg-muted/30 rounded-lg">
               {(() => {
-                const coach = bookingPlan.coach as CoachId || CoachId.Matias;
+                const coach = bookingPlan.coach || 'MATIAS';
                 return (
                   <p className="text-sm text-muted-foreground">
                     These time slots are available based on {COACHES_CONFIG[coach].displayName}&apos;s working hours in their timezone ({COACHES_CONFIG[coach].timezone}, UTC{DateTime.now().setZone(COACHES_CONFIG[coach].timezone).toFormat('ZZ')}).
@@ -348,31 +274,28 @@ export function BookingCalendar() {
       </div>
       
       {sections
-        // Filter out the frequency section as it's not needed in current implementation
-        .filter(section => section.id !== 'frequency')
         .map((section) => {
-        const sectionIndex = sections.findIndex(s => s.id === section.id)
-        const previousSectionsCompleted = sections
-          .slice(0, sectionIndex)
-          .every(s => s.completed)
+          const sectionIndex = sections.findIndex(s => s.id === section.id)
+          const previousSectionsCompleted = sections
+            .slice(0, sectionIndex)
+            .every(s => s.completed)
           
-        // Make date section always available when coach is selected
-        const isAvailable = 
-          section.id === 'date' && bookingPlan?.coach 
-            ? true 
-            : previousSectionsCompleted
+          const isAvailable = 
+            section.id === 'date' && bookingPlan?.coach 
+              ? true 
+              : previousSectionsCompleted
 
-        return (
-          <MemoizedBookingSection 
-            key={section.id} 
-            section={section}
-            activeSection={activeSection}
-            isAvailable={isAvailable}
-            onSectionClick={handleSectionClick}
-            renderContent={() => renderSectionContent(section.id)}
-          />
-        )
-      })}
+          return (
+            <MemoizedBookingSection 
+              key={section.id} 
+              section={section}
+              activeSection={activeSection}
+              isAvailable={isAvailable}
+              onSectionClick={handleSectionClick}
+              renderContent={() => renderSectionContent(section.id)}
+            />
+          )
+        })}
     </div>
   )
 }

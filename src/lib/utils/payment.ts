@@ -1,22 +1,5 @@
-import { BookingFrequency as SuperbaseBookingFrequency } from '@/types/enums';
-import { BookingFrequency as AppBookingFrequency } from '@/types/enums';
 import { getClientCookie } from './cookies'
 
-/**
- * Helper function to convert between BookingFrequency types
- */
-export function convertBookingFrequency(frequency: SuperbaseBookingFrequency): AppBookingFrequency {
-  switch (frequency) {
-    case SuperbaseBookingFrequency.Once:
-      return AppBookingFrequency.Once;
-    case SuperbaseBookingFrequency.Weekly:
-      return AppBookingFrequency.Weekly;
-    case SuperbaseBookingFrequency.TwiceWeekly:
-      return AppBookingFrequency.TwiceWeekly;
-    default:
-      return AppBookingFrequency.Once; // Default fallback
-  }
-}
 
 /**
  * Get user data from cookies

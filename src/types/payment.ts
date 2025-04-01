@@ -9,7 +9,6 @@ export interface CheckoutPayload {
     frequency: BookingFrequency;
     duration: string;
     firstSlot: { date: string } | null;
-    secondSlot: { date: string } | null;
     bookingId?: string;
   };
 }
@@ -74,5 +73,5 @@ export interface PaymentProviderService {
     storePendingBooking?: boolean
   ) => Promise<CheckoutResponse>;
   
-  getVariantIdForBookingPlan: (frequency: string) => string | null;
+  getVariantIdForBookingPlan: (frequency: BookingFrequency) => string | null;
 } 

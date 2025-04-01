@@ -2,7 +2,6 @@ import { DateTime } from 'luxon'
 import { supabase } from '@/lib/supabase/client'
 import { BookingDB } from '@/types/booking'
 import { GroupedTimeSlots, TimeSlot } from '@/types/booking'
-import { BookingFrequency } from '@/types/enums'
 import { CoachId, COACHES_CONFIG } from '@/config/coaches'
 
 const cache = {
@@ -60,7 +59,6 @@ export const bookingService = {
         .from('gvt_coach_meetings_bookings')
         .select(`
           booking_date, 
-          recurring_time,
           id,
           checkout_order_id
         `)
@@ -231,108 +229,92 @@ export const bookingService = {
     
     const { data: bookings } = await supabase
       .from('gvt_coach_meetings_bookings')
-      .select(`
-        id,
-        booking_date, 
-        frequency, 
-        duration,
-        user_email,
-        meet_link,
-        recurring_day, 
-        recurring_time, 
-        end_date,
-        checkout_order_id
-      `)
-      .or(`frequency.eq.once,frequency.neq.once`)
+      // Select only needed fields: booking_date and checkout_order_id for payment check
+      .select(`booking_date, checkout_order_id`) 
       .gte('booking_date', startOfMonth.toISO())
       .lte('booking_date', endOfMonth.toISO());
 
     if (!bookings) {
-      throw new Error('Failed to fetch bookings');
+      cache.bookedDates = { data: [] };
+      return [];
     }
 
-    // Get payment statuses
-    const orderIds = bookings.map(booking => booking.checkout_order_id).filter(Boolean);
-    
-    let validBookings = bookings;
-    
-    if (orderIds.length > 0) {
-      // The previous query tried to get checkout_order_id from gvt_coach_payments_status, which is incorrect
-      // First, get the mappings that contain payment_status_id for the checkout_order_id we have
-      const { data: checkoutMappings } = await supabase
-        .from('gvt_coach_checkout_mapping')
-        .select('checkout_order_id, payment_status_id')
-        .in('checkout_order_id', orderIds);
-      
-      if (checkoutMappings && checkoutMappings.length > 0) {
-        // Then, get the payment statuses using payment_status_id
-        const paymentStatusIds = checkoutMappings.map(mapping => mapping.payment_status_id).filter(Boolean);
-        
-        const { data: paymentStatuses } = await supabase
-          .from('gvt_coach_payments_status')
-          .select('id, status')
-          .in('id', paymentStatusIds)
-          .eq('status', 'PAID');
-        
-        if (paymentStatuses) {
-          // Create a set of payment_status_id that have PAID status
-          const paidStatusIds = new Set(paymentStatuses.map(ps => ps.id));
+    // Define type for booking data selected
+    type BookingSelection = { 
+      booking_date: string; 
+      checkout_order_id: string | null; 
+    };
+
+    // Filter bookings by payment status (Simplified approach)
+    let validBookings: BookingSelection[] = []; // Explicitly type the array
+    if (bookings.length > 0) {
+      const bookingsWithOrderId = bookings.filter(b => b.checkout_order_id);
+      if (bookingsWithOrderId.length > 0) {
+        const orderIds = bookingsWithOrderId.map(b => b.checkout_order_id);
+        // Fetch mappings for these order IDs
+        const { data: checkoutMappings } = await supabase
+          .from('gvt_coach_checkout_mapping')
+          .select('checkout_order_id, payment_status_id')
+          .in('checkout_order_id', orderIds);
           
-          // Filter checkout_order_id that have a payment_status_id with PAID status
-          const validOrderIds = new Set(
-            checkoutMappings
-              .filter(mapping => mapping.payment_status_id && paidStatusIds.has(mapping.payment_status_id))
-              .map(mapping => mapping.checkout_order_id)
-          );
-          
-          validBookings = bookings.filter(booking => 
-            booking.checkout_order_id && validOrderIds.has(booking.checkout_order_id)
-          );
-        }
-      }
-    }
-
-    const singleBookings = validBookings.filter(b => b.frequency === BookingFrequency.Once);
-    const recurringBookings = validBookings.filter(b => b.frequency !== BookingFrequency.Once);
-
-    const bookingsByDate = new Map<string, number>();
-    const TOTAL_SLOTS_PER_DAY = 9;
-
-    singleBookings.forEach(booking => {
-      const dateStr = DateTime.fromISO(booking.booking_date).toFormat('yyyy-MM-dd');
-      bookingsByDate.set(dateStr, (bookingsByDate.get(dateStr) || 0) + 1);
-    });
-
-    for (let d = startOfMonth; d <= endOfMonth; d = d.plus({ days: 1 })) {
-      const dateStr = d.toFormat('yyyy-MM-dd');
-      let currentCount = bookingsByDate.get(dateStr) || 0;
-
-      recurringBookings.forEach(booking => {
-        if (booking.recurring_day === d.weekdayLong) {
-          const startDate = DateTime.fromISO(booking.booking_date);
-          const endDate = booking.end_date ? DateTime.fromISO(booking.end_date) : null;
-          
-          if (d >= startDate && (!endDate || d <= endDate)) {
-            currentCount++;
+        if (checkoutMappings && checkoutMappings.length > 0) {
+          const paymentStatusIds = checkoutMappings
+            .filter(mapping => mapping.payment_status_id)
+            .map(mapping => mapping.payment_status_id);
+            
+          if (paymentStatusIds.length > 0) {
+            // Find which payment statuses are PAID
+            const { data: paymentStatuses } = await supabase
+              .from('gvt_coach_payments_status')
+              .select('id, status')
+              .in('id', paymentStatusIds)
+              .eq('status', 'PAID');
+              
+            if (paymentStatuses && paymentStatuses.length > 0) {
+              const paidStatusIds = new Set(paymentStatuses.map(ps => ps.id));
+              // Get order IDs corresponding to PAID statuses
+              const paidOrderIds = new Set(
+                checkoutMappings
+                  .filter(mapping => mapping.payment_status_id && paidStatusIds.has(mapping.payment_status_id))
+                  .map(mapping => mapping.checkout_order_id)
+              );
+              // Filter the original bookings to keep only those with PAID order IDs
+              validBookings = bookings.filter(booking => 
+                booking.checkout_order_id && paidOrderIds.has(booking.checkout_order_id)
+              );
+            }
           }
         }
-      });
-
-      if (currentCount > 0) {
-        bookingsByDate.set(dateStr, currentCount);
       }
     }
 
-    const result = Array.from(bookingsByDate.entries())
-      .filter(([, count]) => count >= TOTAL_SLOTS_PER_DAY)
-      .map(([dateStr]) => ({
-        date: DateTime.fromFormat(dateStr, 'yyyy-MM-dd').toJSDate(),
-        fullyBooked: true
-      }));
+    const bookingsByDate = new Map<string, number>();
+    const TOTAL_SLOTS_PER_DAY = 9; // Assuming 9 slots per day
+
+    // Count all valid bookings per date
+    validBookings.forEach(booking => {
+      try {
+        const dateStr = DateTime.fromISO(booking.booking_date).toFormat('yyyy-MM-dd');
+        bookingsByDate.set(dateStr, (bookingsByDate.get(dateStr) || 0) + 1);
+      } catch (e) { console.error("Error parsing booking date in count:", booking.booking_date, e); }
+    });
+
+    const fullyBookedDates: Array<{ date: Date, fullyBooked: boolean }> = [];
     
-    // Finally, save the results in cache
-    cache.bookedDates = {data: result};
-    return result;
+    // Check each day in the month
+    for (let d = startOfMonth; d <= endOfMonth; d = d.plus({ days: 1 })) {
+      const dateStr = d.toFormat('yyyy-MM-dd');
+      const currentCount = bookingsByDate.get(dateStr) || 0;
+      
+      fullyBookedDates.push({
+        date: d.toJSDate(),
+        fullyBooked: currentCount >= TOTAL_SLOTS_PER_DAY
+      });
+    }
+
+    // Cache and return the result
+    cache.bookedDates = { data: fullyBookedDates };
+    return fullyBookedDates;
   },
 
   clearTimeSlotsCache: () => {

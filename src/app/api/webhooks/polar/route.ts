@@ -592,5 +592,3 @@ async function createZoomMeetingForBooking(booking: Record<string, unknown>, log
     console.error(`[${logId}] Zoom - General error creating meeting:`, error);
   }
 }
-
-export default POST;

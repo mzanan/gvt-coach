@@ -3,7 +3,7 @@ import { CheckoutResponse, PaymentProviderService } from '@/types/payment';
 import { BookingFrequency } from '@/types/enums';
 import { DateTime } from 'luxon';
 import { getClientCookie, setClientCookie } from '@/lib/utils/cookies';
-import { UserProfile } from '@/types/user';
+import { UserProfile } from '../../../types/user';
 
 export const lemonSqueezyService: PaymentProviderService = {
   createCheckout: async (
@@ -161,53 +161,12 @@ export const lemonSqueezyService: PaymentProviderService = {
     }
   },
 
-  getVariantIdForBookingPlan(frequency: string): string | null {
-    console.log('LemonSqueezy booking frequency:', frequency);
+  getVariantIdForBookingPlan: (frequency: BookingFrequency): string | null => {
+    const variantId = process.env.NEXT_PUBLIC_GVT_COACH_LEMONSQUEEZY_SINGLE_SESSION_VARIANT_ID;
     
-    switch (frequency) {
-      case BookingFrequency.Once:
-        // First try server-side environment variable, then fall back to public one
-        const singleSessionVariantId = process.env.GVT_COACH_LEMONSQUEEZY_SINGLE_SESSION_VARIANT_ID || 
-                                    process.env.NEXT_PUBLIC_GVT_COACH_LEMONSQUEEZY_SINGLE_SESSION_VARIANT_ID;
-        
-        if (!singleSessionVariantId) {
-          console.error('Missing GVT_COACH_LEMONSQUEEZY_SINGLE_SESSION_VARIANT_ID environment variable');
-          return null;
-        }
-        
-        // Log available environment variables for debugging
-        console.log('Environment variables:', {
-          singleSessionVariantId,
-          storeId: process.env.NEXT_PUBLIC_GVT_COACH_LEMONSQUEEZY_STORE_ID
-        });
-        
-        return singleSessionVariantId;
-        
-      case BookingFrequency.Weekly:
-        // First try server-side environment variable, then fall back to public one
-        const weeklyVariantId = process.env.GVT_COACH_LEMONSQUEEZY_WEEKLY_VARIANT_ID || 
-                             process.env.NEXT_PUBLIC_GVT_COACH_LEMONSQUEEZY_WEEKLY_VARIANT_ID;
-        
-        if (!weeklyVariantId) {
-          console.error('Missing GVT_COACH_LEMONSQUEEZY_WEEKLY_VARIANT_ID environment variable');
-          return null;
-        }
-        return weeklyVariantId;
-        
-      case BookingFrequency.TwiceWeekly:
-        // First try server-side environment variable, then fall back to public one
-        const twiceWeeklyVariantId = process.env.GVT_COACH_LEMONSQUEEZY_TWICE_WEEKLY_VARIANT_ID || 
-                                  process.env.NEXT_PUBLIC_GVT_COACH_LEMONSQUEEZY_TWICE_WEEKLY_VARIANT_ID;
-        
-        if (!twiceWeeklyVariantId) {
-          console.error('Missing GVT_COACH_LEMONSQUEEZY_TWICE_WEEKLY_VARIANT_ID environment variable');
-          return null;
-        }
-        return twiceWeeklyVariantId;
-        
-      default:
-        console.error(`Unsupported booking frequency: ${frequency}`);
-        return null;
+    if (frequency === BookingFrequency.Once && variantId) {
+      return variantId;
     }
+    return null; 
   }
 }; 
