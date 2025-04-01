@@ -186,28 +186,32 @@ export function getBookingSummary(
 }
 
 /**
- * Gets the origin URL based on the server parameter or environment
+ * Gets the origin URL based on the server parameter or environment.
+ * Prioritizes NEXT_PUBLIC_APP_URL environment variable.
+ * Throws an error if NEXT_PUBLIC_APP_URL is not defined and no valid server parameter is provided.
  * @param server Optional server parameter to determine the environment
  * @returns The origin URL for the current environment
  */
 export function getRequestOrigin(server = ''): string {
-  // Check if a server parameter was provided
+  // Check if a server parameter was provided and use it if valid
   if (server) {
-    // If the server includes our production domain, use it
     if (server.includes('gvt.academy')) {
       return `https://${server}`;
     }
-    // Otherwise, it's a custom server (like localhost)
-    return server.startsWith('http') ? server : `http://${server}`;
+    // Allow localhost or explicit http/https for the server parameter
+    if (server.startsWith('localhost') || server.startsWith('http')) {
+      return server.startsWith('http') ? server : `http://${server}`;
+    }
+    // If server param is provided but not recognized, proceed to env var check
   }
   
-  // If no server parameter, determine from environment
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    return process.env.NEXT_PUBLIC_APP_URL;
+  // If no valid server parameter, require NEXT_PUBLIC_APP_URL
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+  if (!appUrl) {
+    console.error('Configuration Error: NEXT_PUBLIC_APP_URL environment variable is not defined.');
+    throw new Error('Application URL configuration is missing. Please set NEXT_PUBLIC_APP_URL.');
   }
   
-  // Default to localhost in development
-  return process.env.NEXT_PUBLIC_ENV === 'production'
-    ? 'https://gvt.academy'
-    : 'http://localhost:3000';
+  return appUrl;
 } 

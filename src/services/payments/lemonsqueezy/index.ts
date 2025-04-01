@@ -12,7 +12,12 @@ export const lemonSqueezyService: PaymentProviderService = {
     storePendingBooking = false
   ): Promise<CheckoutResponse> => {
     try {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      // Validate APP_URL
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+      if (!appUrl) {
+        console.error('Missing NEXT_PUBLIC_APP_URL environment variable.');
+        throw new Error('Application URL configuration is missing.');
+      }
       
       // Get user email
       const userEmail = userProfile?.email || getClientCookie('user_email') || '';

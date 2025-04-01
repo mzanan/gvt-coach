@@ -13,6 +13,10 @@ interface BookingData {
   // Add other potential fields if known
 }
 
+interface PolarBookingData {
+  // ... (interface definition)
+}
+
 /**
  * Get a configured Polar client
  */
@@ -54,23 +58,20 @@ export async function POST(req: NextRequest) {
 }
 
 export async function createPolarCheckout(productId: string, bookingData: BookingData): Promise<{ checkoutUrl: string, orderId: string }> {
-  // Usar las variables de entorno existentes
   const isSandbox = process.env.NEXT_PUBLIC_ENV !== 'production';
-  const polarAccessToken = isSandbox 
-    ? process.env.GVT_COACH_POLAR_SANDBOX_ACCESS_TOKEN 
+  const polarAccessToken = isSandbox
+    ? process.env.GVT_COACH_POLAR_SANDBOX_ACCESS_TOKEN
     : process.env.GVT_COACH_POLAR_PRODUCTION_ACCESS_TOKEN;
-  
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  
-  // Loguear la configuración para debugging
-  console.log('Polar checkout configuration:', {
-    isSandbox,
-    hasToken: !!polarAccessToken,
-    tokenPrefix: polarAccessToken?.substring(0, 10),
-    environment: process.env.NEXT_PUBLIC_ENV
-  });
-  
+
+  // Validate APP_URL
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!appUrl) {
+    console.error('Missing NEXT_PUBLIC_APP_URL environment variable.');
+    throw new Error('Application URL configuration is missing.');
+  }
+
   if (!polarAccessToken) {
+    console.error('Polar Access Token is missing in environment variables.');
     throw new Error('Polar API credentials not configured: Missing access token');
   }
   
