@@ -1,7 +1,6 @@
 import { BookingPlan } from '@/types/booking';
 import { UserProfile } from '../../../types/user';
 import { CheckoutResponse, PaymentProviderService } from '@/types/payment';
-import { BookingFrequency } from '@/types/enums';
 import { DateTime } from 'luxon';
 import { getClientCookie, setClientCookie } from '@/lib/utils/cookies';
 import { getPolarProductId } from '@/lib/utils/productIds';

@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
             let bookingDateValue: string | null = null;
             try {
               bookingDateValue = bookingData.utcDate || new Date(bookingData.selectedDate).toISOString();
-            } catch (e) { 
+            } catch { 
               console.error("Invalid date format:", bookingData.selectedDate); 
             }
 

@@ -1,6 +1,5 @@
 import { BookingPlan } from '@/types/booking';
 import { CheckoutResponse, PaymentProviderService } from '@/types/payment';
-import { BookingFrequency } from '@/types/enums';
 import { getClientCookie, setClientCookie } from '@/lib/utils/cookies';
 import { UserProfile } from '../../../types/user';
 import { DateTime } from 'luxon';
@@ -152,7 +151,7 @@ export const lemonSqueezyService: PaymentProviderService = {
       throw error;
     }
   },
-  getVariantIdForBookingPlan: (frequency: BookingFrequency): string | null => {
+  getVariantIdForBookingPlan: (): string | null => {
     console.warn("lemonSqueezyService.getVariantIdForBookingPlan called directly, consider using getLemonSqueezyVariantId helper.");
     return null;
   }

@@ -73,5 +73,5 @@ export interface PaymentProviderService {
     storePendingBooking?: boolean
   ) => Promise<CheckoutResponse>;
   
-  getVariantIdForBookingPlan: (frequency: BookingFrequency) => string | null;
+  getVariantIdForBookingPlan: () => string | null;
 } 

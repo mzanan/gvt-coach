@@ -34,9 +34,6 @@ export function PaymentSuccess() {
         description="This will be updated automatically when your payment is processed. Please don't close this page."
         orderId={orderId}
         fallbackText="Processing your payment. If you've completed checkout, please wait a moment."
-        loadingRefresh={false}
-        onRefresh={() => {}}
-        loadingButtonText="Checking..."
       />
     )
   }
