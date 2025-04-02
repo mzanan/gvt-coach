@@ -259,9 +259,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           booking_date: bookingDateValue,
           user_timezone: userTimezone,
           frequency: BookingFrequency.Once,
-          status: PaymentOrderStatus.Pending,
           checkout_order_id: orderId,
-          session_minutes: 60,
+          duration: 60,
           coach: bookingData.bookingPlan?.coach || 'MATIAS'
         };
 

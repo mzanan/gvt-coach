@@ -40,10 +40,12 @@ export function TimeZoneSelector(props: TimeZoneSelectorProps) {
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="justify-between w-[250px]"
+          className="justify-between max-w-xs w-full"
           size="sm"
         >
-          {currentTimezoneLabel}
+          <span className="truncate">
+            {currentTimezoneLabel}
+          </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>

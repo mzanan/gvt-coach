@@ -181,7 +181,6 @@ export function useBookingCalendar() {
     
     try {
       setSections(prev => prev.map(s => s.id === 'date' ? { ...s, completed: true } : s));
-      console.log('[handleDateSelect] Setting active section to: time');
       setActiveSection('time');
         
       fetchAvailableSlots(

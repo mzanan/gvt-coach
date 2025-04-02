@@ -262,9 +262,9 @@ export function BookingCalendar() {
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold">Book a Consultation</h2>
-          <div className="flex items-center space-x-2">
+      <div className="flex justify-between items-center gap-4">
+        <h2 className="text-2xl font-semibold shrink">Book a Consultation</h2>
+          <div className="flex items-center space-x-2 shrink-0">
             <Globe className="h-4 w-4 text-muted-foreground" />
             <TimeZoneSelector 
               currentTimezone={selectedTimezone}

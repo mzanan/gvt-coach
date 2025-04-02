@@ -365,7 +365,7 @@ async function processWebhookEvent(body: WebhookPayload) {
           id,
           user_email,
           booking_date,
-          session_minutes, 
+          duration,
           meet_link,
           user_name,
           user_timezone,
@@ -397,7 +397,7 @@ async function processWebhookEvent(body: WebhookPayload) {
                 booking.user_email,
                 {
                   start_time: booking.booking_date,
-                  end_time: new Date(new Date(booking.booking_date as string).getTime() + ((booking.session_minutes as number) || 60) * 60000),
+                  end_time: new Date(new Date(booking.booking_date as string).getTime() + ((booking.duration as number) || 60) * 60000),
                   zoom_link: (booking.meet_link as string),
                   user_name: booking.user_name as string,
                   booking_id: booking.id as string,
@@ -507,7 +507,8 @@ async function createZoomMeetingForBooking(booking: Record<string, unknown>, log
           return;
       }
       
-      const durationMinutes = (booking.duration as number) || (booking.session_minutes as number) || 60;
+      // Use duration from booking, fallback to 60
+      const durationMinutes = (booking.duration as number) || 60;
       
       console.log(`[${logId}] Zoom - Creating meeting for ${meetingTime.toISOString()} with duration ${durationMinutes} minutes`);
       

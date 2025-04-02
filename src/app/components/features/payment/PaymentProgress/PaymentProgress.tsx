@@ -47,27 +47,6 @@ export function PaymentProgress({
             <p className="text-xs text-muted-foreground mb-4">
               Checkout ID: {orderId}
             </p>
-            {refreshButtonText && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={onRefresh}
-                disabled={loadingRefresh}
-                className="mt-2"
-              >
-                {loadingRefresh ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {loadingButtonText}
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    {refreshButtonText}
-                  </>
-                )}
-              </Button>
-            )}
           </div>
         ) : (
           <p className="text-xs text-muted-foreground mt-2">

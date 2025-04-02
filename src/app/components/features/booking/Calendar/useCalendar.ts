@@ -7,7 +7,6 @@ import { CoachId, COACHES_CONFIG } from '@/config/coaches'
 interface UseCalendarProps {
   onSelectDate: (date: Date) => void
   selectedDate: Date | null
-  bookedDates: Array<{ date: Date, fullyBooked: boolean }>
   suggestedDate?: Date | null
   selectedTimezone: string
   selectedCoach: CoachId
@@ -16,7 +15,6 @@ interface UseCalendarProps {
 export function useCalendar({
   onSelectDate,
   selectedDate,
-  bookedDates,
   suggestedDate,
   selectedTimezone,
   selectedCoach
@@ -30,7 +28,6 @@ export function useCalendar({
 
   // --- Memoized calculations and Callbacks (Moved from Calendar.tsx) ---
   const getDaysInMonth = useCallback((date: DateTime): DateTime[] => {
-    // (Implementation from Calendar.tsx)
     const year = date.year;
     const month = date.month;
     const firstDayOfMonth = DateTime.local(year, month, 1);
@@ -92,40 +89,38 @@ export function useCalendar({
     return date.startOf('day').hasSame(suggested, 'day');
   }, [suggestedDate, selectedTimezone]);
 
-  const isFullyBooked = useCallback((date: DateTime) => {
-    return bookedDates.some(bookedDateInfo => {
-      const bookedDateTime = DateTime.fromJSDate(bookedDateInfo.date)
-        .setZone(selectedTimezone) // Ensure comparison is in user's timezone context
-        .startOf('day');
-      return date.startOf('day').hasSame(bookedDateTime, 'day');
-    });
-  }, [bookedDates, selectedTimezone]);
-
   const isDisabled = useCallback((date: DateTime) => {
     const coachTimezone = COACHES_CONFIG[selectedCoach].timezone;
     const coachNow = DateTime.now().setZone(coachTimezone);
     const calendarDateInUserTZ = date.setZone(selectedTimezone).startOf('day');
     const calendarDateInCoachTZ = calendarDateInUserTZ.setZone(coachTimezone);
-    const coachToday = coachNow.startOf('day');
-    const isBooked = isFullyBooked(date);
+    const coachTomorrow = coachNow.startOf('day').plus({ days: 1 }); 
 
-    if (calendarDateInCoachTZ > coachToday) {
-      return isBooked; // Future dates are disabled only if booked
+    // Check if the calendar date (in coach's TZ) is ON OR AFTER the coach's tomorrow
+    if (calendarDateInCoachTZ >= coachTomorrow) {
+      return false; 
     }
     
-    // Disable today and past dates in coach timezone
-    return true;
-  }, [selectedTimezone, selectedCoach, isFullyBooked]);
+    // Otherwise (it's today or earlier in coach's timezone)
+    return true; // Disable past dates and coach's current day
+  }, [selectedTimezone, selectedCoach]);
 
   const isCurrentMonth = useCallback((date: DateTime) => {
     return date.hasSame(currentMonth, 'month');
   }, [currentMonth]);
 
   const handleDateSelect = useCallback((date: DateTime) => {
-    if (!isDisabled(date)) {
-      onSelectDate(date.toJSDate());
+    const correctDateInSelectedTZ = DateTime.local(
+      date.year,
+      date.month,
+      date.day, 
+      { zone: selectedTimezone }
+    );
+
+    if (!isDisabled(date)) { 
+      onSelectDate(correctDateInSelectedTZ.toJSDate());
     }
-  }, [isDisabled, onSelectDate]);
+  }, [isDisabled, onSelectDate, selectedTimezone, selectedCoach]);
 
 
   // --- Return values ---
