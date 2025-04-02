@@ -4,6 +4,7 @@ import { CheckoutResponse, PaymentProviderService } from '@/types/payment';
 import { BookingFrequency } from '@/types/enums';
 import { DateTime } from 'luxon';
 import { getClientCookie, setClientCookie } from '@/lib/utils/cookies';
+import { getPolarProductId } from '@/lib/utils/productIds';
 
 export const polarService: PaymentProviderService = {
   async createCheckout(
@@ -20,13 +21,14 @@ export const polarService: PaymentProviderService = {
       
       const userEmail = userProfile?.email || getClientCookie('user_email') || '';
 
-      const frequencyString = bookingPlan.frequency;
-      if (!frequencyString) {
-        throw new Error('Invalid booking plan frequency: frequency is null');
+      const selectedCoach = bookingPlan.coach;
+      if (!selectedCoach) {
+        throw new Error('Coach not specified in booking plan');
       }
-      const variantId = polarService.getVariantIdForBookingPlan(frequencyString);
-      if (!variantId) {
-        throw new Error(`Invalid booking plan frequency or no variant ID found for: ${frequencyString}`);
+
+      const productId = getPolarProductId(selectedCoach);
+      if (!productId) {
+        throw new Error(`No valid Polar product ID found for coach ${selectedCoach}`);
       }
       
       const reliableUserTimezone = getClientCookie('user_timezone') || 
@@ -62,9 +64,7 @@ export const polarService: PaymentProviderService = {
       // Prepare booking data
       const bookingData = {
         userEmail,
-        bookingPlan: {
-          frequency: bookingPlan.frequency
-        },
+        bookingPlan: bookingPlan,
         selectedDate,
         utcDate: utcDateString,
         selectedTimezone: reliableUserTimezone
@@ -74,13 +74,14 @@ export const polarService: PaymentProviderService = {
       setClientCookie('pending_booking', bookingData);
       
       // Call the checkout API
+      console.log('Calling /api/checkout with:', { productId, bookingData, storePendingBooking });
       const response = await fetch(`${appUrl}/api/checkout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          variantId,
+          productId,
           bookingData,
           provider: 'polar',
           storePendingBooking
@@ -88,13 +89,13 @@ export const polarService: PaymentProviderService = {
       });
       
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Checkout error:', errorText);
-        throw new Error('Failed to create checkout');
+        const errorData = await response.text();
+        console.error('Polar Checkout error:', errorData);
+        throw new Error('Failed to create Polar checkout');
       }
       
-      const responseData = await response.json();
-      const { checkoutUrl, orderId } = responseData;
+      const { checkoutUrl, orderId } = await response.json();
+      console.log('Polar Checkout created successfully:', { checkoutUrl, orderId });
       
       if (storePendingBooking) {
         try {
@@ -127,7 +128,7 @@ export const polarService: PaymentProviderService = {
                     .toISO() : 
                   pendingBookingData?.selectedDate,
                 selectedTimezone: pendingBookingData?.selectedTimezone || userProfile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
-                productId: variantId
+                productId: productId
               },
               provider: 'polar'
             };
@@ -169,17 +170,13 @@ export const polarService: PaymentProviderService = {
         orderId
       };
     } catch (error) {
-      console.error('Checkout error:', error);
+      console.error('Polar Checkout error:', error);
       throw error;
     }
   },
 
-  getVariantIdForBookingPlan: (frequency: BookingFrequency): string | null => {
-    const productId = process.env.NEXT_PUBLIC_GVT_COACH_POLAR_SINGLE_SESSION_PRODUCT_ID;
-    
-    if (frequency === BookingFrequency.Once && productId) {
-      return productId;
-    }
+  getVariantIdForBookingPlan: (): string | null => {
+    console.warn("Polar service doesn't use getVariantIdForBookingPlan directly in this setup.");
     return null;
   }
 }; 

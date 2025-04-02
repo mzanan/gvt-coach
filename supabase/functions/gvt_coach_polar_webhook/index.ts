@@ -1,8 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
-// ADD: Import crypto if needed for Zoom token generation (like in Lemon)
-// import { crypto } from "https://deno.land/std@0.181.0/crypto/mod.ts"; // Use appropriate std version
 
 // Crear un client de Supabase
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -16,13 +14,6 @@ const PAYMENT_STATUS = {
   ACTIVE: 'ACTIVE',
   VOID: 'VOID',
   COMPLETED: 'COMPLETED'
-};
-
-// Define booking status constants to match the enum in the main app
-const BOOKING_STATUS = {
-  CONFIRMED: 'CONFIRMED',
-  PENDING: 'PENDING',
-  CANCELLED: 'CANCELLED'
 };
 
 // ADD: Function to get Zoom access token (copied from Lemon webhook)

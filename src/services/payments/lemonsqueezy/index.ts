@@ -1,9 +1,10 @@
 import { BookingPlan } from '@/types/booking';
 import { CheckoutResponse, PaymentProviderService } from '@/types/payment';
 import { BookingFrequency } from '@/types/enums';
-import { DateTime } from 'luxon';
 import { getClientCookie, setClientCookie } from '@/lib/utils/cookies';
 import { UserProfile } from '../../../types/user';
+import { DateTime } from 'luxon';
+import { getLemonSqueezyVariantId } from '@/lib/utils/productIds';
 
 export const lemonSqueezyService: PaymentProviderService = {
   createCheckout: async (
@@ -20,13 +21,18 @@ export const lemonSqueezyService: PaymentProviderService = {
       
       const userEmail = userProfile?.email || getClientCookie('user_email') || '';
       
-      const frequencyString = bookingPlan.frequency;
-      if (!frequencyString) {
+      const selectedCoach = bookingPlan.coach;
+      if (!selectedCoach) {
+        throw new Error('Coach not specified in booking plan');
+      }
+      const frequency = bookingPlan.frequency;
+      if (!frequency) {
         throw new Error('Invalid booking plan frequency: frequency is null');
       }
-      const variantId = lemonSqueezyService.getVariantIdForBookingPlan(frequencyString);
+
+      const variantId = getLemonSqueezyVariantId(selectedCoach, frequency);
       if (!variantId) {
-        throw new Error(`Invalid booking plan frequency or no variant ID found for: ${frequencyString}`);
+        throw new Error(`No valid Lemon Squeezy variant ID found for coach ${selectedCoach} and frequency ${frequency}`);
       }
 
       const slotTime = bookingPlan.firstSlot?.date;
@@ -67,7 +73,6 @@ export const lemonSqueezyService: PaymentProviderService = {
         selectedTimezone: reliableUserTimezone
       });
       
-      // Call the checkout API
       console.log('Calling /api/checkout with:', { variantId, bookingData, storePendingBooking });
       
       const response = await fetch(`${appUrl}/api/checkout`, {
@@ -87,19 +92,14 @@ export const lemonSqueezyService: PaymentProviderService = {
         const errorData = await response.text();
         console.error('Checkout error:', errorData);
         
-        // If we get a 422 error, try with minimal data
         if (response.status === 422) {
           console.log('Trying checkout with minimal data...');
           
-          // Create a minimal version of booking data
           const minimalBookingData = {
             userEmail,
-            bookingPlan: {
-              frequency: bookingPlan.frequency
-            }
+            bookingPlan: { frequency: bookingPlan.frequency, coach: bookingPlan.coach }
           };
           
-          // Try again with minimal data
           const retryResponse = await fetch(`${appUrl}/api/checkout`, {
             method: 'POST',
             headers: {
@@ -133,22 +133,14 @@ export const lemonSqueezyService: PaymentProviderService = {
       
       console.log('Checkout created successfully:', { checkoutUrl, orderId });
       
-      // Update the pendingBooking in cookie with the orderId
       try {
         const pendingBookingData = getClientCookie('pending_booking');
         if (pendingBookingData) {
-          const updatedBookingData = {
-            ...pendingBookingData,
-            orderId,
-            booking: {
-              ...pendingBookingData.booking,
-              checkout_order_id: orderId
-            }
-          };
+          const updatedBookingData = { ...pendingBookingData, orderId };
           setClientCookie('pending_booking', updatedBookingData);
         }
       } catch (e) {
-        console.error('Error updating pendingBooking with order IDs:', e);
+        console.error('Error updating pendingBooking with order ID:', e);
       }
 
       return {
@@ -156,17 +148,12 @@ export const lemonSqueezyService: PaymentProviderService = {
         orderId
       };
     } catch (error) {
-      console.error('Checkout error:', error);
+      console.error('Lemon Squeezy Checkout error:', error);
       throw error;
     }
   },
-
   getVariantIdForBookingPlan: (frequency: BookingFrequency): string | null => {
-    const variantId = process.env.NEXT_PUBLIC_GVT_COACH_LEMONSQUEEZY_SINGLE_SESSION_VARIANT_ID;
-    
-    if (frequency === BookingFrequency.Once && variantId) {
-      return variantId;
-    }
-    return null; 
+    console.warn("lemonSqueezyService.getVariantIdForBookingPlan called directly, consider using getLemonSqueezyVariantId helper.");
+    return null;
   }
 }; 

@@ -120,7 +120,7 @@ export function useCalendar({
     if (!isDisabled(date)) { 
       onSelectDate(correctDateInSelectedTZ.toJSDate());
     }
-  }, [isDisabled, onSelectDate, selectedTimezone, selectedCoach]);
+  }, [isDisabled, onSelectDate, selectedTimezone]);
 
 
   // --- Return values ---

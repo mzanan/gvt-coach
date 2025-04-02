@@ -1,7 +1,6 @@
 import { ReactNode } from 'react'
-import { Loader2, RefreshCw } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { Card } from "@/app/components/ui-kit/card"
-import { Button } from "@/app/components/ui-kit/button"
 
 interface PaymentProgressProps {
   icon: ReactNode
@@ -9,10 +8,6 @@ interface PaymentProgressProps {
   loadingText: string
   description: string
   orderId?: string | null | undefined
-  loadingRefresh: boolean
-  onRefresh: () => void
-  refreshButtonText?: string
-  loadingButtonText: string
   fallbackText: string
 }
 
@@ -22,10 +17,6 @@ export function PaymentProgress({
   loadingText,
   description,
   orderId,
-  loadingRefresh,
-  onRefresh,
-  refreshButtonText = "Refresh Status",
-  loadingButtonText,
   fallbackText
 }: PaymentProgressProps) {
   return (

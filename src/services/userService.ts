@@ -12,8 +12,7 @@ export const userService = {
    */
   getUserFromAuthUsers: async () => {
     try {
-      // TODO: Replace with tradernaut user dataa
-      // also enable RLS security on GVT_COACH tables
+      // TODO: Replace with tradernaut user data and enable RLS security on GVT_COACH tables
       const email = 'matiaszanan@gmail.com';
       const userId = '6e17f4ff-2351-4250-a360-eb8a4bdfeafe';
       const timezone = typeof window !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC';
