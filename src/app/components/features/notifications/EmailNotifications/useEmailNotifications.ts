@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { BookingDB } from '@/types/booking';
 import { toast } from "@/app/components/ui-kit/use-toast";
 import { getTimezoneCookie } from '@/lib/utils/cookies';
+import { DEFAULT_TIMEZONE } from '@/config/site';
 import { EmailNotificationOptions } from '@/types/email';
 
 export const useEmailNotifications = () => {
@@ -48,7 +49,7 @@ export const useEmailNotifications = () => {
   const sendBookingConfirmation = async (booking: BookingDB, userEmail?: string, userName?: string) => {
     try {
       // Get user timezone from cookie or booking data
-      const userTimezone = booking.user_timezone || getTimezoneCookie() || 'UTC';
+      const userTimezone = booking.user_timezone || getTimezoneCookie() || DEFAULT_TIMEZONE;
       
       console.log('Sending booking confirmation with timezone:', userTimezone);
       

@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/app/components/core/ThemeProvider"
 import { Header } from "@/app/components/core/Header"
 import { Footer } from "@/app/components/core/Footer"
+import { SITE_CONFIG } from "@/config/site"
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,11 +17,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Trading Coach Booking",
-  description: "Book your trading consultation",
+  title: SITE_CONFIG.siteName,
+  description: SITE_CONFIG.siteDescription,
   icons: {
-    icon: { url: '/gvtnomad_logo.svg', type: 'image/svg+xml' },
-    shortcut: { url: '/gvtnomad_logo.svg', type: 'image/svg+xml' }
+    icon: { url: SITE_CONFIG.logoPath, type: 'image/svg+xml' },
+    shortcut: { url: SITE_CONFIG.logoPath, type: 'image/svg+xml' }
   }
 };
 

@@ -3,6 +3,7 @@ import { getCoachConfirmationEmail } from './email-templates/confirmation-email-
 import { PaymentOrderStatus } from '@/types/enums';
 import { getTimezoneCookie } from '@/lib/utils/cookies';
 import { COACHES_CONFIG, getCoachTimezone, CoachId } from '@/config/coaches';
+import { DEFAULT_TIMEZONE } from '@/config/site';
 import { EmailData } from '@/types/email';
 import { BookingDB } from '@/types/booking';
 
@@ -106,7 +107,7 @@ export async function sendBookingConfirmation(
     }
 
     if (!userTimezone) {
-      userTimezone = 'UTC';
+      userTimezone = DEFAULT_TIMEZONE;
     }
 
     const userName = bookingDetails.user_name || to;

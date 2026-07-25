@@ -10,6 +10,7 @@ import { setClientCookie, setTimezoneCookie, getTimezoneCookie } from '@/lib/uti
 import { userService } from '@/services/userService'
 import { useToast } from '@/app/components/ui-kit/use-toast'
 import type { CoachId } from "@/config/coaches"
+import { DEFAULT_TIMEZONE } from '@/config/site'
 import { UserProfile } from '@/types/user'
 
 interface Section {
@@ -64,7 +65,7 @@ export function useBookingCalendar() {
       setTimezoneCookie(detectedTimezone);
       return detectedTimezone;
     }
-    return 'UTC';
+    return DEFAULT_TIMEZONE;
   });
 
   useEffect(() => {

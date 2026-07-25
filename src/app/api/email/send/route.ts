@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
+import { SITE_CONFIG } from '@/config/site';
 
 // Nodemailer transporter configuration for Mailgun SMTP
 const transporter = nodemailer.createTransport({
@@ -14,7 +15,7 @@ const transporter = nodemailer.createTransport({
 
 // Email address configuration
 const FROM_NAME = process.env.GVT_COACH_FROM_NAME || 'GVT Coach';
-const defaultFromEmail = process.env.GVT_COACH_FROM_EMAIL || 'coaching@gvtnomad.com';
+const defaultFromEmail = process.env.GVT_COACH_FROM_EMAIL || SITE_CONFIG.contactEmail;
 const formattedFromEmail = `${FROM_NAME} <${defaultFromEmail}>`;
 
 // Endpoint para enviar un correo electrónico genérico
