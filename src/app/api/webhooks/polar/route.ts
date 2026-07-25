@@ -3,6 +3,7 @@ import { CoachId, COACHES_CONFIG } from '@/config/coaches'
 import { PaymentOrderStatus } from '@/types/enums'
 import { BookingDB } from '@/types/booking'
 import { getBookingsByOrderId, updateBooking } from '@/lib/db/bookings'
+import { createZoomMeeting } from '@/lib/zoom'
 import {
   getMappingByOrderId,
   getPaymentStatusById,
@@ -229,83 +230,12 @@ async function createZoomMeetingForBooking(booking: BookingDB, logId: string) {
       return;
     }
 
-    const accountId = process.env.GVT_COACH_ZOOM_ACCOUNT_ID;
-    const clientId = process.env.GVT_COACH_ZOOM_CLIENT_ID;
-    const clientSecret = process.env.GVT_COACH_ZOOM_CLIENT_SECRET;
-
-    if (!accountId || !clientId || !clientSecret) {
-      console.error(`[${logId}] Zoom - Missing Zoom credentials in environment`);
-      return;
-    }
-
-    const tokenResponse = await fetch('https://zoom.us/oauth/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
-      },
-      body: new URLSearchParams({
-        'grant_type': 'account_credentials',
-        'account_id': accountId,
-      }),
-    });
-
-    if (!tokenResponse.ok) {
-      const errorText = await tokenResponse.text();
-      console.error(`[${logId}] Zoom - Error getting token (HTTP ${tokenResponse.status}):`, errorText);
-      return;
-    }
-
-    const tokenData = await tokenResponse.json();
-    const accessToken = tokenData.access_token;
-
-    if (!accessToken) {
-      console.error(`[${logId}] Zoom - No access token in response`);
-      return;
-    }
-
-    let meetingTime: Date;
-    try {
-      meetingTime = new Date(booking.booking_date);
-    } catch (dateError) {
-      console.error(`[${logId}] Zoom - Error parsing booking date: ${booking.booking_date}`, dateError);
-      return;
-    }
-
-    const durationMinutes = booking.duration || 60;
-
-    const meetingData = {
+    const meetingDetails = await createZoomMeeting({
       topic: `GVT Coaching Session with ${booking.user_email}`,
-      type: 2,
-      start_time: meetingTime.toISOString(),
-      duration: durationMinutes,
-      timezone: booking.user_timezone || 'UTC',
-      settings: {
-        host_video: true,
-        participant_video: true,
-        join_before_host: true,
-        waiting_room: false,
-        mute_upon_entry: false,
-        auto_recording: 'none',
-      },
-    };
-
-    const meetingResponse = await fetch('https://api.zoom.us/v2/users/me/meetings', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(meetingData),
+      startTimeIso: new Date(booking.booking_date).toISOString(),
+      durationMinutes: booking.duration,
+      timezone: booking.user_timezone,
     });
-
-    if (!meetingResponse.ok) {
-      const errorText = await meetingResponse.text();
-      console.error(`[${logId}] Zoom - Error creating meeting (HTTP ${meetingResponse.status}):`, errorText);
-      return;
-    }
-
-    const meetingDetails = await meetingResponse.json();
 
     if (meetingDetails.join_url) {
       const updated = await updateBooking(booking.id, { meet_link: meetingDetails.join_url });

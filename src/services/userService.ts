@@ -1,10 +1,11 @@
 'use client';
 
 import { getClientCookie } from '@/lib/utils/cookies'
+import { DEFAULT_TIMEZONE } from '@/config/site'
 
 export const userService = {
   getUserFromAuthUsers: async () => {
-    const timezone = typeof window !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC';
+    const timezone = typeof window !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : DEFAULT_TIMEZONE;
 
     let orderId = null;
     if (typeof window !== 'undefined') {

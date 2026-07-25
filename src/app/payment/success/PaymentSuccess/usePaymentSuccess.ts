@@ -8,6 +8,7 @@ import { bookingService } from '@/services/bookingService'
 import { PaymentOrderStatus } from '@/types/enums'
 import { sendBookingConfirmation } from '@/services/mailer'
 import { getTimezoneCookie } from '@/lib/utils/cookies'
+import { DEFAULT_TIMEZONE } from '@/config/site'
 
 export const usePaymentSuccess = () => {
   const [isLoading, setIsLoading] = useState(true)
@@ -119,7 +120,7 @@ export const usePaymentSuccess = () => {
             meetingTopic,
             meetingTime: meetingTime.toISOString(),
             duration,
-            timezone: finalBooking.user_timezone || 'UTC'
+            timezone: finalBooking.user_timezone || DEFAULT_TIMEZONE
           })
         });
 

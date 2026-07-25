@@ -1,12 +1,13 @@
 import { DateTime } from 'luxon';
 import { COACHES_CONFIG } from '@/config/coaches';
+import { DEFAULT_TIMEZONE } from '@/config/site';
 import { ConfirmationEmailProps } from '@/types/email';
 
 export function getUserConfirmationEmail(bookingDetails: ConfirmationEmailProps) {
   const userName = bookingDetails.user_name || bookingDetails.user_email;
   const coachName = COACHES_CONFIG[bookingDetails.coach].displayName;
   const coachTimezone = COACHES_CONFIG[bookingDetails.coach].timezone;
-  const userTimezone = bookingDetails.user_timezone || 'UTC';
+  const userTimezone = bookingDetails.user_timezone || DEFAULT_TIMEZONE;
   
   // Format date and time in the user's timezone
   const startDateTime = typeof bookingDetails.start_time === 'string' 

@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { DateTime } from 'luxon'
+import { SITE_CONFIG } from '@/config/site'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -59,7 +60,7 @@ export function getBookingSummary(
 export function getRequestOrigin(server = ''): string {
   // Check if a server parameter was provided and use it if valid
   if (server) {
-    if (server.includes('gvt.academy')) {
+    if (server.includes(SITE_CONFIG.productionHost)) {
       return `https://${server}`;
     }
     // Allow localhost or explicit http/https for the server parameter

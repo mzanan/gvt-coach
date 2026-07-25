@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BookingFrequency, PaymentOrderStatus } from '@/types/enums';
 import { insertBooking } from '@/lib/db/bookings';
 import { insertPaymentStatus, upsertMapping } from '@/lib/db/payments';
+import { DEFAULT_TIMEZONE } from '@/config/site';
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,14 +26,14 @@ export async function POST(request: NextRequest) {
       payment_order_id: orderId,
       payment_identifier_id: null,
       payment_status_id: paymentStatus.id,
-      provider: provider || process.env.NEXT_PUBLIC_PAYMENT_PROVIDER || 'lemonsqueezy'
+      provider: provider || process.env.NEXT_PUBLIC_GVT_COACH_PAYMENT_PROVIDER || 'lemonsqueezy'
     });
 
     if (bookingData && bookingData.userEmail && bookingData.selectedDate) {
       try {
         const bookingDate = new Date(bookingData.selectedDate);
         const bookingFrequency = bookingData.bookingPlan?.frequency || BookingFrequency.Once;
-        const userTimezone = bookingData.selectedTimezone || 'UTC';
+        const userTimezone = bookingData.selectedTimezone || DEFAULT_TIMEZONE;
 
         await insertBooking({
           checkout_order_id: orderId,
