@@ -1,7 +1,7 @@
 import { getRequestOrigin } from '@/lib/utils';
 import { NextRequest, NextResponse } from 'next/server';
 import { Polar } from '@polar-sh/sdk';
-import { supabase } from '@/lib/supabase/client';
+import { insertPaymentStatus, upsertMapping } from '@/lib/db/payments';
 
 interface BookingData {
   userEmail?: string;
@@ -98,28 +98,16 @@ export async function createPolarCheckout(productId: string, bookingData: Bookin
     console.log('Returning checkout URL:', checkoutUrl);
     
     try {
-      const { data: paymentStatus, error: paymentStatusError } = await supabase
-        .from('gvt_coach_payments_status')
-        .insert({
-          status: 'PENDING',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          json_data: { polar_order_id: polarOrderId, provider: 'polar' }
-        })
-        .select('id')
-        .single();
+      const paymentStatus = await insertPaymentStatus({
+        status: 'PENDING',
+        json_data: { polar_order_id: polarOrderId, provider: 'polar' }
+      });
 
-      if (paymentStatusError) throw paymentStatusError;
-
-      const { error: mappingError } = await supabase
-        .from('gvt_coach_checkout_mapping')
-        .insert({
-          checkout_order_id: polarOrderId,
-          payment_status_id: paymentStatus.id,
-          provider: 'polar'
-        });
-
-      if (mappingError) throw mappingError;
+      await upsertMapping({
+        checkout_order_id: polarOrderId,
+        payment_status_id: paymentStatus.id,
+        provider: 'polar'
+      });
     } catch (dbError) {
       console.error('Error creating DB records for Polar order:', dbError);
     }

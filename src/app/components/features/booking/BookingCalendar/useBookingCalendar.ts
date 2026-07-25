@@ -73,7 +73,7 @@ export function useBookingCalendar() {
         const userData = await userService.getUserFromAuthUsers();
         if (userData) {
           const userProfileData: UserProfile = {
-            id: userData.id || '',
+            id: String(userData.id ?? ''),
             email: userData.email,
             first_name: userData.first_name,
             last_name: userData.last_name,
