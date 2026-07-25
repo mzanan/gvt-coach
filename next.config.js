@@ -1,8 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true, 
-  },
   typescript: {
     ignoreBuildErrors: false,
   },
@@ -21,16 +18,14 @@ const nextConfig = {
     });
     return config;
   },
-  experimental: {
-    turbo: {
-      rules: {
-        // Configuración para Turbopack
-        '*.svg': {
-          loaders: ['@svgr/webpack'],
-          as: '*.js',
-        },
+  turbopack: {
+    rules: {
+      // Configuración para Turbopack
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
       },
-    },
+    }
   },
 };
 
