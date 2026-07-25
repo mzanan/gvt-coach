@@ -7,6 +7,7 @@ import { CoachId } from '@/config/coaches';
 import { getLemonSqueezyVariantId, getPolarProductId } from '@/lib/utils/productIds';
 import { insertBooking } from '@/lib/db/bookings';
 import { insertPaymentStatus, upsertMapping } from '@/lib/db/payments';
+import { SITE_CONFIG } from '@/config/site';
 
 interface CheckoutBookingData {
   userEmail?: string;
@@ -65,6 +66,13 @@ async function createPendingRecords(
 
 export async function POST(request: NextRequest) {
   try {
+    if (!SITE_CONFIG.paymentsEnabled) {
+      return NextResponse.json(
+        { error: 'Payments are temporarily disabled' },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const { bookingData, provider: requestedProvider = 'stripe', storePendingBooking } = body;
 
