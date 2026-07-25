@@ -11,7 +11,6 @@ const nextConfig = {
     removeConsole: process.env.NEXT_PUBLIC_ENV === 'production' ? { exclude: ['error', 'warn'] } : false,
   },
   webpack(config) {
-    // Configurar SVGs para ser importados como módulos
     config.module.rules.push({
       test: /\.svg$/,
       use: ['@svgr/webpack']
@@ -20,7 +19,6 @@ const nextConfig = {
   },
   turbopack: {
     rules: {
-      // Configuración para Turbopack
       '*.svg': {
         loaders: ['@svgr/webpack'],
         as: '*.js',

@@ -40,41 +40,34 @@ export function useBookingCalendar() {
   const [isLoadingSlots, setIsLoadingSlots] = useState(false)
 
 
-  // Initialize with timezone from cookie or browser
   const [selectedTimezone, setSelectedTimezone] = useState<string>(() => {
     if (typeof window !== 'undefined') {
-      // Clean up old user_timezone cookie if it exists
       if (document.cookie.includes('user_timezone=')) {
         document.cookie = 'user_timezone=;expires=Thu, 01 Jan 1970 00:00:01 GMT;path=/;';
       }
-      
-      // First check cookie
+
       const cookieTimezone = getTimezoneCookie();
-      
+
       if (cookieTimezone) {
         return cookieTimezone;
       }
-      
-      // If no cookie, check cached profile
+
       const profileTimezone = userProfile?.timezone;
-      
+
       if (profileTimezone) {
-        setTimezoneCookie(profileTimezone); // Ensure cookie is set if profile had it
+        setTimezoneCookie(profileTimezone);
         return profileTimezone;
       }
-      
-      // Fallback to browser timezone
+
       const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      
-      // Save detected timezone to cookie immediately
+
       setTimezoneCookie(detectedTimezone);
       return detectedTimezone;
     }
-    return 'UTC'; // Default for server-side rendering
+    return 'UTC';
   });
 
   useEffect(() => {
-    // Load user data from the service
     const loadUserData = async () => {
       try {
         const userData = await userService.getUserFromAuthUsers();
@@ -103,24 +96,23 @@ export function useBookingCalendar() {
     loadUserData();
   }, [toast]);
 
-  const loadBookedDates = useCallback(async () => {
-    try {
-      const dates = await bookingService.getFullyBookedDates(new Date());
-      setBookedDates(dates);
-    } catch {
-      console.error("Error fetching booked dates");
-    }
+  useEffect(() => {
+    let ignore = false;
+
+    bookingService.getFullyBookedDates(new Date())
+      .then(dates => {
+        if (!ignore) setBookedDates(dates);
+      })
+      .catch(() => console.error("Error fetching booked dates"));
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
-  useEffect(() => {
-    loadBookedDates();
-  }, [loadBookedDates]);
-
-  // Define fetchAvailableSlots HERE, before handleDateSelect
   const fetchAvailableSlots = useCallback(async (date: Date, timezone: string, coach: CoachId) => {
     try {
       setIsLoadingSlots(true);
-      // Call bookingService which now returns GroupedTimeSlots[] using TimeSlot[] directly
       const groupedSlots = await bookingService.getAvailableSlots(
         date,
         timezone,
@@ -197,7 +189,7 @@ export function useBookingCalendar() {
         variant: "destructive"
       });
     }
-  }, [selectedTimezone, bookingPlan?.coach, fetchAvailableSlots, setSections, setActiveSection, toast, setIsLoadingSlots, setSelectedDate]);
+  }, [selectedTimezone, bookingPlan, fetchAvailableSlots, setSections, setActiveSection, toast, setIsLoadingSlots, setSelectedDate]);
 
   const handleSlotSelect = useCallback((slot: TimeSlot) => {
     if (!slot.available || !slot.date) {
@@ -246,28 +238,21 @@ export function useBookingCalendar() {
   }, [sections, setActiveSection]);
 
   const handleCoachSelect = useCallback((coach: CoachId) => {
-    // Update booking plan with selected coach and always set ONCE frequency
     setBookingPlan(prev => ({
       ...prev,
       coach,
       frequency: BookingFrequency.Once
     }));
-    
-    // Mark coach section as completed and SKIP frequency section, going straight to date
-    setSections(prev => prev.map(s => 
+
+    setSections(prev => prev.map(s =>
       s.id === 'coach' ? { ...s, completed: true } : s
     ));
     setActiveSection('date');
   }, []);
 
   const formatSlotTime = useCallback((date: Date) => {
-    // Crear objeto DateTime ASUMIENDO que la hora del objeto Date YA está en la zona del usuario.
     const dtUserLocal = DateTime.fromJSDate(date, { zone: selectedTimezone });
-
-    // Usaremos dtUserLocal, que asume que la hora ya es correcta para la zona
-    const finalDateTime = dtUserLocal;
-
-    return finalDateTime.toFormat('h:mm a');
+    return dtUserLocal.toFormat('h:mm a');
   }, [selectedTimezone]);
 
   const handleBookingConfirm = useCallback(async () => {
@@ -278,11 +263,9 @@ export function useBookingCalendar() {
         throw new Error("No time slot was selected");
       }
 
-      // Simplification: get local and UTC date in a single step
       const localDateTime = DateTime.fromJSDate(selectedSlot.date).setZone(selectedTimezone);
       const utcDateTime = localDateTime.toUTC();
 
-      // Use the current selectedSlot directly
       const updatedBookingPlan = {
         ...bookingPlan,
         firstSlot: selectedSlot,
@@ -290,24 +273,22 @@ export function useBookingCalendar() {
         frequency: bookingPlan?.frequency || BookingFrequency.Once
       };
 
-      // Create checkout
       const { checkoutUrl, orderId } = await paymentService.createCheckout(
         updatedBookingPlan,
         userProfile as UserProfile,
         true
       );
-      
+
       if (!orderId || !checkoutUrl) {
         throw new Error('Error creating checkout: missing orderId or checkoutUrl');
       }
-      
-      // Store essential data with the timezone used explicitly
+
       const tempBookingData = {
         userEmail: userProfile?.email,
         bookingPlan: updatedBookingPlan,
         selectedDate: localDateTime.toISO(),
         utcDate: utcDateTime.toISO(),
-        selectedTimezone: selectedTimezone // Always make sure to include timezone
+        selectedTimezone: selectedTimezone
       };
       
       setClientCookie('pending_booking', tempBookingData);
@@ -325,8 +306,6 @@ export function useBookingCalendar() {
   }, [bookingPlan, selectedSlot, userProfile, selectedTimezone, toast]);
 
   const handleNextSection = useCallback(() => {
-    // We can't directly compare 'activeSection' (string) with 'sections.length' (number)
-    // Find the index of the active section and increment if it's not the last one
     const activeIndex = sections.findIndex(s => s.id === activeSection);
     if (activeIndex < sections.length - 1) {
       const nextSection = sections[activeIndex + 1].id;
