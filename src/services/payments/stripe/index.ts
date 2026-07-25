@@ -65,15 +65,7 @@ export const stripeService: PaymentProviderService = {
       if (!response.ok) {
         const errorData = await response.text();
         console.error('Stripe Checkout error:', errorData);
-
-        let serverMessage = '';
-        try {
-          serverMessage = JSON.parse(errorData)?.error || '';
-        } catch {
-          serverMessage = '';
-        }
-
-        throw new Error(serverMessage || 'Failed to create Stripe checkout');
+        throw new Error('Failed to create Stripe checkout');
       }
 
       const { checkoutUrl, orderId } = await response.json();

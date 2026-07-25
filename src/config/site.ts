@@ -5,7 +5,6 @@ export const SITE_CONFIG = {
   companyName: 'GVTNomad',
   contactEmail: 'coaching@gvtnomad.com',
   productionHost: 'gvt.academy',
-  paymentsEnabled: false,
 };
 
 export const DEFAULT_TIMEZONE = 'UTC';

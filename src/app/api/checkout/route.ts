@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 import { createLemonSqueezyCheckout } from './lemonsqueezy';
 import { createPolarCheckout } from './polar';
 import { createStripeCheckout } from './stripe';
@@ -7,7 +8,6 @@ import { CoachId } from '@/config/coaches';
 import { getLemonSqueezyVariantId, getPolarProductId } from '@/lib/utils/productIds';
 import { insertBooking } from '@/lib/db/bookings';
 import { insertPaymentStatus, upsertMapping } from '@/lib/db/payments';
-import { SITE_CONFIG } from '@/config/site';
 
 interface CheckoutBookingData {
   userEmail?: string;
@@ -25,17 +25,22 @@ async function createPendingRecords(
   provider: string,
   bookingData: CheckoutBookingData,
   frequency: BookingFrequency,
-  coach: CoachId
+  coach: CoachId,
+  status: PaymentOrderStatus = PaymentOrderStatus.Pending
 ): Promise<void> {
   try {
+    const confirmed = status === PaymentOrderStatus.Paid;
+
     const paymentStatus = await insertPaymentStatus({
-      status: PaymentOrderStatus.Pending,
+      status,
+      checkout_order_id: orderId,
       json_data: { checkout_order_id: orderId, provider }
     });
 
     await upsertMapping({
       checkout_order_id: orderId,
       payment_status_id: paymentStatus.id,
+      payment_order_id: orderId,
       provider
     });
 
@@ -55,7 +60,10 @@ async function createPendingRecords(
           frequency,
           checkout_order_id: orderId,
           duration: 60,
-          coach
+          coach,
+          payment_status: status,
+          payment_confirmed: confirmed,
+          checkout_completed: confirmed
         });
       }
     }
@@ -66,13 +74,6 @@ async function createPendingRecords(
 
 export async function POST(request: NextRequest) {
   try {
-    if (!SITE_CONFIG.paymentsEnabled) {
-      return NextResponse.json(
-        { error: 'Payments are temporarily disabled' },
-        { status: 503 }
-      );
-    }
-
     const body = await request.json();
     const { bookingData, provider: requestedProvider = 'stripe', storePendingBooking } = body;
 
@@ -88,7 +89,17 @@ export async function POST(request: NextRequest) {
     let checkoutUrl = '';
     let orderId = '';
 
-    if (paymentProvider === 'polar') {
+    if (paymentProvider === 'disabled') {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+      if (!appUrl) {
+        throw new Error('Application URL configuration is missing. Please set NEXT_PUBLIC_APP_URL.');
+      }
+
+      orderId = randomUUID();
+      checkoutUrl = `${appUrl}/payment/success?checkout_order_id=${orderId}`;
+
+      await createPendingRecords(orderId, 'disabled', bookingData, frequency, selectedCoach, PaymentOrderStatus.Paid);
+    } else if (paymentProvider === 'polar') {
       const productId = getPolarProductId(selectedCoach);
       if (!productId) {
         throw new Error(`Polar Product ID not configured for coach ${selectedCoach}`);
