@@ -1,35 +1,66 @@
-import { createClient } from '@/lib/supabase/server';
 import { NextResponse, NextRequest } from 'next/server';
+import { getBookingById, updateBooking, type BookingWrite } from '@/lib/db/bookings';
+
+const PATCHABLE_FIELDS = [
+  'meet_link', 'payment_status', 'checkout_completed', 'payment_confirmed',
+  'confirmation_email_sent', 'user_timezone'
+] as const;
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-
 ) {
   try {
-    const supabase = await createClient();
     const { id } = await params;
 
-    console.log('[GET] Looking for booking with ID:', id);
+    const booking = await getBookingById(id);
 
-    const { data: booking, error: bookingError } = await supabase
-      .from('gvt_coach_meetings_bookings')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (bookingError) {
-      console.error('[GET] Error finding booking:', bookingError);
+    if (!booking) {
       return NextResponse.json(
-        { error: bookingError.message },
-        { status: 400 }
+        { error: `Booking not found with ID: ${id}` },
+        { status: 404 }
       );
     }
 
-    console.log('[GET] Found booking:', booking);
     return NextResponse.json(booking);
   } catch (error) {
-    console.error('[GET] Error:', error);
+    console.error('[GET /api/bookings/[id]] Error:', error);
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const updates = await request.json();
+
+    const existingBooking = await getBookingById(id);
+
+    if (!existingBooking) {
+      return NextResponse.json(
+        { error: `Booking not found with ID: ${id}` },
+        { status: 404 }
+      );
+    }
+
+    const fields: BookingWrite = {};
+    for (const field of PATCHABLE_FIELDS) {
+      if (updates[field] !== undefined) {
+        fields[field] = updates[field];
+      }
+    }
+
+    const updated = await updateBooking(id, fields);
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error('[PATCH /api/bookings/[id]] Error:', error);
     return NextResponse.json(
       { error: 'Internal Server Error' },
       { status: 500 }
@@ -42,76 +73,9 @@ export async function OPTIONS() {
     status: 204,
     headers: {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, PATCH, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Max-Age': '86400'
     }
   });
-}
-
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-
-) {
-  try {
-    const supabase = await createClient();
-    const { id } = await params;
-    const updates = await request.json();
-    
-    console.log('[PATCH] Updating booking:', { id, updates });
-
-    // First, check if the booking exists
-    const { data: existingBooking, error: findError } = await supabase
-      .from('gvt_coach_meetings_bookings')
-      .select('id, checkout_order_id, user_email')
-      .eq('id', id)
-      .single();
-
-    if (findError) {
-      console.error('[PATCH] Booking not found with ID:', id);
-      console.error('[PATCH] Error details:', findError);
-
-      // Let's get all bookings for debugging
-      const { data: allBookings } = await supabase
-        .from('gvt_coach_meetings_bookings')
-        .select('id, checkout_order_id, user_email')
-        .limit(5);
-      
-      console.log('[PATCH] First 5 bookings in database:', allBookings);
-      
-      return NextResponse.json(
-        { error: `Booking not found with ID: ${id}. Error: ${findError.message}` },
-        { status: 404 }
-      );
-    }
-
-    console.log('[PATCH] Found existing booking:', existingBooking);
-
-    const { data, error } = await supabase
-      .from('gvt_coach_meetings_bookings')
-      .update({
-        meet_link: updates.meet_link
-      })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('[PATCH] Error updating booking:', error);
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      );
-    }
-
-    console.log('[PATCH] Booking updated successfully:', data);
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error('[PATCH] Error in PATCH:', error);
-    return NextResponse.json(
-      { error: 'Internal Server Error' },
-      { status: 500 }
-    );
-  }
 }

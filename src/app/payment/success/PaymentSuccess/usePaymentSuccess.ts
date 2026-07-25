@@ -5,7 +5,6 @@ import { BookingDB } from '@/types/booking'
 import { getUserDataFromCookies } from '@/lib/utils/payment'
 import { fetchBookingByOrderId, fetchPaymentMapping, fetchPaymentStatus } from '@/lib/utils/payment/queries'
 import { bookingService } from '@/services/bookingService'
-import { supabase } from '@/lib/supabase/client'
 import { PaymentOrderStatus } from '@/types/enums'
 import { sendBookingConfirmation } from '@/services/mailer'
 import { getTimezoneCookie } from '@/lib/utils/cookies'
@@ -82,23 +81,23 @@ export const usePaymentSuccess = () => {
         return bookingWithUserTimezone;
       }
 
-      const { data, error } = await supabase
-        .from('gvt_coach_meetings_bookings')
-        .update({
+      const updateResponse = await fetch(`/api/bookings/${encodeURIComponent(bookingWithUserTimezone.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           payment_status: PaymentOrderStatus.Paid,
           checkout_completed: true,
           payment_confirmed: true,
           user_timezone: bookingWithUserTimezone.user_timezone
         })
-        .eq('id', bookingWithUserTimezone.id)
-        .select()
-        .single();
+      });
 
-      if (error) {
-        console.error("Error actualizando estado del booking:", error);
+      if (!updateResponse.ok) {
+        console.error("Error actualizando estado del booking:", updateResponse.status);
         return null;
       }
 
+      const data = await updateResponse.json();
       const updatedBooking = data || bookingWithUserTimezone;
 
       const finalBooking = {
@@ -127,12 +126,13 @@ export const usePaymentSuccess = () => {
         if (response.ok) {
           const zoomData = await response.json();
           if (zoomData.join_url) {
-            const { error: updateError } = await supabase
-              .from('gvt_coach_meetings_bookings')
-              .update({ meet_link: zoomData.join_url })
-              .eq('id', finalBooking.id);
+            const meetLinkResponse = await fetch(`/api/bookings/${encodeURIComponent(finalBooking.id)}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ meet_link: zoomData.join_url })
+            });
 
-            if (!updateError) {
+            if (meetLinkResponse.ok) {
               finalBooking.meet_link = zoomData.join_url;
             }
           }
@@ -228,23 +228,13 @@ export const usePaymentSuccess = () => {
     try {
       if (!email) return null
 
-      const { data, error } = await supabase
-        .from('gvt_coach_meetings_bookings')
-        .select('*')
-        .eq('user_email', email)
-        .order('created_at', { ascending: false })
-        .limit(1)
+      const response = await fetch(`/api/bookings/latest?email=${encodeURIComponent(email)}`)
 
-      if (error) {
-        console.error("Error buscando booking por email:", error)
+      if (!response.ok) {
         return null
       }
 
-      if (data && data.length > 0) {
-        return data[0] as BookingDB
-      }
-
-      return null
+      return await response.json() as BookingDB
     } catch {
       console.error("Error en fetchLatestBookingByEmail:")
       return null

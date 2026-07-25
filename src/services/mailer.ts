@@ -1,19 +1,45 @@
-import { supabase } from '@/lib/supabase/client';
 import { getUserConfirmationEmail } from './email-templates/confirmation-email-user';
 import { getCoachConfirmationEmail } from './email-templates/confirmation-email-coach';
 import { PaymentOrderStatus } from '@/types/enums';
 import { getTimezoneCookie } from '@/lib/utils/cookies';
 import { COACHES_CONFIG, getCoachTimezone, CoachId } from '@/config/coaches';
-import { EmailData } from "@/types/email";
+import { EmailData } from '@/types/email';
+import { BookingDB } from '@/types/booking';
+
+function apiUrl(path: string): string {
+  if (typeof window !== 'undefined') {
+    return path;
+  }
+  const base = process.env.NEXT_PUBLIC_APP_URL || `http://localhost:${process.env.PORT || 3000}`;
+  return `${base}${path}`;
+}
+
+async function fetchBooking(bookingId: string): Promise<BookingDB | null> {
+  try {
+    const response = await fetch(apiUrl(`/api/bookings/${encodeURIComponent(bookingId)}`));
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+async function patchBooking(bookingId: string, fields: Record<string, unknown>): Promise<void> {
+  await fetch(apiUrl(`/api/bookings/${encodeURIComponent(bookingId)}`), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(fields)
+  });
+}
 
 export async function sendEmail(emailData: EmailData) {
   try {
-    const response = await fetch('/api/email/send', {
+    const response = await fetch(apiUrl('/api/email/send'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(emailData), // Pass the whole emailData object
+      body: JSON.stringify(emailData),
     });
 
     if (!response.ok) {
@@ -23,20 +49,13 @@ export async function sendEmail(emailData: EmailData) {
     }
 
     const result = await response.json();
-    return { success: true, data: result.data }; // Return success and potential info from API
-
+    return { success: true, data: result.data };
   } catch (error) {
     console.error('Error in sendEmail function:', error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
-/**
- * Sends a booking confirmation email
- * @param to Recipient's email
- * @param bookingDetails Booking details
- * @returns A promise with the sending result
- */
 export async function sendBookingConfirmation(
   to: string,
   bookingDetails: {
@@ -53,64 +72,43 @@ export async function sendBookingConfirmation(
 
   try {
     const selectedCoach: CoachId = bookingDetails.coach as CoachId;
-    
+
     if (!selectedCoach || !(selectedCoach in COACHES_CONFIG)) {
       console.error('[MAILER ERROR] Invalid or missing coach in bookingDetails! Cannot determine correct coach.', bookingDetails);
       return { success: false, error: 'Invalid coach specified' };
     }
-    
+
     const coachConfig = COACHES_CONFIG[selectedCoach];
     const coachEmail = coachConfig?.email;
     getCoachTimezone(selectedCoach);
 
-    // 1. Check/Mark flag in DB to prevent duplicates
-    if (bookingDetails.booking_id) {
-      // Check if email was already sent
-      const { data: booking } = await supabase
-        .from('gvt_coach_meetings_bookings')
-        .select('confirmation_email_sent')
-        .eq('id', bookingDetails.booking_id)
-        .single();
+    let bookingRecord: BookingDB | null = null;
 
-      if (booking?.confirmation_email_sent) {
+    if (bookingDetails.booking_id) {
+      bookingRecord = await fetchBooking(bookingDetails.booking_id);
+
+      if (bookingRecord?.confirmation_email_sent) {
         return { success: true, alreadySent: true };
       }
-      
-      // Mark as sent IMMEDIATELY before sending any email
-      await supabase
-        .from('gvt_coach_meetings_bookings')
-        .update({ confirmation_email_sent: true })
-        .eq('id', bookingDetails.booking_id);
+
+      await patchBooking(bookingDetails.booking_id, { confirmation_email_sent: true });
     }
 
-    // 2. Get user timezone from booking data, cookie, or fall back to UTC
     if (!userTimezone && typeof window !== 'undefined') {
       const cookieTimezone = getTimezoneCookie();
       if (cookieTimezone) {
         userTimezone = cookieTimezone;
       }
     }
-    
-    // If still no timezone, check the database if we have a booking ID
-    if (!userTimezone && bookingDetails.booking_id) {
-      const { data: bookingData } = await supabase
-        .from('gvt_coach_meetings_bookings')
-        .select('user_timezone')
-        .eq('id', bookingDetails.booking_id)
-        .single();
-        
-      if (bookingData?.user_timezone) {
-        userTimezone = bookingData.user_timezone;
-      }
-    }
-    
-    // Fallback to UTC if no timezone found
-    if (!userTimezone) {
-      userTimezone = 'UTC';
-      console.log('No timezone found, defaulting to UTC for user email');
+
+    if (!userTimezone && bookingRecord?.user_timezone) {
+      userTimezone = bookingRecord.user_timezone;
     }
 
-    // 3. Prepare and send email to user
+    if (!userTimezone) {
+      userTimezone = 'UTC';
+    }
+
     const userName = bookingDetails.user_name || to;
     const userEmailContent = getUserConfirmationEmail({
       start_time: bookingDetails.start_time,
@@ -127,43 +125,30 @@ export async function sendBookingConfirmation(
       subject: `New GVT Coaching Session Confirmed with ${COACHES_CONFIG[selectedCoach].displayName}! 🎉`,
       html: userEmailContent.html
     });
-    console.log(`[MAILER] User confirmation email sent to ${to} for coach ${selectedCoach}`);
 
-    // 4. Send email to coach if configured
     if (coachEmail) {
-      // Initial basic booking data
       const bookingInfo = {
         provider: 'Unknown',
         checkout_order_id: 'Unknown'
       };
-      
-      // Get payment provider and checkout_order_id if booking ID exists
-      if (bookingDetails.booking_id) {
-        const { data } = await supabase
-          .from('gvt_coach_meetings_bookings')
-          .select('checkout_order_id, payment_status, payment_confirmed')
-          .eq('id', bookingDetails.booking_id)
-          .single();
 
-        if (data?.checkout_order_id) {
-          // Store the checkout_order_id
-          bookingInfo.checkout_order_id = data.checkout_order_id;
-          
-          // Get provider from the mapping table
-          const { data: mappingData } = await supabase
-            .from('gvt_coach_checkout_mapping')
-            .select('provider')
-            .eq('checkout_order_id', data.checkout_order_id)
-            .single();
-          
-          if (mappingData?.provider) {
-            bookingInfo.provider = mappingData.provider.charAt(0).toUpperCase() + 
-                                  mappingData.provider.slice(1);
+      if (bookingRecord?.checkout_order_id) {
+        bookingInfo.checkout_order_id = bookingRecord.checkout_order_id;
+
+        try {
+          const mappingResponse = await fetch(apiUrl(`/api/payments/mapping/${encodeURIComponent(bookingRecord.checkout_order_id)}`));
+          if (mappingResponse.ok) {
+            const mappingData = await mappingResponse.json();
+            if (mappingData?.provider) {
+              bookingInfo.provider = mappingData.provider.charAt(0).toUpperCase() +
+                                     mappingData.provider.slice(1);
+            }
           }
+        } catch {
+          console.warn('[MAILER] Could not resolve payment provider for coach email');
         }
       }
 
-      console.log(`[MAILER] Attempting to send confirmation to coach ${selectedCoach} at ${coachEmail}`);
       const coachEmailContent = getCoachConfirmationEmail({
         start_time: bookingDetails.start_time,
         end_time: bookingDetails.end_time,
@@ -184,29 +169,22 @@ export async function sendBookingConfirmation(
         subject: `New Coaching Session Booked with ${to}`,
         html: coachEmailContent.html
       });
-
-      console.log(`[MAILER] Coach confirmation email sent successfully to ${coachEmail}`);
     } else {
       console.warn(`[MAILER] No email configured for coach ${selectedCoach}. Skipping coach email.`);
     }
 
-    console.log('[MAILER] All confirmation emails processed successfully');
     return { success: true };
   } catch (error) {
     console.error('[MAILER] Error sending confirmation email:', error);
-    
-    // In case of error, try to unmark the flag to allow retries
+
     if (bookingDetails.booking_id) {
       try {
-        await supabase
-          .from('gvt_coach_meetings_bookings')
-          .update({ confirmation_email_sent: false })
-          .eq('id', bookingDetails.booking_id);
+        await patchBooking(bookingDetails.booking_id, { confirmation_email_sent: false });
       } catch (dbError) {
         console.error('Could not unmark the flag:', dbError);
       }
     }
-    
+
     throw error;
   }
 }
