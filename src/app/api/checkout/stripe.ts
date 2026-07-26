@@ -1,6 +1,8 @@
 import Stripe from 'stripe';
 import { BookingFrequency } from '@/types/enums';
-import { CoachId, COACHES_CONFIG } from '@/config/coaches';
+import { CoachId } from '@/config/coaches';
+import { CoachConfig } from '@/types/coach';
+import { getEffectiveCoachesConfig } from '@/config/appConfig';
 
 interface StripeBookingData {
   userEmail?: string;
@@ -10,7 +12,7 @@ interface StripeBookingData {
   };
 }
 
-const FREQUENCY_PRICE_KEY: Record<BookingFrequency, keyof typeof COACHES_CONFIG.MATIAS.prices> = {
+const FREQUENCY_PRICE_KEY: Record<BookingFrequency, keyof CoachConfig['prices']> = {
   [BookingFrequency.Once]: 'singleSession',
   [BookingFrequency.Weekly]: 'weekly',
   [BookingFrequency.TwiceWeekly]: 'twiceWeekly',
@@ -39,12 +41,14 @@ export async function createStripeCheckout(bookingData: StripeBookingData): Prom
   }
 
   const coach = bookingData.bookingPlan?.coach;
-  if (!coach || !(coach in COACHES_CONFIG)) {
+  const coachesConfig = await getEffectiveCoachesConfig();
+
+  if (!coach || !(coach in coachesConfig)) {
     throw new Error(`Invalid or missing coach for Stripe checkout: ${coach}`);
   }
 
   const frequency = bookingData.bookingPlan?.frequency || BookingFrequency.Once;
-  const coachConfig = COACHES_CONFIG[coach];
+  const coachConfig = coachesConfig[coach];
   const price = coachConfig.prices[FREQUENCY_PRICE_KEY[frequency]];
 
   if (!price || price <= 0) {

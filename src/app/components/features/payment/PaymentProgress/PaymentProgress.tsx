@@ -20,7 +20,7 @@ export function PaymentProgress({
   fallbackText
 }: PaymentProgressProps) {
   return (
-    <div className="container mx-auto py-8 max-w-2xl">
+    <div className="page-container py-8 max-w-2xl">
       <Card className="p-8 text-center">
         <div className="mx-auto mb-4">
           {icon}

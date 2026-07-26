@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { TimeSlot, BookingPlan, DayGroup } from '@/types/booking'
 import { DateTime } from 'luxon'
 import { bookingService } from '@/services/bookingService'
-import { paymentService } from '@/services/payments'
+import { getPaymentService } from '@/services/payments'
 import { BookingFrequency } from '@/types/enums'
+import { useAppConfig } from '@/app/components/core/AppConfigProvider'
 import { setClientCookie, setTimezoneCookie, getTimezoneCookie } from '@/lib/utils/cookies'
 import { userService } from '@/services/userService'
 import { useToast } from '@/app/components/ui-kit/use-toast'
@@ -21,6 +22,7 @@ interface Section {
 
 export function useBookingCalendar() {
   const { toast } = useToast()
+  const { coaches } = useAppConfig()
   const [sections, setSections] = useState<Section[]>([
     { id: 'coach', title: 'Select Coach', completed: false },
     { id: 'date', title: 'Select Date', completed: false },
@@ -39,6 +41,7 @@ export function useBookingCalendar() {
   const [bookedDates, setBookedDates] = useState<Array<{ date: Date, fullyBooked: boolean }>>([])
   const [isBookingLoading, setIsBookingLoading] = useState(false)
   const [isLoadingSlots, setIsLoadingSlots] = useState(false)
+  const [userEmail, setUserEmail] = useState('')
 
 
   const [selectedTimezone, setSelectedTimezone] = useState<string>(() => {
@@ -117,7 +120,8 @@ export function useBookingCalendar() {
       const groupedSlots = await bookingService.getAvailableSlots(
         date,
         timezone,
-        coach
+        coach,
+        coaches[coach]
       );
       
       setAvailableSlots(groupedSlots);
@@ -133,7 +137,7 @@ export function useBookingCalendar() {
     } finally {
       setIsLoadingSlots(false);
     }
-  }, [toast, setIsLoadingSlots]); 
+  }, [toast, setIsLoadingSlots, coaches]);
 
 
   const handleTimezoneChange = useCallback((timezone: string) => {
@@ -257,6 +261,17 @@ export function useBookingCalendar() {
   }, [selectedTimezone]);
 
   const handleBookingConfirm = useCallback(async () => {
+    const email = userEmail.trim();
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast({
+        title: "Email required",
+        description: "Enter a valid email to receive your booking confirmation.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsBookingLoading(true);
 
     try {
@@ -274,9 +289,14 @@ export function useBookingCalendar() {
         frequency: bookingPlan?.frequency || BookingFrequency.Once
       };
 
-      const { checkoutUrl, orderId } = await paymentService.createCheckout(
+      const profileWithEmail = { ...userProfile, email } as UserProfile;
+      setClientCookie('user_email', email);
+
+      const coachProvider = updatedBookingPlan.coach ? coaches[updatedBookingPlan.coach]?.paymentProvider : undefined;
+
+      const { checkoutUrl, orderId } = await getPaymentService(coachProvider).createCheckout(
         updatedBookingPlan,
-        userProfile as UserProfile,
+        profileWithEmail,
         true
       );
 
@@ -285,15 +305,15 @@ export function useBookingCalendar() {
       }
 
       const tempBookingData = {
-        userEmail: userProfile?.email,
+        userEmail: email,
         bookingPlan: updatedBookingPlan,
         selectedDate: localDateTime.toISO(),
         utcDate: utcDateTime.toISO(),
         selectedTimezone: selectedTimezone
       };
-      
+
       setClientCookie('pending_booking', tempBookingData);
-      
+
       window.location.href = checkoutUrl;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Error creating booking.";
@@ -304,7 +324,7 @@ export function useBookingCalendar() {
       });
       setIsBookingLoading(false);
     }
-  }, [bookingPlan, selectedSlot, userProfile, selectedTimezone, toast]);
+  }, [bookingPlan, selectedSlot, userProfile, selectedTimezone, toast, coaches, userEmail]);
 
   const handleNextSection = useCallback(() => {
     const activeIndex = sections.findIndex(s => s.id === activeSection);
@@ -326,6 +346,8 @@ export function useBookingCalendar() {
     isBookingLoading,
     isLoadingSlots,
     selectedTimezone,
+    userEmail,
+    setUserEmail,
     handleTimezoneChange,
     handleDateSelect,
     handleSlotSelect,

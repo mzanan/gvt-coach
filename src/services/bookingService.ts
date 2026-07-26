@@ -2,6 +2,7 @@ import { DateTime } from 'luxon'
 import { BookingDB } from '@/types/booking'
 import { GroupedTimeSlots, TimeSlot } from '@/types/booking'
 import { CoachId, COACHES_CONFIG } from '@/config/coaches'
+import { CoachConfig } from '@/types/coach'
 
 const cache = {
   availableSlots: new Map<string, GroupedTimeSlots[]>(),
@@ -26,7 +27,7 @@ async function fetchPaidBookings(startIso: string, endIso: string): Promise<Book
 }
 
 export const bookingService = {
-  getAvailableSlots: async (date: Date, userTimezone: string, coach: CoachId): Promise<GroupedTimeSlots[]> => {
+  getAvailableSlots: async (date: Date, userTimezone: string, coach: CoachId, coachConfigOverride?: CoachConfig): Promise<GroupedTimeSlots[]> => {
     const dateString = DateTime.fromJSDate(date).setZone(userTimezone).startOf('day').toFormat('yyyy-MM-dd');
     const cacheKey = `slots-${dateString}-${userTimezone}-${coach}`;
 
@@ -35,7 +36,7 @@ export const bookingService = {
       return cachedSlots;
     }
 
-    const coachConfig = COACHES_CONFIG[coach];
+    const coachConfig = coachConfigOverride || COACHES_CONFIG[coach];
     const COACH_TIMEZONE = coachConfig.timezone;
     const morningStart = coachConfig.workingHours.morning.start;
     const morningEnd = coachConfig.workingHours.morning.end;

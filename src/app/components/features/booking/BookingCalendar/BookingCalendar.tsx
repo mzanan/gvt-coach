@@ -4,13 +4,15 @@ import React, { useMemo } from 'react'
 import { useBookingCalendar } from './useBookingCalendar'
 import { Calendar } from '../Calendar'
 import { Button } from '@/app/components/ui-kit/button'
+import { Input } from '@/app/components/ui-kit/input'
+import { Label } from '@/app/components/ui-kit/label'
 import { ChevronDown, ChevronUp, Check, Loader2, Globe, User, DollarSign, Clock, CreditCard, CalendarIcon } from 'lucide-react'
 import { Card } from '@/app/components/ui-kit/card'
 import { DateTime } from 'luxon'
 import { CoachSelector } from '../CoachSelector'
 import { TimeZoneSelector } from '../TimeZoneSelector'
 import { getBookingSummary, cn } from '@/lib/utils'
-import { COACHES_CONFIG } from '@/config/coaches'
+import { useAppConfig } from '@/app/components/core/AppConfigProvider'
 
 
 // Memoized payment button component to reduce renders
@@ -71,6 +73,7 @@ const MemoizedBookingSection = React.memo(({
 MemoizedBookingSection.displayName = 'MemoizedBookingSection';
 
 export function BookingCalendar() {
+  const { coaches } = useAppConfig()
   const {
     sections,
     activeSection,
@@ -82,6 +85,8 @@ export function BookingCalendar() {
     isBookingLoading,
     isLoadingSlots,
     selectedTimezone,
+    userEmail,
+    setUserEmail,
     handleDateSelect,
     handleSlotSelect,
     handleSectionClick,
@@ -95,7 +100,7 @@ export function BookingCalendar() {
     if (!bookingPlan || !selectedSlot || !bookingPlan.coach) return null;
    
     const coach = bookingPlan.coach;
-    const price = COACHES_CONFIG[coach].prices.singleSession;
+    const price = coaches[coach].prices.singleSession;
   
     return (
       <div className="space-y-6">
@@ -123,7 +128,7 @@ export function BookingCalendar() {
                   </div>
                   <div>
                     <h3 className="text-lg font-medium">Coach</h3>
-                    <p className="text-muted-foreground">{COACHES_CONFIG[coach].displayName}</p>
+                    <p className="text-muted-foreground">{coaches[coach].displayName}</p>
                   </div>
                 </div>
               )}
@@ -149,11 +154,26 @@ export function BookingCalendar() {
             </div>
           </div>
         </div>
-        
+
+        <div className="space-y-2">
+          <Label htmlFor="booking-email">Your email</Label>
+          <Input
+            id="booking-email"
+            type="email"
+            value={userEmail}
+            onChange={e => setUserEmail(e.target.value)}
+            placeholder="you@example.com"
+            autoComplete="email"
+          />
+          <p className="text-xs text-muted-foreground">
+            The booking confirmation and meeting link are sent to this address.
+          </p>
+        </div>
+
         {/* Payment button */}
-        <Button 
-          onClick={handleBookingConfirm} 
-          disabled={isBookingLoading}
+        <Button
+          onClick={handleBookingConfirm}
+          disabled={isBookingLoading || !userEmail.trim()}
           className="w-full h-12 text-lg font-medium"
         >
           {isBookingLoading ? (
@@ -170,7 +190,7 @@ export function BookingCalendar() {
         </Button>
       </div>
     )
-  }, [bookingPlan, selectedSlot, selectedTimezone, handleBookingConfirm, isBookingLoading]);
+  }, [bookingPlan, selectedSlot, selectedTimezone, handleBookingConfirm, isBookingLoading, coaches, userEmail, setUserEmail]);
 
   // Function to render specific content for each section
   const renderSectionContent = (sectionId: string) => {
@@ -242,7 +262,7 @@ export function BookingCalendar() {
                 const coach = bookingPlan.coach || 'MATIAS';
                 return (
                   <p className="text-sm text-muted-foreground">
-                    These time slots are available based on {COACHES_CONFIG[coach].displayName}&apos;s working hours in their timezone ({COACHES_CONFIG[coach].timezone}, UTC{DateTime.now().setZone(COACHES_CONFIG[coach].timezone).toFormat('ZZ')}).
+                    These time slots are available based on {coaches[coach].displayName}&apos;s working hours in their timezone ({coaches[coach].timezone}, UTC{DateTime.now().setZone(coaches[coach].timezone).toFormat('ZZ')}).
                   </p>
                 );
               })()}
@@ -266,7 +286,8 @@ export function BookingCalendar() {
         <h2 className="text-2xl font-semibold shrink">Book a Consultation</h2>
           <div className="flex items-center space-x-2 shrink-0">
             <Globe className="h-4 w-4 text-muted-foreground" />
-            <TimeZoneSelector 
+            <TimeZoneSelector
+              className="max-w-xs"
               currentTimezone={selectedTimezone}
               onTimezoneChange={handleTimezoneChange}
             />

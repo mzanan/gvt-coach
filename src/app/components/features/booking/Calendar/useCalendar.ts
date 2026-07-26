@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useCallback } from 'react'
 import { DateTime } from 'luxon'
-import { CoachId, COACHES_CONFIG } from '@/config/coaches'
+import { CoachId } from '@/config/coaches'
+import { useAppConfig } from '@/app/components/core/AppConfigProvider'
 
 interface UseCalendarProps {
   onSelectDate: (date: Date) => void
@@ -19,8 +20,8 @@ export function useCalendar({
   selectedTimezone,
   selectedCoach
 }: UseCalendarProps) {
-  
-  // --- State ---
+  const { coaches } = useAppConfig();
+
   const [currentMonth, setCurrentMonth] = useState(() => {
     const userNow = DateTime.now().setZone(selectedTimezone);
     return userNow;
@@ -90,7 +91,7 @@ export function useCalendar({
   }, [suggestedDate, selectedTimezone]);
 
   const isDisabled = useCallback((date: DateTime) => {
-    const coachTimezone = COACHES_CONFIG[selectedCoach].timezone;
+    const coachTimezone = coaches[selectedCoach].timezone;
     const coachNow = DateTime.now().setZone(coachTimezone);
     const calendarDateInUserTZ = date.setZone(selectedTimezone).startOf('day');
     const calendarDateInCoachTZ = calendarDateInUserTZ.setZone(coachTimezone);
@@ -103,7 +104,7 @@ export function useCalendar({
     
     // Otherwise (it's today or earlier in coach's timezone)
     return true; // Disable past dates and coach's current day
-  }, [selectedTimezone, selectedCoach]);
+  }, [selectedTimezone, selectedCoach, coaches]);
 
   const isCurrentMonth = useCallback((date: DateTime) => {
     return date.hasSame(currentMonth, 'month');

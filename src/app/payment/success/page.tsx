@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 export default function PaymentSuccessPage() {
   return (
     <Suspense fallback={
-      <div className="container mx-auto py-8 max-w-2xl">
+      <div className="page-container py-8 max-w-2xl">
         <Card className="p-8 text-center">
           <Clock className="h-8 w-8 text-orange-500 mx-auto" />
           <h1 className="text-2xl font-bold mb-2">Loading Payment Details</h1>

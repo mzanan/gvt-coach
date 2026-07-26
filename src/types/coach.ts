@@ -1,13 +1,16 @@
 export interface WorkingHours {
   morning: {
-    start: number;  // UTC hour
-    end: number;    // UTC hour
+    start: number;
+    end: number;
   };
   afternoon: {
-    start: number;  // UTC hour
-    end: number;    // UTC hour
+    start: number;
+    end: number;
   };
 }
+
+export type CoachPaymentProvider = 'stripe' | 'polar' | 'lemonsqueezy' | 'disabled';
+export type CoachMeetingProvider = 'zoom' | 'google-meet';
 
 export interface CoachConfig {
   name: string;
@@ -22,4 +25,12 @@ export interface CoachConfig {
     weekly: number;
     twiceWeekly: number;
   };
-} 
+  paymentProvider?: CoachPaymentProvider;
+  meetingProvider?: CoachMeetingProvider;
+}
+
+export interface CoachRecord extends CoachConfig {
+  id: string;
+  paymentProvider: CoachPaymentProvider;
+  meetingProvider: CoachMeetingProvider;
+}

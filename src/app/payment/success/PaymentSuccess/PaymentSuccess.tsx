@@ -39,7 +39,7 @@ export function PaymentSuccess() {
   }
 
   return (
-    <div className="container mx-auto py-8 max-w-2xl">
+    <div className="page-container py-8 max-w-2xl">
       <Link href="/" className="text-primary hover:underline mb-8 inline-flex items-center gap-2">
         <ChevronLeft className="h-4 w-4" />
         Back to Calendar

@@ -1,33 +1,9 @@
-import { DateTime } from 'luxon'
-import { CoachConfig, WorkingHours } from '@/types/coach'
+import { CoachConfig } from '@/types/coach'
 
-// Define AND export Coach ID type locally as a workaround
-export type CoachId = 'MATIAS' | 'GABRIEL';
+export type CoachId = string;
 
-// Helper function to format time in coach's timezone
-function getLocalTime(utcHour: number, timezone: string): string {
-  const result = DateTime.fromObject({ hour: utcHour }, { zone: 'UTC' })
-    .setZone(timezone);
-  
-  return result.toFormat('h:mm a');
-}
-
-// Helper to get working hours in local timezone
-function getLocalWorkingHours(workingHours: WorkingHours, timezone: string) {
-  return {
-    morning: {
-      start: getLocalTime(workingHours.morning.start, timezone),
-      end: getLocalTime(workingHours.morning.end, timezone)
-    },
-    afternoon: {
-      start: getLocalTime(workingHours.afternoon.start, timezone),
-      end: getLocalTime(workingHours.afternoon.end, timezone)
-    }
-  };
-}
-
-export const COACHES_CONFIG: Record<CoachId, CoachConfig> = {
-  'MATIAS': { 
+export const COACHES_CONFIG: Record<string, CoachConfig> = {
+  'MATIAS': {
     name: 'Matias',
     displayName: 'Matias',
     description: 'Basic coaching sessions for beginners',
@@ -36,12 +12,12 @@ export const COACHES_CONFIG: Record<CoachId, CoachConfig> = {
     email: 'mzanan.net@gmail.com',
     workingHours: {
       morning: {
-        start: 1,  
-        end: 4,    
+        start: 1,
+        end: 4,
       },
       afternoon: {
-        start: 12, 
-        end: 16,   
+        start: 12,
+        end: 16,
       }
     },
     prices: {
@@ -50,12 +26,12 @@ export const COACHES_CONFIG: Record<CoachId, CoachConfig> = {
       twiceWeekly: 350
     }
   },
-  'GABRIEL': { 
+  'GABRIEL': {
     name: 'Gabriel',
     displayName: 'Gabriel',
     description: 'Advanced coaching sessions',
     photoUrl: '/coaches/gabriel.jpg',
-    timezone: 'Asia/Saigon', 
+    timezone: 'Asia/Saigon',
     email: 'coaching@gvtnomad.com',
     workingHours: {
       morning: { start: 1, end: 4 },
@@ -68,23 +44,3 @@ export const COACHES_CONFIG: Record<CoachId, CoachConfig> = {
     }
   }
 };
-
-// Export helper functions using the local CoachId type
-export function getCoachLocalWorkingHours(coach: CoachId, timezone: string) {
-  const config = COACHES_CONFIG[coach];
-  if (!config) {
-      console.warn(`Configuration for coach ${coach} not found.`);
-      return { morning: { start: '', end: '' }, afternoon: { start: '', end: '' } }; 
-  }
-  return getLocalWorkingHours(config.workingHours, timezone);
-}
-
-// Get coach timezone from config
-export function getCoachTimezone(coachId: CoachId = 'MATIAS'): string | null { 
-  const timezone = COACHES_CONFIG[coachId]?.timezone;
-  if (!timezone) {
-      console.error(`Timezone for coach ${coachId} not found in COACHES_CONFIG.`);
-      return null; 
-  }
-  return timezone;
-} 
