@@ -34,19 +34,11 @@ export function AdminPanel({ initialConfig }: AdminPanelProps) {
   const activeCoach = coaches[activeCoachId] || coachList[0]
 
   return (
-    <div className="space-y-8">
-      <header className="space-y-1">
-        <h1 className="text-3xl font-semibold tracking-tight">Admin</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage your site settings and coaches.
-        </p>
-      </header>
-
-      <Tabs value={section} onValueChange={setSection} className="space-y-6">
-        <TabsList className="w-full sm:w-auto">
-          <TabsTrigger value="general" className="flex-1 sm:flex-none">General</TabsTrigger>
-          <TabsTrigger value="coaches" className="flex-1 sm:flex-none">Coaches</TabsTrigger>
-        </TabsList>
+    <Tabs value={section} onValueChange={setSection} className="space-y-6">
+      <TabsList className="w-full sm:w-auto">
+        <TabsTrigger value="general" className="flex-1 sm:flex-none">General</TabsTrigger>
+        <TabsTrigger value="coaches" className="flex-1 sm:flex-none">Coaches</TabsTrigger>
+      </TabsList>
 
         <TabsContent value="general" className="mt-0">
           <SiteSettingsForm
@@ -87,8 +79,7 @@ export function AdminPanel({ initialConfig }: AdminPanelProps) {
               onDelete={removeCoach}
             />
           )}
-        </TabsContent>
-      </Tabs>
-    </div>
+      </TabsContent>
+    </Tabs>
   )
 }

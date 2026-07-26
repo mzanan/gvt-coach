@@ -1,7 +1,6 @@
 'use client'
 
-import { LogOut, Settings } from 'lucide-react'
-import Link from 'next/link'
+import { LogOut } from 'lucide-react'
 import {
   Avatar,
   AvatarFallback,
@@ -43,12 +42,6 @@ export function UserMenu({ email, name, image }: UserMenuProps) {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/admin">
-            <Settings className="h-4 w-4" />
-            Admin
-          </Link>
-        </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => signOutAction()}>
           <LogOut className="h-4 w-4" />
           Sign out

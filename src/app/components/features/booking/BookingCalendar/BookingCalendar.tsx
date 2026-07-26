@@ -286,7 +286,8 @@ export function BookingCalendar() {
         <h2 className="text-2xl font-semibold shrink">Book a Consultation</h2>
           <div className="flex items-center space-x-2 shrink-0">
             <Globe className="h-4 w-4 text-muted-foreground" />
-            <TimeZoneSelector 
+            <TimeZoneSelector
+              className="max-w-xs"
               currentTimezone={selectedTimezone}
               onTimezoneChange={handleTimezoneChange}
             />

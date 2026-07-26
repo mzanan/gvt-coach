@@ -144,8 +144,9 @@ export function CoachForm({ coach, canDelete, isSaving, onChange, onSave, onDele
             />
           </div>
           <div className="space-y-2">
-            <Label>Timezone</Label>
+            <Label htmlFor={`${coach.id}-timezone`}>Timezone</Label>
             <TimeZoneSelector
+              triggerId={`${coach.id}-timezone`}
               currentTimezone={coach.timezone}
               onTimezoneChange={timezone => set({ timezone })}
             />

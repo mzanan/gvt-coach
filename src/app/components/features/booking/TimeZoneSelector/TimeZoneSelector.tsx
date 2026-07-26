@@ -22,6 +22,8 @@ import { useTimeZoneSelector } from './useTimeZoneSelector'
 interface TimeZoneSelectorProps {
   currentTimezone: string;
   onTimezoneChange: (timezone: string) => void;
+  className?: string;
+  triggerId?: string;
 }
 
 export function TimeZoneSelector(props: TimeZoneSelectorProps) {
@@ -37,11 +39,11 @@ export function TimeZoneSelector(props: TimeZoneSelectorProps) {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          id={props.triggerId}
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="justify-between max-w-xs w-full"
-          size="sm"
+          className={cn("flex w-full justify-between font-normal", props.className)}
         >
           <span className="truncate">
             {currentTimezoneLabel}
@@ -49,7 +51,7 @@ export function TimeZoneSelector(props: TimeZoneSelectorProps) {
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[250px] p-0">
+      <PopoverContent className="w-[--radix-popover-trigger-width] min-w-[250px] p-0" align="start">
         <Command filter={(value, search) => {
           const option = timezoneOptions.find(opt => opt.value === value);
           const label = option?.label || value;
