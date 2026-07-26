@@ -1,6 +1,7 @@
 import { auth, signIn, signOut, isAdminEmail } from '@/auth'
 import { getAppConfig } from '@/config/appConfig'
 import { Button } from '@/app/components/ui-kit/button'
+import { GoogleIcon } from '@/app/components/ui-kit/GoogleIcon'
 import { AdminPanel } from '@/app/components/features/admin/AdminPanel'
 
 export default async function AdminPage() {
@@ -17,7 +18,10 @@ export default async function AdminPage() {
             await signIn('google', { redirectTo: '/admin' })
           }}
         >
-          <Button type="submit">Sign in with Google</Button>
+          <Button type="submit" variant="outline" className="gap-2">
+            <GoogleIcon />
+            Sign in with Google
+          </Button>
         </form>
       </main>
     )
