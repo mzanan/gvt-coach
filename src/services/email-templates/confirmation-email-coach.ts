@@ -11,22 +11,19 @@ export function getCoachConfirmationEmail(bookingDetails: ConfirmationEmailProps
   const coachTimezone = coach.timezone;
   const userTimezone = bookingDetails.user_timezone || DEFAULT_TIMEZONE;
 
-  // Format booking date and time in the coach's timezone
   const startDateTimeCoach = (typeof bookingDetails.start_time === 'string'
-    ? DateTime.fromISO(bookingDetails.start_time) // Assume UTC or with offset if ISO string
-    : DateTime.fromJSDate(bookingDetails.start_time) // If JS Date, keep its internal time
-  ).setZone(coachTimezone); // Convert to Coach's Timezone
+    ? DateTime.fromISO(bookingDetails.start_time)
+    : DateTime.fromJSDate(bookingDetails.start_time)
+  ).setZone(coachTimezone);
 
   const endDateTimeCoach = (typeof bookingDetails.end_time === 'string'
     ? DateTime.fromISO(bookingDetails.end_time)
     : DateTime.fromJSDate(bookingDetails.end_time)
   ).setZone(coachTimezone);
 
-  // Format booking date and time in the user's timezone
-  const startDateTimeUser = startDateTimeCoach.setZone(userTimezone); // Convert coach's start time to user's TZ
-  const endDateTimeUser = endDateTimeCoach.setZone(userTimezone);   // Convert coach's end time to user's TZ
+  const startDateTimeUser = startDateTimeCoach.setZone(userTimezone);
+  const endDateTimeUser = endDateTimeCoach.setZone(userTimezone);
 
-  // Get UTC offsets
   const coachOffset = startDateTimeCoach.toFormat('Z');
   const userOffset = startDateTimeUser.toFormat('Z');
 

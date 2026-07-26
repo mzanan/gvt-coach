@@ -15,7 +15,6 @@ import { getBookingSummary, cn } from '@/lib/utils'
 import { useAppConfig } from '@/app/components/core/AppConfigProvider'
 
 
-// Memoized payment button component to reduce renders
 const PaymentButton = React.memo(({ onClick, isLoading }: { onClick: () => void, isLoading: boolean }) => (
   <Button 
     onClick={onClick} 
@@ -30,7 +29,6 @@ const PaymentButton = React.memo(({ onClick, isLoading }: { onClick: () => void,
 ));
 PaymentButton.displayName = 'PaymentButton';
 
-// Memoized component to render a section to avoid unnecessary renders
 const MemoizedBookingSection = React.memo(({ 
   section, 
   activeSection, 
@@ -95,7 +93,6 @@ export function BookingCalendar() {
     handleBookingConfirm,
   } = useBookingCalendar()
 
-  // Memoize summary rendering to avoid repeated calculations
   const summaryContent = useMemo(() => {
     if (!bookingPlan || !selectedSlot || !bookingPlan.coach) return null;
    
@@ -192,7 +189,6 @@ export function BookingCalendar() {
     )
   }, [bookingPlan, selectedSlot, selectedTimezone, handleBookingConfirm, isBookingLoading, coaches, userEmail, setUserEmail]);
 
-  // Function to render specific content for each section
   const renderSectionContent = (sectionId: string) => {
     switch (sectionId) {
       case 'coach':
@@ -213,7 +209,6 @@ export function BookingCalendar() {
           />
         )
       case 'time':
-        // Show loading indicator while slots are loading
         if (isLoadingSlots) {
           return (
             <div className="flex justify-center items-center py-8">
@@ -221,11 +216,9 @@ export function BookingCalendar() {
             </div>
           );
         }
-        
-        // Display time slots with coach info
+
         return (
           <>
-            {/* Available time slots */}
             {availableSlots.map((dayGroup) => {
               return (
                 <div key={dayGroup.date.toString()} className="mb-4">
@@ -255,8 +248,7 @@ export function BookingCalendar() {
                 </div>
               );
             })}
-            
-            {/* Coach working hours explanation */}
+
             <div className="mt-6 p-4 bg-muted/30 rounded-lg">
               {(() => {
                 const coach = bookingPlan.coach || 'MATIAS';

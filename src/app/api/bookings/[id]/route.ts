@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/adminAuth';
+import { withAdmin } from '@/lib/adminAuth';
 import { getBookingById, updateBooking, type BookingWrite } from '@/lib/db/bookings';
 
 const PATCHABLE_FIELDS = [
@@ -33,43 +33,30 @@ export async function GET(
   }
 }
 
-export async function PATCH(
+export const PATCH = withAdmin(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await requireAdmin();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+) => {
+  const { id } = await params;
+  const updates = await request.json();
 
-    const { id } = await params;
-    const updates = await request.json();
+  const existingBooking = await getBookingById(id);
 
-    const existingBooking = await getBookingById(id);
-
-    if (!existingBooking) {
-      return NextResponse.json(
-        { error: `Booking not found with ID: ${id}` },
-        { status: 404 }
-      );
-    }
-
-    const fields: BookingWrite = {};
-    for (const field of PATCHABLE_FIELDS) {
-      if (updates[field] !== undefined) {
-        fields[field] = updates[field];
-      }
-    }
-
-    const updated = await updateBooking(id, fields);
-
-    return NextResponse.json(updated);
-  } catch (error) {
-    console.error('[PATCH /api/bookings/[id]] Error:', error);
+  if (!existingBooking) {
     return NextResponse.json(
-      { error: 'Internal Server Error' },
-      { status: 500 }
+      { error: `Booking not found with ID: ${id}` },
+      { status: 404 }
     );
   }
-}
+
+  const fields: BookingWrite = {};
+  for (const field of PATCHABLE_FIELDS) {
+    if (updates[field] !== undefined) {
+      fields[field] = updates[field];
+    }
+  }
+
+  const updated = await updateBooking(id, fields);
+
+  return NextResponse.json(updated);
+});

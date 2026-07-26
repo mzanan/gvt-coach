@@ -129,6 +129,35 @@ export async function getMappingByAnyOrderId(orderId: string): Promise<CheckoutM
   return result.rows[0] ? rowToMapping(result.rows[0]) : null;
 }
 
+export async function ensurePendingPaymentStatus(
+  orderId: string,
+  provider: string,
+  extraJson: Record<string, unknown> = {}
+): Promise<string> {
+  const existingMapping = await getMappingByAnyOrderId(orderId);
+  if (existingMapping?.payment_status_id) {
+    return existingMapping.payment_status_id;
+  }
+
+  const existingByJson = await findPaymentStatusByJsonOrderId(orderId);
+  const paymentStatusId = existingByJson
+    ? existingByJson.id
+    : (await insertPaymentStatus({
+        status: 'PENDING',
+        checkout_order_id: orderId,
+        json_data: { checkout_order_id: orderId, provider, ...extraJson }
+      })).id;
+
+  await upsertMapping({
+    checkout_order_id: orderId,
+    payment_order_id: orderId,
+    payment_status_id: paymentStatusId,
+    provider
+  });
+
+  return paymentStatusId;
+}
+
 export async function getMostRecentMapping(): Promise<CheckoutMappingRecord | null> {
   await ensureSchema();
   const result = await getDb().execute(

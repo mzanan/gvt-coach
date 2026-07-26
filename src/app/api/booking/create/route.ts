@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { BookingFrequency, PaymentOrderStatus } from '@/types/enums';
+import { BookingFrequency } from '@/types/enums';
 import { getBookingByOrderId, insertBooking } from '@/lib/db/bookings';
-import {
-  findPaymentStatusByJsonOrderId,
-  getMappingByAnyOrderId,
-  getMappingByOrderId,
-  insertPaymentStatus,
-  upsertMapping
-} from '@/lib/db/payments';
+import { ensurePendingPaymentStatus } from '@/lib/db/payments';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
@@ -20,45 +14,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }, { status: 400 });
     }
 
-    let paymentStatusId: string | null = null;
-
-    const existingMapping = await getMappingByOrderId(orderId);
-
-    if (existingMapping?.payment_status_id) {
-      paymentStatusId = existingMapping.payment_status_id;
-    } else {
-      const existingPaymentByJson = await findPaymentStatusByJsonOrderId(orderId);
-      if (existingPaymentByJson) {
-        paymentStatusId = existingPaymentByJson.id;
-      }
-    }
-
-    if (!paymentStatusId) {
-      const newPaymentStatus = await insertPaymentStatus({
-        status: PaymentOrderStatus.Pending,
-        json_data: {
-          checkout_order_id: orderId,
-          checkout_id: orderId,
-          status: PaymentOrderStatus.Pending,
-          event_type: 'checkout.initiated',
-          customer_email: bookingData?.userEmail || null,
-          product_id: bookingData?.productId || null,
-          updated_at: new Date().toISOString()
-        }
-      });
-      paymentStatusId = newPaymentStatus.id;
-    }
-
-    const mappingCheck = await getMappingByAnyOrderId(orderId);
-
-    if (!mappingCheck) {
-      await upsertMapping({
-        checkout_order_id: orderId,
-        payment_status_id: paymentStatusId,
-        provider,
-        payment_order_id: orderId
-      });
-    }
+    const paymentStatusId = await ensurePendingPaymentStatus(orderId, provider, {
+      checkout_id: orderId,
+      event_type: 'checkout.initiated',
+      customer_email: bookingData?.userEmail || null,
+      product_id: bookingData?.productId || null,
+      updated_at: new Date().toISOString()
+    });
 
     if (bookingData) {
       const existingBooking = await getBookingByOrderId(orderId);
