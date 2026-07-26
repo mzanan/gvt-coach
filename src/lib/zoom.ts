@@ -13,6 +13,14 @@ interface ZoomMeetingDetails {
   [key: string]: unknown;
 }
 
+export function isZoomConfigured(): boolean {
+  return Boolean(
+    process.env.GVT_COACH_ZOOM_ACCOUNT_ID &&
+    process.env.GVT_COACH_ZOOM_CLIENT_ID &&
+    process.env.GVT_COACH_ZOOM_CLIENT_SECRET
+  );
+}
+
 export async function getZoomAccessToken(): Promise<string> {
   const accountId = process.env.GVT_COACH_ZOOM_ACCOUNT_ID;
   const clientId = process.env.GVT_COACH_ZOOM_CLIENT_ID;

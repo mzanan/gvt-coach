@@ -1,20 +1,16 @@
 import { lemonSqueezyService } from './lemonsqueezy';
 import { polarService } from './polar';
+import { stripeService } from './stripe';
+import { disabledPaymentsService } from './disabled';
 import { PaymentProviderService } from '@/types/payment';
 
-/**
- * Payment service selection based on environment variable
- * NEXT_PUBLIC_GVT_COACH_PAYMENT_PROVIDER can be 'lemonsqueezy' or 'polar'
- */
-let selectedPaymentService: PaymentProviderService;
+const PROVIDERS: Record<string, PaymentProviderService> = {
+  stripe: stripeService,
+  polar: polarService,
+  lemonsqueezy: lemonSqueezyService,
+  disabled: disabledPaymentsService,
+};
 
-if (process.env.NEXT_PUBLIC_GVT_COACH_PAYMENT_PROVIDER === 'polar') {
-  selectedPaymentService = polarService;
-  console.log('Using Polar payments provider');
-} else {
-  // Default to LemonSqueezy
-  selectedPaymentService = lemonSqueezyService;
-  console.log('Using LemonSqueezy payments provider');
-}
+const selectedProvider = process.env.NEXT_PUBLIC_GVT_COACH_PAYMENT_PROVIDER || 'stripe';
 
-export const paymentService = selectedPaymentService; 
+export const paymentService: PaymentProviderService = PROVIDERS[selectedProvider] || stripeService;
