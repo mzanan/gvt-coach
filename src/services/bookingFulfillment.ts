@@ -2,11 +2,16 @@ import { sendBookingConfirmation } from '@/services/mailer';
 import { CoachId, COACHES_CONFIG } from '@/config/coaches';
 import { BookingDB } from '@/types/booking';
 import { getBookingsByOrderId, updateBooking } from '@/lib/db/bookings';
-import { createZoomMeeting } from '@/lib/zoom';
+import { createZoomMeeting, isZoomConfigured } from '@/lib/zoom';
 
 async function ensureMeetingLink(booking: BookingDB, logId: string): Promise<void> {
   try {
     if (booking.meet_link) {
+      return;
+    }
+
+    if (!isZoomConfigured()) {
+      console.warn(`[${logId}] Fulfillment - Zoom not configured, skipping meeting creation`);
       return;
     }
 
