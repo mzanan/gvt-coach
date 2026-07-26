@@ -4,6 +4,8 @@ import React, { useMemo } from 'react'
 import { useBookingCalendar } from './useBookingCalendar'
 import { Calendar } from '../Calendar'
 import { Button } from '@/app/components/ui-kit/button'
+import { Input } from '@/app/components/ui-kit/input'
+import { Label } from '@/app/components/ui-kit/label'
 import { ChevronDown, ChevronUp, Check, Loader2, Globe, User, DollarSign, Clock, CreditCard, CalendarIcon } from 'lucide-react'
 import { Card } from '@/app/components/ui-kit/card'
 import { DateTime } from 'luxon'
@@ -83,6 +85,8 @@ export function BookingCalendar() {
     isBookingLoading,
     isLoadingSlots,
     selectedTimezone,
+    userEmail,
+    setUserEmail,
     handleDateSelect,
     handleSlotSelect,
     handleSectionClick,
@@ -150,11 +154,26 @@ export function BookingCalendar() {
             </div>
           </div>
         </div>
-        
+
+        <div className="space-y-2">
+          <Label htmlFor="booking-email">Your email</Label>
+          <Input
+            id="booking-email"
+            type="email"
+            value={userEmail}
+            onChange={e => setUserEmail(e.target.value)}
+            placeholder="you@example.com"
+            autoComplete="email"
+          />
+          <p className="text-xs text-muted-foreground">
+            The booking confirmation and meeting link are sent to this address.
+          </p>
+        </div>
+
         {/* Payment button */}
-        <Button 
-          onClick={handleBookingConfirm} 
-          disabled={isBookingLoading}
+        <Button
+          onClick={handleBookingConfirm}
+          disabled={isBookingLoading || !userEmail.trim()}
           className="w-full h-12 text-lg font-medium"
         >
           {isBookingLoading ? (
@@ -171,7 +190,7 @@ export function BookingCalendar() {
         </Button>
       </div>
     )
-  }, [bookingPlan, selectedSlot, selectedTimezone, handleBookingConfirm, isBookingLoading, coaches]);
+  }, [bookingPlan, selectedSlot, selectedTimezone, handleBookingConfirm, isBookingLoading, coaches, userEmail, setUserEmail]);
 
   // Function to render specific content for each section
   const renderSectionContent = (sectionId: string) => {

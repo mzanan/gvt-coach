@@ -120,7 +120,8 @@ export const usePaymentSuccess = () => {
             meetingTopic,
             meetingTime: meetingTime.toISOString(),
             duration,
-            timezone: finalBooking.user_timezone || DEFAULT_TIMEZONE
+            timezone: finalBooking.user_timezone || DEFAULT_TIMEZONE,
+            coach: finalBooking.coach
           })
         });
 
