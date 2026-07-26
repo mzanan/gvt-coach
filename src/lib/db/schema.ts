@@ -58,6 +58,7 @@ export const SCHEMA_STATEMENTS = [
     prices TEXT NOT NULL,
     payment_provider TEXT NOT NULL DEFAULT 'stripe',
     meeting_provider TEXT NOT NULL DEFAULT 'zoom',
+    polar_product_id TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
     updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
   )`,
@@ -70,4 +71,8 @@ export const SCHEMA_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_bookings_user_email ON gvt_coach_meetings_bookings(user_email)`,
   `CREATE INDEX IF NOT EXISTS idx_bookings_booking_date ON gvt_coach_meetings_bookings(booking_date)`,
   `CREATE INDEX IF NOT EXISTS idx_mapping_payment_order_id ON gvt_coach_checkout_mapping(payment_order_id)`,
+];
+
+export const COLUMN_MIGRATIONS = [
+  `ALTER TABLE coaches ADD COLUMN polar_product_id TEXT NOT NULL DEFAULT ''`,
 ];

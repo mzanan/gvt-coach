@@ -9,7 +9,7 @@ export interface WorkingHours {
   };
 }
 
-export type CoachPaymentProvider = 'stripe' | 'polar' | 'lemonsqueezy' | 'disabled';
+export type CoachPaymentProvider = 'stripe' | 'polar' | 'disabled';
 export type CoachMeetingProvider = 'zoom' | 'google-meet';
 
 export interface CoachConfig {
@@ -27,10 +27,12 @@ export interface CoachConfig {
   };
   paymentProvider?: CoachPaymentProvider;
   meetingProvider?: CoachMeetingProvider;
+  polarProductId?: string;
 }
 
 export interface CoachRecord extends CoachConfig {
   id: string;
   paymentProvider: CoachPaymentProvider;
   meetingProvider: CoachMeetingProvider;
+  polarProductId: string;
 }

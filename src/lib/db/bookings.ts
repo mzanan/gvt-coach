@@ -107,6 +107,17 @@ export async function updateBooking(id: string, fields: BookingWrite): Promise<B
   return getBookingById(id);
 }
 
+export async function claimConfirmationEmail(id: string): Promise<boolean> {
+  await ensureSchema();
+  const result = await getDb().execute({
+    sql: `UPDATE gvt_coach_meetings_bookings
+          SET confirmation_email_sent = 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+          WHERE id = ? AND confirmation_email_sent = 0`,
+    args: [id]
+  });
+  return result.rowsAffected > 0;
+}
+
 export async function getPaidOrderIds(orderIds: string[]): Promise<Set<string>> {
   await ensureSchema();
   if (orderIds.length === 0) return new Set();

@@ -1,52 +1,23 @@
 import { getUserConfirmationEmail } from './email-templates/confirmation-email-user';
 import { getCoachConfirmationEmail } from './email-templates/confirmation-email-coach';
 import { PaymentOrderStatus } from '@/types/enums';
-import { getTimezoneCookie } from '@/lib/utils/cookies';
 import { COACHES_CONFIG, CoachId } from '@/config/coaches';
 import { DEFAULT_TIMEZONE } from '@/config/site';
 import { CoachConfig } from '@/types/coach';
 import { EmailData } from '@/types/email';
 import { BookingDB } from '@/types/booking';
+import { claimConfirmationEmail, getBookingById, updateBooking } from '@/lib/db/bookings';
+import { getCoach } from '@/lib/db/coaches';
+import { getMappingByOrderId } from '@/lib/db/payments';
 
 function apiUrl(path: string): string {
-  if (typeof window !== 'undefined') {
-    return path;
-  }
   const base = process.env.NEXT_PUBLIC_APP_URL || `http://localhost:${process.env.PORT || 3000}`;
   return `${base}${path}`;
 }
 
-async function fetchBooking(bookingId: string): Promise<BookingDB | null> {
-  try {
-    const response = await fetch(apiUrl(`/api/bookings/${encodeURIComponent(bookingId)}`));
-    if (!response.ok) return null;
-    return await response.json();
-  } catch {
-    return null;
-  }
-}
-
-async function patchBooking(bookingId: string, fields: Record<string, unknown>): Promise<void> {
-  await fetch(apiUrl(`/api/bookings/${encodeURIComponent(bookingId)}`), {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(fields)
-  });
-}
-
-async function fetchEffectiveCoachConfig(coachId: CoachId): Promise<CoachConfig> {
-  try {
-    const response = await fetch(apiUrl('/api/config'));
-    if (response.ok) {
-      const appConfig = await response.json();
-      if (appConfig?.coaches?.[coachId]) {
-        return appConfig.coaches[coachId];
-      }
-    }
-  } catch {
-    console.warn('[MAILER] Could not fetch effective config, using defaults');
-  }
-  return COACHES_CONFIG[coachId];
+async function fetchEffectiveCoachConfig(coachId: CoachId): Promise<CoachConfig | null> {
+  const coach = await getCoach(coachId);
+  return coach || COACHES_CONFIG[coachId] || null;
 }
 
 export async function sendEmail(emailData: EmailData) {
@@ -89,31 +60,23 @@ export async function sendBookingConfirmation(
 
   try {
     const selectedCoach: CoachId = bookingDetails.coach as CoachId;
+    const coachConfig = selectedCoach ? await fetchEffectiveCoachConfig(selectedCoach) : null;
 
-    if (!selectedCoach || !(selectedCoach in COACHES_CONFIG)) {
+    if (!coachConfig) {
       console.error('[MAILER ERROR] Invalid or missing coach in bookingDetails! Cannot determine correct coach.', bookingDetails);
       return { success: false, error: 'Invalid coach specified' };
     }
 
-    const coachConfig = await fetchEffectiveCoachConfig(selectedCoach);
-    const coachEmail = coachConfig?.email;
+    const coachEmail = coachConfig.email;
 
     let bookingRecord: BookingDB | null = null;
 
     if (bookingDetails.booking_id) {
-      bookingRecord = await fetchBooking(bookingDetails.booking_id);
+      bookingRecord = await getBookingById(bookingDetails.booking_id);
 
-      if (bookingRecord?.confirmation_email_sent) {
+      const claimed = await claimConfirmationEmail(bookingDetails.booking_id);
+      if (!claimed) {
         return { success: true, alreadySent: true };
-      }
-
-      await patchBooking(bookingDetails.booking_id, { confirmation_email_sent: true });
-    }
-
-    if (!userTimezone && typeof window !== 'undefined') {
-      const cookieTimezone = getTimezoneCookie();
-      if (cookieTimezone) {
-        userTimezone = cookieTimezone;
       }
     }
 
@@ -152,13 +115,9 @@ export async function sendBookingConfirmation(
         bookingInfo.checkout_order_id = bookingRecord.checkout_order_id;
 
         try {
-          const mappingResponse = await fetch(apiUrl(`/api/payments/mapping/${encodeURIComponent(bookingRecord.checkout_order_id)}`));
-          if (mappingResponse.ok) {
-            const mappingData = await mappingResponse.json();
-            if (mappingData?.provider) {
-              bookingInfo.provider = mappingData.provider.charAt(0).toUpperCase() +
-                                     mappingData.provider.slice(1);
-            }
+          const mapping = await getMappingByOrderId(bookingRecord.checkout_order_id);
+          if (mapping?.provider) {
+            bookingInfo.provider = mapping.provider.charAt(0).toUpperCase() + mapping.provider.slice(1);
           }
         } catch {
           console.warn('[MAILER] Could not resolve payment provider for coach email');
@@ -195,7 +154,7 @@ export async function sendBookingConfirmation(
 
     if (bookingDetails.booking_id) {
       try {
-        await patchBooking(bookingDetails.booking_id, { confirmation_email_sent: false });
+        await updateBooking(bookingDetails.booking_id, { confirmation_email_sent: false });
       } catch (dbError) {
         console.error('Could not unmark the flag:', dbError);
       }

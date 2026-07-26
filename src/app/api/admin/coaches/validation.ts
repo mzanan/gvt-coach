@@ -1,7 +1,7 @@
 import { CoachRecord } from '@/lib/db/coaches';
 import { CoachPaymentProvider, CoachMeetingProvider } from '@/types/coach';
 
-const PAYMENT_PROVIDERS: CoachPaymentProvider[] = ['stripe', 'polar', 'lemonsqueezy', 'disabled'];
+const PAYMENT_PROVIDERS: CoachPaymentProvider[] = ['stripe', 'polar', 'disabled'];
 const MEETING_PROVIDERS: CoachMeetingProvider[] = ['zoom', 'google-meet'];
 
 interface ValidationResult {
@@ -63,6 +63,12 @@ export function validateCoachPayload(body: unknown): ValidationResult {
     return { error: `Invalid meeting provider: ${data.meetingProvider}` };
   }
 
+  const polarProductId = typeof data.polarProductId === 'string' ? data.polarProductId.trim() : '';
+
+  if (paymentProvider === 'polar' && !polarProductId) {
+    return { error: 'A Polar product ID is required when the payment provider is Polar' };
+  }
+
   return {
     id: rawId,
     coach: {
@@ -83,6 +89,7 @@ export function validateCoachPayload(body: unknown): ValidationResult {
       },
       paymentProvider,
       meetingProvider,
+      polarProductId,
     },
   };
 }

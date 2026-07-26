@@ -11,7 +11,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { orderId } = await params;
     const searchParams = request.nextUrl.searchParams;
-    const provider = searchParams.get('provider') || 'lemonsqueezy';
+    const provider = searchParams.get('provider') || 'stripe';
 
     if (!orderId) {
       return NextResponse.json(

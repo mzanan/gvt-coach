@@ -1,5 +1,5 @@
 import { createClient, type Client } from '@libsql/client';
-import { SCHEMA_STATEMENTS } from './schema';
+import { SCHEMA_STATEMENTS, COLUMN_MIGRATIONS } from './schema';
 
 const globalForDb = globalThis as unknown as {
   dbClient?: Client;
@@ -25,6 +25,15 @@ export function ensureSchema(): Promise<void> {
       const db = getDb();
       for (const statement of SCHEMA_STATEMENTS) {
         await db.execute(statement);
+      }
+      for (const statement of COLUMN_MIGRATIONS) {
+        try {
+          await db.execute(statement);
+        } catch (error) {
+          if (!String(error).includes('duplicate column name')) {
+            throw error;
+          }
+        }
       }
     })();
   }
