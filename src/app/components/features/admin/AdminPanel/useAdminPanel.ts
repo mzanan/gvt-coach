@@ -1,72 +1,162 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { AppConfig, SiteConfig } from '@/config/appConfig'
-import { CoachId } from '@/config/coaches'
-import { CoachConfig } from '@/types/coach'
+import { CoachRecord } from '@/types/coach'
 import { useToast } from '@/app/components/ui-kit/use-toast'
 
 export function useAdminPanel(initialConfig: AppConfig) {
+  const router = useRouter()
   const { toast } = useToast()
-  const [config, setConfig] = useState<AppConfig>(initialConfig)
+  const [site, setSite] = useState<SiteConfig>(initialConfig.site)
+  const [coaches, setCoaches] = useState<Record<string, CoachRecord>>(initialConfig.coaches)
+  const [activeTab, setActiveTab] = useState('general')
   const [isSaving, setIsSaving] = useState(false)
 
   const updateSite = useCallback((field: keyof SiteConfig, value: string) => {
-    setConfig(prev => ({
-      ...prev,
-      site: { ...prev.site, [field]: value }
-    }))
+    setSite(prev => ({ ...prev, [field]: value }))
   }, [])
 
-  const updateCoach = useCallback((coachId: CoachId, coach: CoachConfig) => {
-    setConfig(prev => ({
-      ...prev,
-      coaches: { ...prev.coaches, [coachId]: coach }
-    }))
+  const updateCoach = useCallback((coach: CoachRecord) => {
+    setCoaches(prev => ({ ...prev, [coach.id]: coach }))
   }, [])
 
-  const updateProvider = useCallback((field: 'paymentProvider' | 'meetingProvider', value: string) => {
-    setConfig(prev => ({ ...prev, [field]: value } as AppConfig))
-  }, [])
+  const notifyError = useCallback((error: unknown, fallback: string) => {
+    toast({
+      title: 'Error',
+      description: error instanceof Error ? error.message : fallback,
+      variant: 'destructive'
+    })
+  }, [toast])
 
-  const handleSave = useCallback(async () => {
+  const saveSite = useCallback(async () => {
     setIsSaving(true)
     try {
       const response = await fetch('/api/admin/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config)
+        body: JSON.stringify({ site })
       })
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || `Save failed with status ${response.status}`)
+        throw new Error(errorData.error || 'Could not save site settings')
       }
 
-      const saved = await response.json()
-      setConfig(saved)
-
-      toast({
-        title: 'Saved',
-        description: 'Configuration updated successfully.'
-      })
+      toast({ title: 'Saved', description: 'Site settings updated.' })
+      router.refresh()
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Could not save configuration.',
-        variant: 'destructive'
-      })
+      notifyError(error, 'Could not save site settings.')
     } finally {
       setIsSaving(false)
     }
-  }, [config, toast])
+  }, [site, toast, router, notifyError])
+
+  const saveCoach = useCallback(async (coach: CoachRecord) => {
+    setIsSaving(true)
+    try {
+      const response = await fetch(`/api/admin/coaches/${encodeURIComponent(coach.id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(coach)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Could not save coach')
+      }
+
+      const saved = await response.json()
+      setCoaches(prev => ({ ...prev, [saved.id]: saved }))
+      toast({ title: 'Saved', description: `${saved.displayName} updated.` })
+      router.refresh()
+    } catch (error) {
+      notifyError(error, 'Could not save coach.')
+    } finally {
+      setIsSaving(false)
+    }
+  }, [toast, router, notifyError])
+
+  const createCoach = useCallback(async (id: string, displayName: string) => {
+    setIsSaving(true)
+    try {
+      const template = Object.values(coaches)[0]
+      const response = await fetch('/api/admin/coaches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          displayName,
+          name: displayName,
+          description: '',
+          photoUrl: '',
+          email: site.contactEmail,
+          timezone: template?.timezone || 'UTC',
+          workingHours: template?.workingHours || { morning: { start: 1, end: 4 }, afternoon: { start: 12, end: 16 } },
+          prices: { singleSession: 50, weekly: 200, twiceWeekly: 350 },
+          paymentProvider: template?.paymentProvider || 'stripe',
+          meetingProvider: template?.meetingProvider || 'zoom',
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Could not create coach')
+      }
+
+      const created = await response.json()
+      setCoaches(prev => ({ ...prev, [created.id]: created }))
+      setActiveTab(created.id)
+      toast({ title: 'Created', description: `${created.displayName} added.` })
+      router.refresh()
+      return true
+    } catch (error) {
+      notifyError(error, 'Could not create coach.')
+      return false
+    } finally {
+      setIsSaving(false)
+    }
+  }, [coaches, site.contactEmail, toast, router, notifyError])
+
+  const removeCoach = useCallback(async (id: string) => {
+    setIsSaving(true)
+    try {
+      const response = await fetch(`/api/admin/coaches/${encodeURIComponent(id)}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Could not delete coach')
+      }
+
+      setCoaches(prev => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+      setActiveTab('general')
+      toast({ title: 'Deleted', description: `Coach ${id} removed.` })
+      router.refresh()
+    } catch (error) {
+      notifyError(error, 'Could not delete coach.')
+    } finally {
+      setIsSaving(false)
+    }
+  }, [toast, router, notifyError])
 
   return {
-    config,
+    site,
+    coaches,
+    activeTab,
+    setActiveTab,
     isSaving,
     updateSite,
     updateCoach,
-    updateProvider,
-    handleSave,
+    saveSite,
+    saveCoach,
+    createCoach,
+    removeCoach,
   }
 }

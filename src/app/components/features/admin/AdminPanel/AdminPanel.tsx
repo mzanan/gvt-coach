@@ -1,20 +1,15 @@
 'use client'
 
+import { Plus } from 'lucide-react'
 import { Button } from '@/app/components/ui-kit/button'
 import { Card } from '@/app/components/ui-kit/card'
 import { Input } from '@/app/components/ui-kit/input'
 import { Label } from '@/app/components/ui-kit/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/app/components/ui-kit/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui-kit/tabs'
 import { AppConfig } from '@/config/appConfig'
-import { CoachId } from '@/config/coaches'
 import { useAdminPanel } from './useAdminPanel'
-import { CoachSettingsCard } from './CoachSettingsCard'
+import { CoachForm } from './CoachForm'
+import { NewCoachDialog } from './NewCoachDialog'
 
 interface AdminPanelProps {
   initialConfig: AppConfig;
@@ -22,107 +17,101 @@ interface AdminPanelProps {
 
 export function AdminPanel({ initialConfig }: AdminPanelProps) {
   const {
-    config,
+    site,
+    coaches,
+    activeTab,
+    setActiveTab,
     isSaving,
     updateSite,
     updateCoach,
-    updateProvider,
-    handleSave,
+    saveSite,
+    saveCoach,
+    createCoach,
+    removeCoach,
   } = useAdminPanel(initialConfig)
 
+  const coachList = Object.values(coaches)
+
   return (
-    <div className="space-y-8">
-      <Card className="p-6 space-y-4">
-        <h2 className="text-lg font-medium">Site</h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="siteName">Site name</Label>
-            <Input
-              id="siteName"
-              value={config.site.siteName}
-              onChange={e => updateSite('siteName', e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="siteDescription">Description</Label>
-            <Input
-              id="siteDescription"
-              value={config.site.siteDescription}
-              onChange={e => updateSite('siteDescription', e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="companyName">Company name</Label>
-            <Input
-              id="companyName"
-              value={config.site.companyName}
-              onChange={e => updateSite('companyName', e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="contactEmail">Contact email</Label>
-            <Input
-              id="contactEmail"
-              type="email"
-              value={config.site.contactEmail}
-              onChange={e => updateSite('contactEmail', e.target.value)}
-            />
-          </div>
-        </div>
-      </Card>
-
-      <Card className="p-6 space-y-4">
-        <h2 className="text-lg font-medium">Providers</h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Payment provider</Label>
-            <Select
-              value={config.paymentProvider}
-              onValueChange={value => updateProvider('paymentProvider', value)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="stripe">Stripe</SelectItem>
-                <SelectItem value="polar">Polar</SelectItem>
-                <SelectItem value="lemonsqueezy">Lemon Squeezy</SelectItem>
-                <SelectItem value="disabled">Disabled (testing)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Meeting provider</Label>
-            <Select
-              value={config.meetingProvider}
-              onValueChange={value => updateProvider('meetingProvider', value)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="zoom">Zoom</SelectItem>
-                <SelectItem value="google-meet">Google Meet (coming soon)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </Card>
-
-      {(Object.keys(config.coaches) as CoachId[]).map(coachId => (
-        <CoachSettingsCard
-          key={coachId}
-          coachId={coachId}
-          coach={config.coaches[coachId]}
-          onChange={updateCoach}
-        />
-      ))}
-
-      <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={isSaving}>
-          {isSaving ? 'Saving...' : 'Save changes'}
-        </Button>
+    <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <TabsList>
+          <TabsTrigger value="general">General</TabsTrigger>
+          {coachList.map(coach => (
+            <TabsTrigger key={coach.id} value={coach.id}>
+              {coach.displayName}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        <NewCoachDialog onCreate={createCoach} isSaving={isSaving}>
+          <Button variant="outline" size="sm" className="gap-1">
+            <Plus className="h-4 w-4" />
+            New coach
+          </Button>
+        </NewCoachDialog>
       </div>
-    </div>
+
+      <TabsContent value="general">
+        <Card className="p-6 space-y-4 max-w-2xl">
+          <h2 className="text-lg font-medium">Site</h2>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="siteName">Site name</Label>
+              <Input
+                id="siteName"
+                value={site.siteName}
+                onChange={e => updateSite('siteName', e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="siteDescription">Description</Label>
+              <Input
+                id="siteDescription"
+                value={site.siteDescription}
+                onChange={e => updateSite('siteDescription', e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="companyName">Company name</Label>
+              <Input
+                id="companyName"
+                value={site.companyName}
+                onChange={e => updateSite('companyName', e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contactEmail">Contact email</Label>
+              <Input
+                id="contactEmail"
+                type="email"
+                value={site.contactEmail}
+                onChange={e => updateSite('contactEmail', e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Used as the sender of booking confirmation emails when no dedicated sender is configured.
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={saveSite} disabled={isSaving}>
+              {isSaving ? 'Saving...' : 'Save site settings'}
+            </Button>
+          </div>
+        </Card>
+      </TabsContent>
+
+      {coachList.map(coach => (
+        <TabsContent key={coach.id} value={coach.id}>
+          <CoachForm
+            coach={coach}
+            canDelete={coachList.length > 1}
+            isSaving={isSaving}
+            onChange={updateCoach}
+            onSave={saveCoach}
+            onDelete={removeCoach}
+          />
+        </TabsContent>
+      ))}
+    </Tabs>
   )
 }
