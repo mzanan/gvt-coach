@@ -1,5 +1,3 @@
-'use client'
-
 import { BookingFrequency } from '@/types/enums'
 import { getBookingSummary } from '@/lib/utils'
 import { Badge } from '@/app/components/ui-kit/badge'
