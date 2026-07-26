@@ -85,7 +85,7 @@ export async function createPolarCheckout(productId: string, bookingData: Bookin
     
     const checkout = await polarClient.checkouts.create({
       successUrl: successUrlTemplate,
-      productId: productId,
+      products: [productId],
       allowDiscountCodes: false,
       customerEmail: bookingData?.userEmail ?? '',
       metadata: { ...safeMetadata, ...customMetadata }
@@ -156,7 +156,7 @@ export async function createPolarCheckoutSession({
     const successUrlTemplate = `${getRequestOrigin(server)}/payment/success?checkout_order_id={CHECKOUT_ID}`;
     
     const checkoutSession = await polarClient.checkouts.create({
-      productId: productId,
+      products: [productId],
       successUrl: successUrlTemplate,
       allowDiscountCodes: false,
       metadata: safeMetadata
