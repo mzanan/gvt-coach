@@ -46,6 +46,11 @@ export const SCHEMA_STATEMENTS = [
     sent_at TEXT,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
   )`,
+  `CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  )`,
   `CREATE INDEX IF NOT EXISTS idx_bookings_checkout_order_id ON gvt_coach_meetings_bookings(checkout_order_id)`,
   `CREATE INDEX IF NOT EXISTS idx_bookings_user_email ON gvt_coach_meetings_bookings(user_email)`,
   `CREATE INDEX IF NOT EXISTS idx_bookings_booking_date ON gvt_coach_meetings_bookings(booking_date)`,
