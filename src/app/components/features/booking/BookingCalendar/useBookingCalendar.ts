@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { TimeSlot, BookingPlan, DayGroup } from '@/types/booking'
 import { DateTime } from 'luxon'
 import { bookingService } from '@/services/bookingService'
-import { paymentService } from '@/services/payments'
+import { getPaymentService } from '@/services/payments'
 import { BookingFrequency } from '@/types/enums'
+import { useAppConfig } from '@/app/components/core/AppConfigProvider'
 import { setClientCookie, setTimezoneCookie, getTimezoneCookie } from '@/lib/utils/cookies'
 import { userService } from '@/services/userService'
 import { useToast } from '@/app/components/ui-kit/use-toast'
@@ -21,6 +22,7 @@ interface Section {
 
 export function useBookingCalendar() {
   const { toast } = useToast()
+  const { coaches, paymentProvider } = useAppConfig()
   const [sections, setSections] = useState<Section[]>([
     { id: 'coach', title: 'Select Coach', completed: false },
     { id: 'date', title: 'Select Date', completed: false },
@@ -117,7 +119,8 @@ export function useBookingCalendar() {
       const groupedSlots = await bookingService.getAvailableSlots(
         date,
         timezone,
-        coach
+        coach,
+        coaches[coach]
       );
       
       setAvailableSlots(groupedSlots);
@@ -133,7 +136,7 @@ export function useBookingCalendar() {
     } finally {
       setIsLoadingSlots(false);
     }
-  }, [toast, setIsLoadingSlots]); 
+  }, [toast, setIsLoadingSlots, coaches]);
 
 
   const handleTimezoneChange = useCallback((timezone: string) => {
@@ -274,7 +277,7 @@ export function useBookingCalendar() {
         frequency: bookingPlan?.frequency || BookingFrequency.Once
       };
 
-      const { checkoutUrl, orderId } = await paymentService.createCheckout(
+      const { checkoutUrl, orderId } = await getPaymentService(paymentProvider).createCheckout(
         updatedBookingPlan,
         userProfile as UserProfile,
         true
@@ -304,7 +307,7 @@ export function useBookingCalendar() {
       });
       setIsBookingLoading(false);
     }
-  }, [bookingPlan, selectedSlot, userProfile, selectedTimezone, toast]);
+  }, [bookingPlan, selectedSlot, userProfile, selectedTimezone, toast, paymentProvider]);
 
   const handleNextSection = useCallback(() => {
     const activeIndex = sections.findIndex(s => s.id === activeSection);

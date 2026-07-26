@@ -3,10 +3,17 @@ import { CoachId, COACHES_CONFIG } from '@/config/coaches';
 import { BookingDB } from '@/types/booking';
 import { getBookingsByOrderId, updateBooking } from '@/lib/db/bookings';
 import { createZoomMeeting, isZoomConfigured } from '@/lib/zoom';
+import { getMeetingProvider } from '@/config/appConfig';
 
 async function ensureMeetingLink(booking: BookingDB, logId: string): Promise<void> {
   try {
     if (booking.meet_link) {
+      return;
+    }
+
+    const meetingProvider = await getMeetingProvider();
+    if (meetingProvider !== 'zoom') {
+      console.warn(`[${logId}] Fulfillment - Meeting provider '${meetingProvider}' not implemented yet, skipping meeting creation`);
       return;
     }
 

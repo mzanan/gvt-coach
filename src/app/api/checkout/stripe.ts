@@ -1,6 +1,7 @@
 import Stripe from 'stripe';
 import { BookingFrequency } from '@/types/enums';
 import { CoachId, COACHES_CONFIG } from '@/config/coaches';
+import { getEffectiveCoachesConfig } from '@/config/appConfig';
 
 interface StripeBookingData {
   userEmail?: string;
@@ -44,7 +45,8 @@ export async function createStripeCheckout(bookingData: StripeBookingData): Prom
   }
 
   const frequency = bookingData.bookingPlan?.frequency || BookingFrequency.Once;
-  const coachConfig = COACHES_CONFIG[coach];
+  const coachesConfig = await getEffectiveCoachesConfig();
+  const coachConfig = coachesConfig[coach];
   const price = coachConfig.prices[FREQUENCY_PRICE_KEY[frequency]];
 
   if (!price || price <= 0) {

@@ -11,6 +11,7 @@ const PROVIDERS: Record<string, PaymentProviderService> = {
   disabled: disabledPaymentsService,
 };
 
-const selectedProvider = process.env.NEXT_PUBLIC_GVT_COACH_PAYMENT_PROVIDER || 'stripe';
-
-export const paymentService: PaymentProviderService = PROVIDERS[selectedProvider] || stripeService;
+export function getPaymentService(provider?: string): PaymentProviderService {
+  const fallback = process.env.NEXT_PUBLIC_GVT_COACH_PAYMENT_PROVIDER || 'stripe';
+  return PROVIDERS[provider || fallback] || stripeService;
+}

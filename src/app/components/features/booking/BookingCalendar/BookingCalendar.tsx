@@ -10,7 +10,7 @@ import { DateTime } from 'luxon'
 import { CoachSelector } from '../CoachSelector'
 import { TimeZoneSelector } from '../TimeZoneSelector'
 import { getBookingSummary, cn } from '@/lib/utils'
-import { COACHES_CONFIG } from '@/config/coaches'
+import { useAppConfig } from '@/app/components/core/AppConfigProvider'
 
 
 // Memoized payment button component to reduce renders
@@ -71,6 +71,7 @@ const MemoizedBookingSection = React.memo(({
 MemoizedBookingSection.displayName = 'MemoizedBookingSection';
 
 export function BookingCalendar() {
+  const { coaches } = useAppConfig()
   const {
     sections,
     activeSection,
@@ -95,7 +96,7 @@ export function BookingCalendar() {
     if (!bookingPlan || !selectedSlot || !bookingPlan.coach) return null;
    
     const coach = bookingPlan.coach;
-    const price = COACHES_CONFIG[coach].prices.singleSession;
+    const price = coaches[coach].prices.singleSession;
   
     return (
       <div className="space-y-6">
@@ -123,7 +124,7 @@ export function BookingCalendar() {
                   </div>
                   <div>
                     <h3 className="text-lg font-medium">Coach</h3>
-                    <p className="text-muted-foreground">{COACHES_CONFIG[coach].displayName}</p>
+                    <p className="text-muted-foreground">{coaches[coach].displayName}</p>
                   </div>
                 </div>
               )}
@@ -170,7 +171,7 @@ export function BookingCalendar() {
         </Button>
       </div>
     )
-  }, [bookingPlan, selectedSlot, selectedTimezone, handleBookingConfirm, isBookingLoading]);
+  }, [bookingPlan, selectedSlot, selectedTimezone, handleBookingConfirm, isBookingLoading, coaches]);
 
   // Function to render specific content for each section
   const renderSectionContent = (sectionId: string) => {
@@ -242,7 +243,7 @@ export function BookingCalendar() {
                 const coach = bookingPlan.coach || 'MATIAS';
                 return (
                   <p className="text-sm text-muted-foreground">
-                    These time slots are available based on {COACHES_CONFIG[coach].displayName}&apos;s working hours in their timezone ({COACHES_CONFIG[coach].timezone}, UTC{DateTime.now().setZone(COACHES_CONFIG[coach].timezone).toFormat('ZZ')}).
+                    These time slots are available based on {coaches[coach].displayName}&apos;s working hours in their timezone ({coaches[coach].timezone}, UTC{DateTime.now().setZone(coaches[coach].timezone).toFormat('ZZ')}).
                   </p>
                 );
               })()}

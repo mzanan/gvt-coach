@@ -2,8 +2,9 @@ import { getUserConfirmationEmail } from './email-templates/confirmation-email-u
 import { getCoachConfirmationEmail } from './email-templates/confirmation-email-coach';
 import { PaymentOrderStatus } from '@/types/enums';
 import { getTimezoneCookie } from '@/lib/utils/cookies';
-import { COACHES_CONFIG, getCoachTimezone, CoachId } from '@/config/coaches';
+import { COACHES_CONFIG, CoachId } from '@/config/coaches';
 import { DEFAULT_TIMEZONE } from '@/config/site';
+import { CoachConfig } from '@/types/coach';
 import { EmailData } from '@/types/email';
 import { BookingDB } from '@/types/booking';
 
@@ -31,6 +32,21 @@ async function patchBooking(bookingId: string, fields: Record<string, unknown>):
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(fields)
   });
+}
+
+async function fetchEffectiveCoachConfig(coachId: CoachId): Promise<CoachConfig> {
+  try {
+    const response = await fetch(apiUrl('/api/config'));
+    if (response.ok) {
+      const appConfig = await response.json();
+      if (appConfig?.coaches?.[coachId]) {
+        return appConfig.coaches[coachId];
+      }
+    }
+  } catch {
+    console.warn('[MAILER] Could not fetch effective config, using defaults');
+  }
+  return COACHES_CONFIG[coachId];
 }
 
 export async function sendEmail(emailData: EmailData) {
@@ -79,9 +95,8 @@ export async function sendBookingConfirmation(
       return { success: false, error: 'Invalid coach specified' };
     }
 
-    const coachConfig = COACHES_CONFIG[selectedCoach];
+    const coachConfig = await fetchEffectiveCoachConfig(selectedCoach);
     const coachEmail = coachConfig?.email;
-    getCoachTimezone(selectedCoach);
 
     let bookingRecord: BookingDB | null = null;
 
@@ -119,11 +134,11 @@ export async function sendBookingConfirmation(
       user_email: to,
       user_timezone: userTimezone,
       coach: selectedCoach
-    });
+    }, coachConfig);
 
     await sendEmail({
       to,
-      subject: `New GVT Coaching Session Confirmed with ${COACHES_CONFIG[selectedCoach].displayName}! 🎉`,
+      subject: `New GVT Coaching Session Confirmed with ${coachConfig.displayName}! 🎉`,
       html: userEmailContent.html
     });
 
@@ -163,7 +178,7 @@ export async function sendBookingConfirmation(
         payment_confirmed: true,
         payment_provider: bookingInfo.provider,
         coach: selectedCoach
-      });
+      }, coachConfig);
 
       await sendEmail({
         to: coachEmail,
