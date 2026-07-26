@@ -172,7 +172,6 @@ export function CoachForm({ coach, canDelete, isSaving, onChange, onSave, onDele
               <SelectContent>
                 <SelectItem value="stripe">Stripe</SelectItem>
                 <SelectItem value="polar">Polar</SelectItem>
-                <SelectItem value="lemonsqueezy">Lemon Squeezy</SelectItem>
                 <SelectItem value="disabled">Disabled (testing)</SelectItem>
               </SelectContent>
             </Select>
@@ -192,6 +191,20 @@ export function CoachForm({ coach, canDelete, isSaving, onChange, onSave, onDele
               </SelectContent>
             </Select>
           </div>
+          {coach.paymentProvider === 'polar' && (
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor={`${coach.id}-polarProductId`}>Polar product ID</Label>
+              <Input
+                id={`${coach.id}-polarProductId`}
+                value={coach.polarProductId}
+                onChange={e => set({ polarProductId: e.target.value })}
+                placeholder="Product ID from your Polar dashboard"
+              />
+              <p className="text-xs text-muted-foreground">
+                Required for Polar checkouts. Stripe uses the prices below instead.
+              </p>
+            </div>
+          )}
         </div>
       </Card>
 

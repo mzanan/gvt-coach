@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       payment_order_id: orderId,
       payment_identifier_id: null,
       payment_status_id: paymentStatus.id,
-      provider: provider || process.env.NEXT_PUBLIC_GVT_COACH_PAYMENT_PROVIDER || 'lemonsqueezy'
+      provider: provider || process.env.NEXT_PUBLIC_GVT_COACH_PAYMENT_PROVIDER || 'stripe'
     });
 
     if (bookingData && bookingData.userEmail && bookingData.selectedDate) {

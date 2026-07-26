@@ -12,7 +12,7 @@ import {
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const body = await req.json();
-    const { orderId, bookingData, provider = 'lemonsqueezy' } = body;
+    const { orderId, bookingData, provider = 'stripe' } = body;
 
     if (!orderId) {
       return NextResponse.json({
