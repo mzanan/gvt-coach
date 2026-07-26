@@ -90,7 +90,7 @@ export function CoachForm({ coach, canDelete, isSaving, onChange, onSave, onDele
   const set = (fields: Partial<CoachRecord>) => onChange({ ...coach, ...fields })
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6">
       <Card className="p-6 space-y-6">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 relative rounded-full overflow-hidden bg-muted flex items-center justify-center shrink-0">
@@ -106,7 +106,7 @@ export function CoachForm({ coach, canDelete, isSaving, onChange, onSave, onDele
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor={`${coach.id}-displayName`}>Display name</Label>
             <Input
@@ -125,7 +125,7 @@ export function CoachForm({ coach, canDelete, isSaving, onChange, onSave, onDele
             />
             <p className="text-xs text-muted-foreground">Receives the booking notifications for this coach.</p>
           </div>
-          <div className="space-y-2 md:col-span-2">
+          <div className="space-y-2 sm:col-span-2">
             <Label htmlFor={`${coach.id}-description`}>Description</Label>
             <Textarea
               id={`${coach.id}-description`}
@@ -158,7 +158,7 @@ export function CoachForm({ coach, canDelete, isSaving, onChange, onSave, onDele
           <h3 className="font-medium">Providers</h3>
           <p className="text-sm text-muted-foreground">How this coach gets paid and where the sessions happen.</p>
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
             <Label>Payments</Label>
             <Select
@@ -199,7 +199,7 @@ export function CoachForm({ coach, canDelete, isSaving, onChange, onSave, onDele
           <h3 className="font-medium">Prices</h3>
           <p className="text-sm text-muted-foreground">USD per plan.</p>
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           <PriceInput
             id={`${coach.id}-price-single`}
             label="Single session"
@@ -226,7 +226,7 @@ export function CoachForm({ coach, canDelete, isSaving, onChange, onSave, onDele
           <h3 className="font-medium">Working hours</h3>
           <p className="text-sm text-muted-foreground">In UTC. Slots are offered inside these two shifts.</p>
         </div>
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           <HourSelect
             id={`${coach.id}-morning-start`}
             label="Morning from"
@@ -254,10 +254,10 @@ export function CoachForm({ coach, canDelete, isSaving, onChange, onSave, onDele
         </div>
       </Card>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Dialog>
           <DialogTrigger asChild>
-            <Button variant="destructive" size="sm" className="gap-1" disabled={!canDelete || isSaving}>
+            <Button variant="destructive" size="sm" className="gap-1 w-full sm:w-auto" disabled={!canDelete || isSaving}>
               <Trash2 className="h-4 w-4" />
               Delete coach
             </Button>
@@ -277,7 +277,7 @@ export function CoachForm({ coach, canDelete, isSaving, onChange, onSave, onDele
           </DialogContent>
         </Dialog>
 
-        <Button onClick={() => onSave(coach)} disabled={isSaving}>
+        <Button onClick={() => onSave(coach)} disabled={isSaving} className="w-full sm:w-auto">
           {isSaving ? 'Saving...' : 'Save coach'}
         </Button>
       </div>

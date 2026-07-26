@@ -6,7 +6,7 @@ export async function Footer() {
 
   return (
     <footer className="w-full bg-background">
-      <div className="container mx-auto py-8 md:py-12 text-center mx-auto">
+      <div className="page-container py-8 md:py-12 text-center">
           <p className="text-sm">© {year} {site.companyName}. All rights reserved.</p>
       </div>
     </footer>

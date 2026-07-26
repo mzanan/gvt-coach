@@ -38,7 +38,7 @@ export function BookingHome() {
   }
 
   return (
-    <main className="container mx-auto py-8">
+    <main className="page-container py-8">
       <BookingCalendar />
     </main>
   )

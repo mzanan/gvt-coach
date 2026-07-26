@@ -11,7 +11,8 @@ export function useAdminPanel(initialConfig: AppConfig) {
   const { toast } = useToast()
   const [site, setSite] = useState<SiteConfig>(initialConfig.site)
   const [coaches, setCoaches] = useState<Record<string, CoachRecord>>(initialConfig.coaches)
-  const [activeTab, setActiveTab] = useState('general')
+  const [section, setSection] = useState('general')
+  const [activeCoachId, setActiveCoachId] = useState(Object.keys(initialConfig.coaches)[0] || '')
   const [isSaving, setIsSaving] = useState(false)
 
   const updateSite = useCallback((field: keyof SiteConfig, value: string) => {
@@ -107,7 +108,7 @@ export function useAdminPanel(initialConfig: AppConfig) {
 
       const created = await response.json()
       setCoaches(prev => ({ ...prev, [created.id]: created }))
-      setActiveTab(created.id)
+      setActiveCoachId(created.id)
       toast({ title: 'Created', description: `${created.displayName} added.` })
       router.refresh()
       return true
@@ -134,9 +135,9 @@ export function useAdminPanel(initialConfig: AppConfig) {
       setCoaches(prev => {
         const next = { ...prev }
         delete next[id]
+        setActiveCoachId(Object.keys(next)[0] || '')
         return next
       })
-      setActiveTab('general')
       toast({ title: 'Deleted', description: `Coach ${id} removed.` })
       router.refresh()
     } catch (error) {
@@ -149,8 +150,10 @@ export function useAdminPanel(initialConfig: AppConfig) {
   return {
     site,
     coaches,
-    activeTab,
-    setActiveTab,
+    section,
+    setSection,
+    activeCoachId,
+    setActiveCoachId,
     isSaving,
     updateSite,
     updateCoach,

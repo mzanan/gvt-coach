@@ -13,7 +13,7 @@ export default function PaymentCancelPage() {
   }, [])
 
   return (
-    <div className="container mx-auto py-8 max-w-2xl">
+    <div className="page-container py-8 max-w-2xl">
       <Card className="p-8 text-center">
         <div className="mb-6">
           <XCircle className="h-12 w-12 text-red-500 mx-auto" />

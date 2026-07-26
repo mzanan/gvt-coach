@@ -1,6 +1,8 @@
-import { auth, signIn, signOut, isAdminEmail } from '@/auth'
+import { auth, isAdminEmail } from '@/auth'
+import { signInWithGoogle } from '@/app/actions/auth'
 import { getAppConfig } from '@/config/appConfig'
 import { Button } from '@/app/components/ui-kit/button'
+import { Card } from '@/app/components/ui-kit/card'
 import { GoogleIcon } from '@/app/components/ui-kit/GoogleIcon'
 import { AdminPanel } from '@/app/components/features/admin/AdminPanel'
 
@@ -9,43 +11,30 @@ export default async function AdminPage() {
 
   if (!isAdminEmail(session?.user?.email)) {
     return (
-      <main className="container mx-auto py-24 flex flex-col items-center gap-6">
-        <h1 className="text-2xl font-semibold">Admin</h1>
-        <p className="text-muted-foreground">Sign in with an authorized Google account to manage the site configuration.</p>
-        <form
-          action={async () => {
-            'use server'
-            await signIn('google', { redirectTo: '/admin' })
-          }}
-        >
-          <Button type="submit" variant="outline" className="gap-2">
-            <GoogleIcon />
-            Sign in with Google
-          </Button>
-        </form>
-      </main>
+      <div className="page-container py-24 flex justify-center">
+        <Card className="w-full max-w-sm p-8 flex flex-col items-center gap-6 text-center">
+          <div className="space-y-2">
+            <h1 className="text-2xl font-semibold">Admin</h1>
+            <p className="text-sm text-muted-foreground">
+              Sign in with an authorized Google account to manage the site configuration.
+            </p>
+          </div>
+          <form action={signInWithGoogle} className="w-full">
+            <Button type="submit" variant="outline" className="w-full gap-2">
+              <GoogleIcon />
+              Sign in with Google
+            </Button>
+          </form>
+        </Card>
+      </div>
     )
   }
 
   const config = await getAppConfig()
 
   return (
-    <main className="container mx-auto py-8 space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Admin</h1>
-          <p className="text-sm text-muted-foreground">{session?.user?.email}</p>
-        </div>
-        <form
-          action={async () => {
-            'use server'
-            await signOut({ redirectTo: '/' })
-          }}
-        >
-          <Button type="submit" variant="outline">Sign out</Button>
-        </form>
-      </div>
+    <div className="page-container py-8 md:py-12">
       <AdminPanel initialConfig={config} />
-    </main>
+    </div>
   )
 }

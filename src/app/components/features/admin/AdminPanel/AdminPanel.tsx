@@ -2,14 +2,12 @@
 
 import { Plus } from 'lucide-react'
 import { Button } from '@/app/components/ui-kit/button'
-import { Card } from '@/app/components/ui-kit/card'
-import { Input } from '@/app/components/ui-kit/input'
-import { Label } from '@/app/components/ui-kit/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui-kit/tabs'
 import { AppConfig } from '@/config/appConfig'
 import { useAdminPanel } from './useAdminPanel'
 import { CoachForm } from './CoachForm'
 import { NewCoachDialog } from './NewCoachDialog'
+import { SiteSettingsForm } from './SiteSettingsForm'
 
 interface AdminPanelProps {
   initialConfig: AppConfig;
@@ -19,8 +17,10 @@ export function AdminPanel({ initialConfig }: AdminPanelProps) {
   const {
     site,
     coaches,
-    activeTab,
-    setActiveTab,
+    section,
+    setSection,
+    activeCoachId,
+    setActiveCoachId,
     isSaving,
     updateSite,
     updateCoach,
@@ -31,87 +31,64 @@ export function AdminPanel({ initialConfig }: AdminPanelProps) {
   } = useAdminPanel(initialConfig)
 
   const coachList = Object.values(coaches)
+  const activeCoach = coaches[activeCoachId] || coachList[0]
 
   return (
-    <Tabs value={activeTab} onValueChange={setActiveTab}>
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <TabsList>
-          <TabsTrigger value="general">General</TabsTrigger>
-          {coachList.map(coach => (
-            <TabsTrigger key={coach.id} value={coach.id}>
-              {coach.displayName}
-            </TabsTrigger>
-          ))}
+    <div className="space-y-8">
+      <header className="space-y-1">
+        <h1 className="text-3xl font-semibold tracking-tight">Admin</h1>
+        <p className="text-sm text-muted-foreground">
+          Manage your site settings and coaches.
+        </p>
+      </header>
+
+      <Tabs value={section} onValueChange={setSection} className="space-y-6">
+        <TabsList className="w-full sm:w-auto">
+          <TabsTrigger value="general" className="flex-1 sm:flex-none">General</TabsTrigger>
+          <TabsTrigger value="coaches" className="flex-1 sm:flex-none">Coaches</TabsTrigger>
         </TabsList>
-        <NewCoachDialog onCreate={createCoach} isSaving={isSaving}>
-          <Button variant="outline" size="sm" className="gap-1">
-            <Plus className="h-4 w-4" />
-            New coach
-          </Button>
-        </NewCoachDialog>
-      </div>
 
-      <TabsContent value="general">
-        <Card className="p-6 space-y-4 max-w-2xl">
-          <h2 className="text-lg font-medium">Site</h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="siteName">Site name</Label>
-              <Input
-                id="siteName"
-                value={site.siteName}
-                onChange={e => updateSite('siteName', e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="siteDescription">Description</Label>
-              <Input
-                id="siteDescription"
-                value={site.siteDescription}
-                onChange={e => updateSite('siteDescription', e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="companyName">Company name</Label>
-              <Input
-                id="companyName"
-                value={site.companyName}
-                onChange={e => updateSite('companyName', e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="contactEmail">Contact email</Label>
-              <Input
-                id="contactEmail"
-                type="email"
-                value={site.contactEmail}
-                onChange={e => updateSite('contactEmail', e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Used as the sender of booking confirmation emails when no dedicated sender is configured.
-              </p>
-            </div>
-          </div>
-          <div className="flex justify-end">
-            <Button onClick={saveSite} disabled={isSaving}>
-              {isSaving ? 'Saving...' : 'Save site settings'}
-            </Button>
-          </div>
-        </Card>
-      </TabsContent>
-
-      {coachList.map(coach => (
-        <TabsContent key={coach.id} value={coach.id}>
-          <CoachForm
-            coach={coach}
-            canDelete={coachList.length > 1}
+        <TabsContent value="general" className="mt-0">
+          <SiteSettingsForm
+            site={site}
             isSaving={isSaving}
-            onChange={updateCoach}
-            onSave={saveCoach}
-            onDelete={removeCoach}
+            onChange={updateSite}
+            onSave={saveSite}
           />
         </TabsContent>
-      ))}
-    </Tabs>
+
+        <TabsContent value="coaches" className="mt-0 space-y-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Tabs value={activeCoach?.id} onValueChange={setActiveCoachId}>
+              <TabsList className="flex-wrap h-auto">
+                {coachList.map(coach => (
+                  <TabsTrigger key={coach.id} value={coach.id}>
+                    {coach.displayName}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+            <NewCoachDialog onCreate={createCoach} isSaving={isSaving}>
+              <Button variant="outline" size="sm" className="gap-1 self-start sm:self-auto">
+                <Plus className="h-4 w-4" />
+                New coach
+              </Button>
+            </NewCoachDialog>
+          </div>
+
+          {activeCoach && (
+            <CoachForm
+              key={activeCoach.id}
+              coach={activeCoach}
+              canDelete={coachList.length > 1}
+              isSaving={isSaving}
+              onChange={updateCoach}
+              onSave={saveCoach}
+              onDelete={removeCoach}
+            />
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
   )
 }
