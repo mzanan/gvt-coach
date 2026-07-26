@@ -1,3 +1,4 @@
+import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks'
 import { PaymentOrderStatus } from '@/types/enums'
 import { fulfillPaidBookings } from '@/services/bookingFulfillment'
 import {
@@ -36,8 +37,29 @@ interface WebhookPayload {
 
 export async function POST(request: Request) {
   try {
-    const clonedRequest = request.clone();
-    const body = await clonedRequest.json();
+    const webhookSecret = process.env.GVT_COACH_POLAR_WEBHOOK_SECRET;
+
+    if (!webhookSecret) {
+      console.error('[ERROR] Polar webhook - Missing GVT_COACH_POLAR_WEBHOOK_SECRET');
+      return new Response(JSON.stringify({ error: 'Webhook not configured' }), { status: 500 });
+    }
+
+    const rawBody = await request.text();
+    const headers: Record<string, string> = {};
+    request.headers.forEach((value, key) => {
+      headers[key] = value;
+    });
+
+    let body: WebhookPayload;
+    try {
+      body = validateEvent(rawBody, headers, webhookSecret) as WebhookPayload;
+    } catch (verificationError) {
+      if (verificationError instanceof WebhookVerificationError) {
+        console.error('[ERROR] Polar webhook - Signature verification failed');
+        return new Response(JSON.stringify({ error: 'Invalid signature' }), { status: 403 });
+      }
+      throw verificationError;
+    }
 
     const response = new Response(JSON.stringify({ message: 'Webhook received' }), {
       status: 202,
