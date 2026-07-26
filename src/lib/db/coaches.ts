@@ -19,6 +19,7 @@ function rowToCoach(row: Row): CoachRecord {
     prices: JSON.parse(String(record.prices)),
     paymentProvider: String(record.payment_provider) as CoachPaymentProvider,
     meetingProvider: String(record.meeting_provider) as CoachMeetingProvider,
+    polarProductId: String(record.polar_product_id ?? ''),
   };
 }
 
@@ -27,8 +28,8 @@ async function seedFromDefaults(): Promise<void> {
 
   for (const [id, coach] of Object.entries(COACHES_CONFIG)) {
     await getDb().execute({
-      sql: `INSERT INTO coaches (id, name, display_name, description, photo_url, timezone, email, working_hours, prices, payment_provider, meeting_provider)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO coaches (id, name, display_name, description, photo_url, timezone, email, working_hours, prices, payment_provider, meeting_provider, polar_product_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         id,
         coach.name,
@@ -41,6 +42,7 @@ async function seedFromDefaults(): Promise<void> {
         JSON.stringify(coach.prices),
         defaultPaymentProvider,
         'zoom',
+        '',
       ]
     });
   }
@@ -66,8 +68,8 @@ export async function getCoach(id: string): Promise<CoachRecord | null> {
 export async function upsertCoach(id: string, coach: Omit<CoachRecord, 'id'>): Promise<CoachRecord | null> {
   await ensureSchema();
   await getDb().execute({
-    sql: `INSERT INTO coaches (id, name, display_name, description, photo_url, timezone, email, working_hours, prices, payment_provider, meeting_provider)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    sql: `INSERT INTO coaches (id, name, display_name, description, photo_url, timezone, email, working_hours, prices, payment_provider, meeting_provider, polar_product_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             name = excluded.name,
             display_name = excluded.display_name,
@@ -79,6 +81,7 @@ export async function upsertCoach(id: string, coach: Omit<CoachRecord, 'id'>): P
             prices = excluded.prices,
             payment_provider = excluded.payment_provider,
             meeting_provider = excluded.meeting_provider,
+            polar_product_id = excluded.polar_product_id,
             updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`,
     args: [
       id,
@@ -92,6 +95,7 @@ export async function upsertCoach(id: string, coach: Omit<CoachRecord, 'id'>): P
       JSON.stringify(coach.prices),
       coach.paymentProvider,
       coach.meetingProvider,
+      coach.polarProductId,
     ]
   });
   return getCoach(id);

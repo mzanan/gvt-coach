@@ -14,6 +14,7 @@ function defaultCoaches(): Record<string, CoachRecord> {
       id,
       paymentProvider: coach.paymentProvider || 'stripe',
       meetingProvider: coach.meetingProvider || 'zoom',
+      polarProductId: coach.polarProductId || '',
     };
   }
   return result;

@@ -3,7 +3,6 @@ import { UserProfile } from '../../../types/user';
 import { CheckoutResponse, PaymentProviderService } from '@/types/payment';
 import { DateTime } from 'luxon';
 import { getClientCookie, setClientCookie } from '@/lib/utils/cookies';
-import { getPolarProductId } from '@/lib/utils/productIds';
 
 export const polarService: PaymentProviderService = {
   async createCheckout(
@@ -25,11 +24,6 @@ export const polarService: PaymentProviderService = {
         throw new Error('Coach not specified in booking plan');
       }
 
-      const productId = getPolarProductId(selectedCoach);
-      if (!productId) {
-        throw new Error(`No valid Polar product ID found for coach ${selectedCoach}`);
-      }
-      
       const reliableUserTimezone = getClientCookie('user_timezone') || 
                                     userProfile?.timezone || 
                                     Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -73,14 +67,14 @@ export const polarService: PaymentProviderService = {
       setClientCookie('pending_booking', bookingData);
       
       // Call the checkout API
-      console.log('Calling /api/checkout with:', { productId, bookingData, storePendingBooking });
+      
       const response = await fetch(`${appUrl}/api/checkout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          productId,
+
           bookingData,
           provider: 'polar',
           storePendingBooking
@@ -126,8 +120,7 @@ export const polarService: PaymentProviderService = {
                     .setZone(reliableUserTimezone)
                     .toISO() : 
                   pendingBookingData?.selectedDate,
-                selectedTimezone: pendingBookingData?.selectedTimezone || userProfile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
-                productId: productId
+                selectedTimezone: pendingBookingData?.selectedTimezone || userProfile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
               },
               provider: 'polar'
             };

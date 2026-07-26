@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
-import { createLemonSqueezyCheckout } from './lemonsqueezy';
 import { createPolarCheckout } from './polar';
 import { createStripeCheckout } from './stripe';
 import { BookingFrequency, PaymentOrderStatus } from '@/types/enums';
 import { CoachId } from '@/config/coaches';
-import { getLemonSqueezyVariantId, getPolarProductId } from '@/lib/utils/productIds';
+import { getEffectiveCoachesConfig } from '@/config/appConfig';
+import { getPolarProductId } from '@/lib/utils/productIds';
 import { insertBooking } from '@/lib/db/bookings';
 import { insertPaymentStatus, upsertMapping } from '@/lib/db/payments';
 
@@ -100,25 +100,14 @@ export async function POST(request: NextRequest) {
 
       await createPendingRecords(orderId, 'disabled', bookingData, frequency, selectedCoach, PaymentOrderStatus.Paid);
     } else if (paymentProvider === 'polar') {
-      const productId = getPolarProductId(selectedCoach);
+      const coachesConfig = await getEffectiveCoachesConfig();
+      const productId = getPolarProductId(coachesConfig[selectedCoach]);
       if (!productId) {
         throw new Error(`Polar Product ID not configured for coach ${selectedCoach}`);
       }
       const polarResponse = await createPolarCheckout(productId, bookingData);
       checkoutUrl = polarResponse.checkoutUrl;
       orderId = polarResponse.orderId;
-    } else if (paymentProvider === 'lemonsqueezy') {
-      const variantId = getLemonSqueezyVariantId(selectedCoach, frequency);
-      if (!variantId) {
-        throw new Error(`Lemon Squeezy Variant ID not configured for coach ${selectedCoach} and frequency ${frequency}`);
-      }
-      const lemonResponse = await createLemonSqueezyCheckout(variantId, bookingData);
-      checkoutUrl = lemonResponse.checkoutUrl;
-      orderId = lemonResponse.orderId;
-
-      if (bookingData.userEmail) {
-        await createPendingRecords(orderId, 'lemonsqueezy', bookingData, frequency, selectedCoach);
-      }
     } else {
       const stripeResponse = await createStripeCheckout(bookingData);
       checkoutUrl = stripeResponse.checkoutUrl;
