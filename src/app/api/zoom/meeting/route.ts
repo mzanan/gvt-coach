@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createZoomMeeting, getZoomAccessToken, isZoomConfigured } from '@/lib/zoom';
-import { getMeetingProvider } from '@/config/appConfig';
+import { getCoach } from '@/lib/db/coaches';
 
 export async function POST(request: NextRequest) {
   try {
-    const meetingProvider = await getMeetingProvider();
+    const { meetingTopic, meetingTime, duration, timezone, coach } = await request.json();
+
+    const coachRecord = coach ? await getCoach(coach) : null;
+    const meetingProvider = coachRecord?.meetingProvider || 'zoom';
     if (meetingProvider !== 'zoom') {
       console.warn(`Meeting provider '${meetingProvider}' not implemented yet, skipping meeting creation`);
       return NextResponse.json({ error: 'Meeting provider not available' }, { status: 503 });
@@ -14,8 +17,6 @@ export async function POST(request: NextRequest) {
       console.warn('Zoom is not configured, skipping meeting creation');
       return NextResponse.json({ error: 'Zoom not configured' }, { status: 503 });
     }
-
-    const { meetingTopic, meetingTime, duration, timezone } = await request.json();
 
     if (!meetingTopic || !meetingTime) {
       return NextResponse.json({

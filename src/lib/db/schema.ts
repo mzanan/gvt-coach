@@ -46,6 +46,21 @@ export const SCHEMA_STATEMENTS = [
     sent_at TEXT,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
   )`,
+  `CREATE TABLE IF NOT EXISTS coaches (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    photo_url TEXT NOT NULL DEFAULT '',
+    timezone TEXT NOT NULL,
+    email TEXT NOT NULL,
+    working_hours TEXT NOT NULL,
+    prices TEXT NOT NULL,
+    payment_provider TEXT NOT NULL DEFAULT 'stripe',
+    meeting_provider TEXT NOT NULL DEFAULT 'zoom',
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  )`,
   `CREATE TABLE IF NOT EXISTS app_settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL,

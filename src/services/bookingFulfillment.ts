@@ -1,9 +1,9 @@
 import { sendBookingConfirmation } from '@/services/mailer';
-import { CoachId, COACHES_CONFIG } from '@/config/coaches';
+import { CoachId } from '@/config/coaches';
 import { BookingDB } from '@/types/booking';
 import { getBookingsByOrderId, updateBooking } from '@/lib/db/bookings';
 import { createZoomMeeting, isZoomConfigured } from '@/lib/zoom';
-import { getMeetingProvider } from '@/config/appConfig';
+import { getCoach } from '@/lib/db/coaches';
 
 async function ensureMeetingLink(booking: BookingDB, logId: string): Promise<void> {
   try {
@@ -11,7 +11,8 @@ async function ensureMeetingLink(booking: BookingDB, logId: string): Promise<voi
       return;
     }
 
-    const meetingProvider = await getMeetingProvider();
+    const coach = booking.coach ? await getCoach(booking.coach) : null;
+    const meetingProvider = coach?.meetingProvider || 'zoom';
     if (meetingProvider !== 'zoom') {
       console.warn(`[${logId}] Fulfillment - Meeting provider '${meetingProvider}' not implemented yet, skipping meeting creation`);
       return;
@@ -62,11 +63,8 @@ export async function fulfillPaidBookings(checkoutOrderId: string, logId: string
     await ensureMeetingLink(booking, logId);
 
     try {
-      const coachKey = booking.coach as string;
-      const coachValue: CoachId | undefined =
-        coachKey && Object.prototype.hasOwnProperty.call(COACHES_CONFIG, coachKey)
-          ? coachKey as CoachId
-          : undefined;
+      const coachRecord = booking.coach ? await getCoach(booking.coach) : null;
+      const coachValue: CoachId | undefined = coachRecord?.id;
 
       await sendBookingConfirmation(
         booking.user_email,
