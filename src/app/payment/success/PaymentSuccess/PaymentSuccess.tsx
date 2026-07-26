@@ -9,9 +9,6 @@ import { BookingSummaryDisplay } from '@/app/components/features/booking/Booking
 import { usePaymentSuccess } from './usePaymentSuccess'
 import { PaymentProgress } from '@/app/components/features/payment/PaymentProgress/PaymentProgress'
 
-/**
- * Payment success component that displays the booking confirmation
- */
 export function PaymentSuccess() {
   const {
     isLoading,
@@ -24,7 +21,6 @@ export function PaymentSuccess() {
     isEmailSent
   } = usePaymentSuccess();
 
-  // Show loading state while waiting for payment info
   if (isLoading || !isPaid) {
     return (
       <PaymentProgress
@@ -75,7 +71,6 @@ export function PaymentSuccess() {
               📩 Your session details have been sent to <span className="font-medium text-foreground">{userEmail || (booking?.user_email || '')}</span>.
             </p>
             
-            {/* Indicador de estado del envío del email */}
             <div className="flex items-center justify-center border-t pt-4 mt-4">
               {isEmailSending ? (
                 <div className="flex items-center text-sm text-amber-600">

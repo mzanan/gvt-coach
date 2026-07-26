@@ -9,9 +9,6 @@ export const metadata: Metadata = {
   description: 'Your payment has been completed successfully.',
 }
 
-/**
- * Payment success page wrapped in a Suspense boundary
- */
 export default function PaymentSuccessPage() {
   return (
     <Suspense fallback={

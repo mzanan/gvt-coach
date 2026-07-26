@@ -16,8 +16,7 @@ interface CalendarProps {
   selectedCoach: CoachId
 }
 
-// Componente de día memoizado para evitar renderizados innecesarios
-const CalendarDay = React.memo(({ 
+const CalendarDay = React.memo(({
   date, 
   isCurrentMonth, 
   isSelected, 
@@ -35,23 +34,17 @@ const CalendarDay = React.memo(({
   <button
     className={cn(
       "h-9 w-9 rounded-md p-0 font-normal flex items-center justify-center mx-auto",
-      // Base styles for days from other months
       !isCurrentMonth && "text-muted-foreground",
-      // Additional opacity for disabled days from other months
       !isCurrentMonth && isDisabled && "opacity-50",
-      // Keep hover effects for enabled days from other months
       !isCurrentMonth && !isDisabled && "hover:bg-accent hover:text-accent-foreground",
-      // Selected state overrides other styles
       isSelected && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
       isSuggestedDate && "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
-      // Disabled state
       isDisabled && "pointer-events-none opacity-50",
-      // Hover for current month enabled days
       !isSelected && !isSuggestedDate && !isDisabled && isCurrentMonth && "hover:bg-accent hover:text-accent-foreground"
     )}
     disabled={isDisabled}
     onClick={onClick}
-    tabIndex={isDisabled ? -1 : 0} // Allow focus on days outside current month if selectable
+    tabIndex={isDisabled ? -1 : 0}
   >
     {date.day}
   </button>
@@ -59,7 +52,6 @@ const CalendarDay = React.memo(({
 CalendarDay.displayName = 'CalendarDay';
 
 export function Calendar(props: CalendarProps) {
-  // Use the hook to get state and callbacks
   const {
     currentMonth,
     days,
@@ -71,7 +63,7 @@ export function Calendar(props: CalendarProps) {
     isDisabled,
     isCurrentMonth,
     handleDateSelect
-  } = useCalendar(props); // Pass all props to the hook
+  } = useCalendar(props);
 
   return (
     <div className="space-y-4">

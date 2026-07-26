@@ -27,34 +27,30 @@ export function useCalendar({
     return userNow;
   });
 
-  // --- Memoized calculations and Callbacks (Moved from Calendar.tsx) ---
   const getDaysInMonth = useCallback((date: DateTime): DateTime[] => {
     const year = date.year;
     const month = date.month;
     const firstDayOfMonth = DateTime.local(year, month, 1);
     const lastDayOfMonth = firstDayOfMonth.endOf('month');
     const daysInMonth = lastDayOfMonth.day;
-    const dayOfWeek = (firstDayOfMonth.weekday === 7) ? 0 : firstDayOfMonth.weekday; // Adjust Sunday to 0
-    
+    const dayOfWeek = (firstDayOfMonth.weekday === 7) ? 0 : firstDayOfMonth.weekday;
+
     const days: DateTime[] = [];
-    
-    // Add days from previous month
+
     for (let i = 0; i < dayOfWeek; i++) {
       days.push(firstDayOfMonth.minus({ days: dayOfWeek - i }));
     }
-    
-    // Add days from current month
+
     for (let i = 0; i < daysInMonth; i++) {
       days.push(firstDayOfMonth.plus({ days: i }));
     }
-    
-    // Add days from next month to complete the grid (usually 6 rows = 42 days)
-    const totalCells = days.length > 35 ? 42 : 35; // Adjust grid size if needed
+
+    const totalCells = days.length > 35 ? 42 : 35;
     const remainingDays = totalCells - days.length;
     for (let i = 0; i < remainingDays; i++) {
       days.push(lastDayOfMonth.plus({ days: i + 1 }));
     }
-    
+
     return days;
   }, []);
 
@@ -95,15 +91,13 @@ export function useCalendar({
     const coachNow = DateTime.now().setZone(coachTimezone);
     const calendarDateInUserTZ = date.setZone(selectedTimezone).startOf('day');
     const calendarDateInCoachTZ = calendarDateInUserTZ.setZone(coachTimezone);
-    const coachTomorrow = coachNow.startOf('day').plus({ days: 1 }); 
+    const coachTomorrow = coachNow.startOf('day').plus({ days: 1 });
 
-    // Check if the calendar date (in coach's TZ) is ON OR AFTER the coach's tomorrow
     if (calendarDateInCoachTZ >= coachTomorrow) {
-      return false; 
+      return false;
     }
-    
-    // Otherwise (it's today or earlier in coach's timezone)
-    return true; // Disable past dates and coach's current day
+
+    return true;
   }, [selectedTimezone, selectedCoach, coaches]);
 
   const isCurrentMonth = useCallback((date: DateTime) => {
@@ -114,17 +108,15 @@ export function useCalendar({
     const correctDateInSelectedTZ = DateTime.local(
       date.year,
       date.month,
-      date.day, 
+      date.day,
       { zone: selectedTimezone }
     );
 
-    if (!isDisabled(date)) { 
+    if (!isDisabled(date)) {
       onSelectDate(correctDateInSelectedTZ.toJSDate());
     }
   }, [isDisabled, onSelectDate, selectedTimezone]);
 
-
-  // --- Return values ---
   return {
     currentMonth,
     days,
@@ -137,4 +129,4 @@ export function useCalendar({
     isCurrentMonth,
     handleDateSelect
   };
-} 
+}
