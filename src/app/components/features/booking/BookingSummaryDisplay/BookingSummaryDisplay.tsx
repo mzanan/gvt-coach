@@ -133,11 +133,11 @@ export function BookingSummaryDisplay({ booking, timezone }: BookingSummaryDispl
               <div className="min-w-32 font-medium">Status:</div>
               <div>
                 {booking.status === 'PENDING' ? (
-                  <Badge variant="outline" className="bg-yellow-50 text-yellow-600 hover:bg-yellow-50">
+                  <Badge variant="warning">
                     Payment pending
                   </Badge>
                 ) : booking.status === 'CANCELLED' ? (
-                  <Badge variant="outline" className="bg-red-50 text-red-600 hover:bg-red-50">
+                  <Badge variant="destructive">
                     Cancelled
                   </Badge>
                 ) : (
