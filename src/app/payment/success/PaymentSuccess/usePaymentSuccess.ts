@@ -54,7 +54,6 @@ export const usePaymentSuccess = () => {
   const [userTimezone, setUserTimezone] = useState('')
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [paymentStatus, setPaymentStatus] = useState<PaymentOrderStatus>(PaymentOrderStatus.Pending)
-  const [orderId, setOrderId] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const { toast } = useToast()
 
@@ -126,8 +125,6 @@ export const usePaymentSuccess = () => {
           return
         }
 
-        if (isMounted) setOrderId(checkoutOrderId)
-
         const confirmed = await poll(checkoutOrderId)
 
         if (confirmed || !isMounted) return
@@ -174,7 +171,6 @@ export const usePaymentSuccess = () => {
     userTimezone,
     userEmail,
     paymentStatus,
-    orderId,
     isEmailSending: false,
     isEmailSent: Boolean(booking?.confirmation_email_sent)
   }

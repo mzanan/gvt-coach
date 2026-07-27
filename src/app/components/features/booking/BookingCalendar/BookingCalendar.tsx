@@ -5,12 +5,12 @@ import { useBookingCalendar } from './useBookingCalendar'
 import { Calendar } from '../Calendar'
 import { Button } from '@/app/components/ui-kit/button'
 import { Input } from '@/app/components/ui-kit/input'
-import { Label } from '@/app/components/ui-kit/label'
-import { ChevronDown, ChevronUp, Check, Loader2, Globe, User, DollarSign, Clock, CreditCard, CalendarIcon } from 'lucide-react'
+import { ChevronDown, ChevronUp, Check, Loader2, Globe, User, DollarSign, Clock, CreditCard, CalendarIcon, Mail, Pencil } from 'lucide-react'
 import { Card } from '@/app/components/ui-kit/card'
 import { DateTime } from 'luxon'
 import { CoachSelector } from '../CoachSelector'
 import { TimeZoneSelector } from '../TimeZoneSelector'
+import { BookingSelectionSummary } from '../BookingSelectionSummary'
 import { getBookingSummary, cn } from '@/lib/utils'
 import { useAppConfig } from '@/app/components/core/AppConfigProvider'
 
@@ -29,45 +29,59 @@ const PaymentButton = React.memo(({ onClick, isLoading }: { onClick: () => void,
 ));
 PaymentButton.displayName = 'PaymentButton';
 
-const MemoizedBookingSection = React.memo(({ 
-  section, 
-  activeSection, 
-  isAvailable, 
+const MemoizedBookingSection = React.memo(({
+  section,
+  activeSection,
+  isAvailable,
+  summaryText,
   onSectionClick,
   renderContent
-}: { 
-  section: { id: string, title: string, completed: boolean }, 
+}: {
+  section: { id: string, title: string, completed: boolean },
   activeSection: string,
   isAvailable: boolean,
+  summaryText?: string | null,
   onSectionClick: (id: string) => void,
   renderContent: () => React.ReactNode
-}) => (
-  <Card className="overflow-hidden">
-    <button
-      className={`
-        w-full p-4 flex items-center justify-between text-left
-        ${isAvailable ? 'hover:bg-accent/50' : 'opacity-50 cursor-not-allowed'}
-      `}
-      onClick={() => onSectionClick(section.id)}
-      disabled={!isAvailable}
-    >
-      <div className="flex items-center space-x-2">
-        {section.completed && <Check className="w-4 h-4" />}
-        <span className="font-medium">{section.title}</span>
-      </div>
-      {activeSection === section.id ? 
-        <ChevronUp className="w-4 h-4" /> : 
-        <ChevronDown className="w-4 h-4" />
-      }
-    </button>
-    
-    {activeSection === section.id && isAvailable && (
-      <div className="p-4 border-t">
-        {renderContent()}
-      </div>
-    )}
-  </Card>
-));
+}) => {
+  const isCollapsedWithSummary = section.completed && activeSection !== section.id && summaryText;
+
+  return (
+    <Card className="overflow-hidden">
+      <button
+        id={`section-header-${section.id}`}
+        className={`
+          w-full p-4 flex items-center justify-between text-left gap-4
+          ${isAvailable ? 'hover:bg-accent/50' : 'opacity-50 cursor-not-allowed'}
+        `}
+        onClick={() => onSectionClick(section.id)}
+        disabled={!isAvailable}
+        aria-expanded={activeSection === section.id}
+        aria-controls={`section-panel-${section.id}`}
+      >
+        <div className="flex items-center space-x-2 min-w-0">
+          {section.completed && <Check className="w-4 h-4 shrink-0" />}
+          <span className="font-medium shrink-0">{section.title}</span>
+          {isCollapsedWithSummary && (
+            <span className="lg:hidden text-sm text-muted-foreground truncate">
+              &middot; {summaryText}
+            </span>
+          )}
+        </div>
+        {activeSection === section.id ?
+          <ChevronUp className="w-4 h-4 shrink-0" /> :
+          <ChevronDown className="w-4 h-4 shrink-0" />
+        }
+      </button>
+
+      {activeSection === section.id && isAvailable && (
+        <div id={`section-panel-${section.id}`} role="region" aria-labelledby={`section-header-${section.id}`} className="p-4 border-t">
+          {renderContent()}
+        </div>
+      )}
+    </Card>
+  );
+});
 MemoizedBookingSection.displayName = 'MemoizedBookingSection';
 
 export function BookingCalendar() {
@@ -84,7 +98,12 @@ export function BookingCalendar() {
     isLoadingSlots,
     selectedTimezone,
     userEmail,
-    setUserEmail,
+    emailError,
+    isEmailValid,
+    isEditingEmail,
+    handleEmailChange,
+    handleEmailEditToggle,
+    handleEmailKeyDown,
     handleDateSelect,
     handleSlotSelect,
     handleSectionClick,
@@ -92,6 +111,29 @@ export function BookingCalendar() {
     handleTimezoneChange,
     handleBookingConfirm,
   } = useBookingCalendar()
+
+  const selectedCoachConfig = bookingPlan.coach ? coaches[bookingPlan.coach] : null;
+
+  const dateLabel = useMemo(() => {
+    if (!selectedDate) return null;
+    return DateTime.fromJSDate(selectedDate).setZone(selectedTimezone).toFormat('EEE, MMM d');
+  }, [selectedDate, selectedTimezone]);
+
+  const timeLabel = useMemo(() => {
+    if (!selectedSlot) return null;
+    return DateTime.fromJSDate(selectedSlot.date).setZone(selectedTimezone).toFormat('h:mm a');
+  }, [selectedSlot, selectedTimezone]);
+
+  const dateTimeLabel = dateLabel
+    ? (timeLabel ? `${dateLabel}, ${timeLabel}` : dateLabel)
+    : null;
+
+  const sectionSummaries: Record<string, string | null> = {
+    coach: selectedCoachConfig?.displayName || null,
+    date: dateLabel,
+    time: timeLabel ? (dateLabel ? `${dateLabel}, ${timeLabel}` : timeLabel) : null,
+    summary: null,
+  };
 
   const summaryContent = useMemo(() => {
     if (!bookingPlan || !selectedSlot || !bookingPlan.coach) return null;
@@ -140,8 +182,60 @@ export function BookingCalendar() {
                   <p className="text-xl font-semibold">${price}</p>
                 </div>
               </div>
+
+              {/* Email */}
+              <div className="flex items-start space-x-3">
+                <div className="mt-1 p-2 bg-primary/10 rounded-full">
+                  <Mail className="h-5 w-5 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-lg font-medium">
+                    Your email <span className="text-xs font-normal text-muted-foreground">(from your Google account)</span>
+                  </h3>
+                  {isEditingEmail ? (
+                    <div className="flex items-center gap-1.5">
+                      <Input
+                        type="email"
+                        value={userEmail}
+                        onChange={e => handleEmailChange(e.target.value)}
+                        onKeyDown={handleEmailKeyDown}
+                        autoFocus
+                        autoComplete="email"
+                        className="h-8 max-w-xs"
+                        aria-invalid={!!emailError}
+                        aria-describedby={emailError ? "booking-email-error" : undefined}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleEmailEditToggle}
+                        aria-label="Confirm email"
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                      >
+                        <Check className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <p className="text-muted-foreground break-all">{userEmail}</p>
+                      <button
+                        type="button"
+                        onClick={handleEmailEditToggle}
+                        aria-label="Edit email"
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+                  {emailError && (
+                    <p id="booking-email-error" role="alert" className="text-xs text-danger-text mt-1">
+                      {emailError}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
-            
+
             {/* Time and timezone */}
             <div className="pt-4 border-t border-muted">
               <div className="flex items-center text-sm text-muted-foreground">
@@ -152,25 +246,10 @@ export function BookingCalendar() {
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="booking-email">Your email</Label>
-          <Input
-            id="booking-email"
-            type="email"
-            value={userEmail}
-            onChange={e => setUserEmail(e.target.value)}
-            placeholder="you@example.com"
-            autoComplete="email"
-          />
-          <p className="text-xs text-muted-foreground">
-            The booking confirmation and meeting link are sent to this address.
-          </p>
-        </div>
-
         {/* Payment button */}
         <Button
           onClick={handleBookingConfirm}
-          disabled={isBookingLoading || !userEmail.trim()}
+          disabled={isBookingLoading || !isEmailValid}
           className="w-full h-12 text-lg font-medium"
         >
           {isBookingLoading ? (
@@ -187,7 +266,7 @@ export function BookingCalendar() {
         </Button>
       </div>
     )
-  }, [bookingPlan, selectedSlot, selectedTimezone, handleBookingConfirm, isBookingLoading, coaches, userEmail, setUserEmail]);
+  }, [bookingPlan, selectedSlot, selectedTimezone, handleBookingConfirm, isBookingLoading, coaches, userEmail, isEmailValid, isEditingEmail, emailError, handleEmailChange, handleEmailEditToggle, handleEmailKeyDown]);
 
   const renderSectionContent = (sectionId: string) => {
     switch (sectionId) {
@@ -273,42 +352,56 @@ export function BookingCalendar() {
   }
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
-      <div className="flex justify-between items-center gap-4">
-        <h2 className="text-2xl font-semibold shrink">Book a Consultation</h2>
-          <div className="flex items-center space-x-2 shrink-0">
-            <Globe className="h-4 w-4 text-muted-foreground" />
-            <TimeZoneSelector
-              className="max-w-xs"
-              currentTimezone={selectedTimezone}
-              onTimezoneChange={handleTimezoneChange}
-            />
-          </div>
-      </div>
-      
-      {sections
-        .map((section) => {
-          const sectionIndex = sections.findIndex(s => s.id === section.id)
-          const previousSectionsCompleted = sections
-            .slice(0, sectionIndex)
-            .every(s => s.completed)
-          
-          const isAvailable = 
-            section.id === 'date' && bookingPlan?.coach 
-              ? true 
-              : previousSectionsCompleted
+    <div className="grid gap-6 lg:grid-cols-[1fr_320px] items-start">
+      <div className="space-y-6">
+        <div className="flex justify-between items-center gap-4">
+          <h2 className="text-2xl font-semibold shrink">Book a Consultation</h2>
+            <div className="flex items-center space-x-2 shrink-0">
+              <Globe className="h-4 w-4 text-muted-foreground" />
+              <TimeZoneSelector
+                className="max-w-xs"
+                currentTimezone={selectedTimezone}
+                onTimezoneChange={handleTimezoneChange}
+              />
+            </div>
+        </div>
 
-          return (
-            <MemoizedBookingSection 
-              key={section.id} 
-              section={section}
-              activeSection={activeSection}
-              isAvailable={isAvailable}
-              onSectionClick={handleSectionClick}
-              renderContent={() => renderSectionContent(section.id)}
-            />
-          )
-        })}
+        {sections
+          .map((section) => {
+            const sectionIndex = sections.findIndex(s => s.id === section.id)
+            const previousSectionsCompleted = sections
+              .slice(0, sectionIndex)
+              .every(s => s.completed)
+
+            const isAvailable =
+              section.id === 'date' && bookingPlan?.coach
+                ? true
+                : previousSectionsCompleted
+
+            return (
+              <MemoizedBookingSection
+                key={section.id}
+                section={section}
+                activeSection={activeSection}
+                isAvailable={isAvailable}
+                summaryText={sectionSummaries[section.id]}
+                onSectionClick={handleSectionClick}
+                renderContent={() => renderSectionContent(section.id)}
+              />
+            )
+          })}
+      </div>
+
+      <div className="hidden lg:block sticky top-6">
+        <BookingSelectionSummary
+          coachName={selectedCoachConfig?.displayName}
+          coachPhotoUrl={selectedCoachConfig?.photoUrl}
+          dateTimeLabel={dateTimeLabel}
+          email={userEmail || null}
+          price={selectedCoachConfig?.prices.singleSession}
+          timezone={selectedTimezone}
+        />
+      </div>
     </div>
   )
 }

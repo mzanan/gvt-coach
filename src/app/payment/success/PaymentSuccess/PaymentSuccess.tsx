@@ -1,13 +1,15 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Clock, Loader2, Check } from 'lucide-react'
-import { Card } from '@/app/components/ui-kit/card'
+import { PaymentCard } from '@/app/components/features/payment/PaymentCard/PaymentCard'
 import Link from 'next/link'
 import { ChevronLeft } from "lucide-react"
 import { BookingSummaryDisplay } from '@/app/components/features/booking/BookingSummaryDisplay'
 import { usePaymentSuccess } from './usePaymentSuccess'
 import { PaymentProgress } from '@/app/components/features/payment/PaymentProgress/PaymentProgress'
+
+const MIN_LOADING_MS = 600
 
 export function PaymentSuccess() {
   const {
@@ -16,32 +18,37 @@ export function PaymentSuccess() {
     booking,
     userTimezone,
     userEmail,
-    orderId,
     isEmailSending,
     isEmailSent
   } = usePaymentSuccess();
 
-  if (isLoading || !isPaid) {
+  const [minLoadingElapsed, setMinLoadingElapsed] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setMinLoadingElapsed(true), MIN_LOADING_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isLoading || !isPaid || !minLoadingElapsed) {
     return (
       <PaymentProgress
         icon={<Clock className="h-8 w-8 text-orange-500 mx-auto" />}
         title="Payment Processing"
         loadingText="Confirming your payment..."
         description="This will be updated automatically when your payment is processed. Please don't close this page."
-        orderId={orderId}
         fallbackText="Processing your payment. If you've completed checkout, please wait a moment."
       />
     )
   }
 
   return (
-    <div className="page-container py-8 max-w-2xl">
+    <div className="page-container py-8 max-w-2xl animate-in fade-in-0 duration-300 motion-reduce:animate-none">
       <Link href="/" className="text-primary hover:underline mb-8 inline-flex items-center gap-2">
         <ChevronLeft className="h-4 w-4" />
         Back to Calendar
       </Link>
 
-      <Card className="max-w-2xl mx-auto p-8">
+      <PaymentCard>
         <div className="text-center mb-8">
           <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Check className="h-6 w-6 text-green-600" />
@@ -91,7 +98,7 @@ export function PaymentSuccess() {
             </div>
           </div>
         </div>
-      </Card>
+      </PaymentCard>
     </div>
   )
-} 
+}
