@@ -6,6 +6,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
+}
+
 export const bookingSummaryTexts = {
   once: (dateTime: DateTime, time: string) => {
     if (!dateTime || !dateTime.isValid) return "One-time session";

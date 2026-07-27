@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, type KeyboardEvent } from 'react'
 import { TimeSlot, BookingPlan, DayGroup } from '@/types/booking'
 import { DateTime } from 'luxon'
 import { bookingService } from '@/services/bookingService'
@@ -8,6 +8,7 @@ import { getPaymentService } from '@/services/payments'
 import { BookingFrequency } from '@/types/enums'
 import { useAppConfig } from '@/app/components/core/AppConfigProvider'
 import { setClientCookie, setTimezoneCookie, getTimezoneCookie } from '@/lib/utils/cookies'
+import { isValidEmail } from '@/lib/utils'
 import { userService } from '@/services/userService'
 import { useToast } from '@/app/components/ui-kit/use-toast'
 import type { CoachId } from "@/config/coaches"
@@ -42,7 +43,8 @@ export function useBookingCalendar() {
   const [isBookingLoading, setIsBookingLoading] = useState(false)
   const [isLoadingSlots, setIsLoadingSlots] = useState(false)
   const [userEmail, setUserEmail] = useState('')
-
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [isEditingEmail, setIsEditingEmail] = useState(false)
 
   const [selectedTimezone, setSelectedTimezone] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -72,32 +74,44 @@ export function useBookingCalendar() {
   });
 
   useEffect(() => {
+    let ignore = false;
+
     const loadUserData = async () => {
       try {
         const userData = await userService.getUserFromAuthUsers();
-        if (userData) {
-          const userProfileData: UserProfile = {
-            id: String(userData.id ?? ''),
-            email: userData.email,
-            first_name: userData.first_name,
-            last_name: userData.last_name,
-            phone: '',
-            timezone: userData.timezone,
-            full_name: `${userData.first_name} ${userData.last_name}`
-          };
-          
-          setUserProfile(userProfileData);
+        if (!userData || ignore) return;
+
+        const userProfileData: UserProfile = {
+          id: String(userData.id ?? ''),
+          email: userData.email,
+          first_name: userData.first_name,
+          last_name: userData.last_name,
+          phone: '',
+          timezone: userData.timezone,
+          full_name: `${userData.first_name} ${userData.last_name}`
+        };
+
+        setUserProfile(userProfileData);
+
+        if (userData.email) {
+          setUserEmail(prev => prev || userData.email);
         }
       } catch {
-        toast({
-          title: "Error",
-          description: "Could not load user data.",
-          variant: "destructive"
-        });
+        if (!ignore) {
+          toast({
+            title: "Error",
+            description: "Could not load user data.",
+            variant: "destructive"
+          });
+        }
       }
     };
-    
+
     loadUserData();
+
+    return () => {
+      ignore = true;
+    };
   }, [toast]);
 
   useEffect(() => {
@@ -123,7 +137,7 @@ export function useBookingCalendar() {
         coach,
         coaches[coach]
       );
-      
+
       setAvailableSlots(groupedSlots);
 
     } catch (error: unknown) {
@@ -139,22 +153,21 @@ export function useBookingCalendar() {
     }
   }, [toast, setIsLoadingSlots, coaches]);
 
-
   const handleTimezoneChange = useCallback((timezone: string) => {
     setSelectedTimezone(timezone);
     setTimezoneCookie(timezone);
-    
+
     setSelectedDate(null);
     setSelectedSlot(null);
     setAvailableSlots([]);
-    
+
     setBookingPlan(prev => ({
       ...prev,
       coach: prev?.coach as CoachId || 'MATIAS',
       frequency: BookingFrequency.Once,
-      duration: 1 
+      duration: 1
     }));
-    
+
     setSections(prev => prev.map(s => {
       if (s.id === 'coach') return { ...s, completed: true };
       if (s.id === 'date') return { ...s, completed: false };
@@ -162,9 +175,11 @@ export function useBookingCalendar() {
       if (s.id === 'summary') return { ...s, completed: false };
       return s;
     }));
-    
+
+    setEmailError(null);
+    setIsEditingEmail(false);
     setActiveSection('date');
-    
+
     toast({
       title: "Timezone Updated",
       description: `Your timezone has been updated to ${timezone}.`,
@@ -175,13 +190,13 @@ export function useBookingCalendar() {
     setIsLoadingSlots(true);
     const selectedLocalDate = DateTime.fromJSDate(date).startOf('day').setZone(selectedTimezone, { keepLocalTime: true });
     setSelectedDate(selectedLocalDate.toJSDate());
-    
+
     try {
       setSections(prev => prev.map(s => s.id === 'date' ? { ...s, completed: true } : s));
       setActiveSection('time');
-        
+
       fetchAvailableSlots(
-        selectedLocalDate.toJSDate(), 
+        selectedLocalDate.toJSDate(),
         selectedTimezone,
         bookingPlan?.coach as CoachId || 'MATIAS'
       );
@@ -205,16 +220,16 @@ export function useBookingCalendar() {
       });
       return;
     }
-    
+
     const slotDateTime = DateTime.fromJSDate(slot.date).setZone(selectedTimezone);
     const slotUTC = slotDateTime.toUTC();
-    
+
     const correctedSlot = {
       ...slot,
       date: slotDateTime.toJSDate(),
       utcDate: slotUTC.toJSDate()
     };
-    
+
     setBookingPlan(prev => ({
       ...prev,
       firstSlot: correctedSlot,
@@ -223,8 +238,8 @@ export function useBookingCalendar() {
     }));
 
     setSelectedSlot(correctedSlot);
-    
-    setSections(prev => prev.map(s => 
+
+    setSections(prev => prev.map(s =>
       s.id === 'time' ? { ...s, completed: true } : s
     ));
     setActiveSection('summary');
@@ -232,11 +247,11 @@ export function useBookingCalendar() {
 
   const handleSectionClick = useCallback((sectionId: string) => {
     const sectionIndex = sections.findIndex(s => s.id === sectionId);
-    
+
     const previousSectionsCompleted = sections
       .slice(0, sectionIndex)
       .every(s => s.completed);
-    
+
     if (previousSectionsCompleted) {
       setActiveSection(sectionId);
     }
@@ -260,15 +275,45 @@ export function useBookingCalendar() {
     return dtUserLocal.toFormat('h:mm a');
   }, [selectedTimezone]);
 
+  const handleEmailChange = useCallback((value: string) => {
+    setUserEmail(value);
+
+    if (emailError && isValidEmail(value)) {
+      setEmailError(null);
+    }
+  }, [emailError]);
+
+  const handleEmailEditToggle = useCallback(() => {
+    if (!isEditingEmail) {
+      setIsEditingEmail(true);
+      return;
+    }
+
+    if (!isValidEmail(userEmail)) {
+      setEmailError('Enter a valid email address.');
+      return;
+    }
+
+    setUserEmail(userEmail.trim());
+    setEmailError(null);
+    setIsEditingEmail(false);
+  }, [isEditingEmail, userEmail]);
+
+  const isEmailValid = isValidEmail(userEmail);
+
+  const handleEmailKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleEmailEditToggle();
+    }
+  }, [handleEmailEditToggle]);
+
   const handleBookingConfirm = useCallback(async () => {
     const email = userEmail.trim();
 
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      toast({
-        title: "Email required",
-        description: "Enter a valid email to receive your booking confirmation.",
-        variant: "destructive"
-      });
+    if (!isValidEmail(email)) {
+      setEmailError('Enter a valid email address.');
+      setIsEditingEmail(true);
       return;
     }
 
@@ -348,6 +393,12 @@ export function useBookingCalendar() {
     selectedTimezone,
     userEmail,
     setUserEmail,
+    emailError,
+    isEmailValid,
+    isEditingEmail,
+    handleEmailChange,
+    handleEmailEditToggle,
+    handleEmailKeyDown,
     handleTimezoneChange,
     handleDateSelect,
     handleSlotSelect,
@@ -360,4 +411,4 @@ export function useBookingCalendar() {
   }
 }
 
-export type BookingCalendarHook = ReturnType<typeof useBookingCalendar>; 
+export type BookingCalendarHook = ReturnType<typeof useBookingCalendar>;
