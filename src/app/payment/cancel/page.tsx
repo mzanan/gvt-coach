@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { Card } from "@/app/components/ui-kit/card"
+import { PaymentCard } from "@/app/components/features/payment/PaymentCard/PaymentCard"
 import { Button } from "@/app/components/ui-kit/button"
 import Link from 'next/link'
 import { XCircle } from "lucide-react"
@@ -14,7 +14,7 @@ export default function PaymentCancelPage() {
 
   return (
     <div className="page-container py-8 max-w-2xl">
-      <Card className="p-8 text-center">
+      <PaymentCard className="text-center">
         <div className="mb-6">
           <XCircle className="h-12 w-12 text-red-500 mx-auto" />
         </div>
@@ -27,7 +27,7 @@ export default function PaymentCancelPage() {
             Return to Booking
           </Link>
         </Button>
-      </Card>
+      </PaymentCard>
     </div>
   )
-} 
+}

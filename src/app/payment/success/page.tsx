@@ -1,7 +1,7 @@
 import { Suspense } from "react"
-import { Card } from "@/app/components/ui-kit/card"
-import { Loader2, Clock } from "lucide-react"
+import { Clock } from "lucide-react"
 import { PaymentSuccess } from './PaymentSuccess/PaymentSuccess'
+import { PaymentProgress } from '@/app/components/features/payment/PaymentProgress/PaymentProgress'
 import { Metadata } from 'next'
 
 export const metadata: Metadata = {
@@ -12,16 +12,13 @@ export const metadata: Metadata = {
 export default function PaymentSuccessPage() {
   return (
     <Suspense fallback={
-      <div className="page-container py-8 max-w-2xl">
-        <Card className="p-8 text-center">
-          <Clock className="h-8 w-8 text-orange-500 mx-auto" />
-          <h1 className="text-2xl font-bold mb-2">Loading Payment Details</h1>
-          <div className="flex justify-center my-6">
-            <Loader2 className="h-6 w-6 animate-spin mr-2" />
-            <p>Please wait...</p>
-          </div>
-        </Card>
-      </div>
+      <PaymentProgress
+        icon={<Clock className="h-8 w-8 text-orange-500 mx-auto" />}
+        title="Payment Processing"
+        loadingText="Confirming your payment..."
+        description="This will be updated automatically when your payment is processed. Please don't close this page."
+        fallbackText="Processing your payment. If you've completed checkout, please wait a moment."
+      />
     }>
       <PaymentSuccess />
     </Suspense>

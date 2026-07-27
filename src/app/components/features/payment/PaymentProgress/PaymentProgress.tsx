@@ -1,13 +1,12 @@
 import { ReactNode } from 'react'
 import { Loader2 } from "lucide-react"
-import { Card } from "@/app/components/ui-kit/card"
+import { PaymentCard } from "@/app/components/features/payment/PaymentCard/PaymentCard"
 
 interface PaymentProgressProps {
   icon: ReactNode
   title: string
   loadingText: string
   description: string
-  orderId?: string | null | undefined
   fallbackText: string
 }
 
@@ -16,12 +15,11 @@ export function PaymentProgress({
   title,
   loadingText,
   description,
-  orderId,
   fallbackText
 }: PaymentProgressProps) {
   return (
     <div className="page-container py-8 max-w-2xl">
-      <Card className="p-8 text-center">
+      <PaymentCard className="text-center animate-in fade-in-0 duration-300 motion-reduce:animate-none">
         <div className="mx-auto mb-4">
           {icon}
         </div>
@@ -33,18 +31,10 @@ export function PaymentProgress({
         <p className="text-muted-foreground mb-4">
           {description}
         </p>
-        {orderId ? (
-          <div className="mt-4">
-            <p className="text-xs text-muted-foreground mb-4">
-              Checkout ID: {orderId}
-            </p>
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground mt-2">
-            {fallbackText}
-          </p>
-        )}
-      </Card>
+        <p className="text-xs text-muted-foreground mt-2">
+          {fallbackText}
+        </p>
+      </PaymentCard>
     </div>
   )
-} 
+}
