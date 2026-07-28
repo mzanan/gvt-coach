@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, type KeyboardEvent } from 'react'
+import { useState, useEffect, useCallback, useRef, type KeyboardEvent } from 'react'
 import { TimeSlot, BookingPlan, DayGroup } from '@/types/booking'
 import { DateTime } from 'luxon'
 import { bookingService } from '@/services/bookingService'
@@ -42,6 +42,7 @@ export function useBookingCalendar() {
   const [bookedDates, setBookedDates] = useState<Array<{ date: Date, fullyBooked: boolean }>>([])
   const [isBookingLoading, setIsBookingLoading] = useState(false)
   const [isLoadingSlots, setIsLoadingSlots] = useState(false)
+  const latestSlotsRequestRef = useRef(0)
   const [userEmail, setUserEmail] = useState('')
   const [emailError, setEmailError] = useState<string | null>(null)
   const [isEditingEmail, setIsEditingEmail] = useState(false)
@@ -129,6 +130,8 @@ export function useBookingCalendar() {
   }, []);
 
   const fetchAvailableSlots = useCallback(async (date: Date, timezone: string, coach: CoachId) => {
+    const requestId = ++latestSlotsRequestRef.current;
+
     try {
       setIsLoadingSlots(true);
       const groupedSlots = await bookingService.getAvailableSlots(
@@ -138,9 +141,13 @@ export function useBookingCalendar() {
         coaches[coach]
       );
 
+      if (requestId !== latestSlotsRequestRef.current) return;
+
       setAvailableSlots(groupedSlots);
 
     } catch (error: unknown) {
+      if (requestId !== latestSlotsRequestRef.current) return;
+
       console.error('Error fetching available slots:', error);
       const errorMessage = error instanceof Error ? error.message : "Failed to fetch available time slots. Please try again.";
       toast({
@@ -149,7 +156,9 @@ export function useBookingCalendar() {
         variant: "destructive"
       });
     } finally {
-      setIsLoadingSlots(false);
+      if (requestId === latestSlotsRequestRef.current) {
+        setIsLoadingSlots(false);
+      }
     }
   }, [toast, setIsLoadingSlots, coaches]);
 
