@@ -189,26 +189,30 @@ export function BookingCalendar() {
                         aria-invalid={!!emailError}
                         aria-describedby={emailError ? "booking-email-error" : undefined}
                       />
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={handleEmailEditToggle}
                         aria-label="Confirm email"
                         className="shrink-0 text-muted-foreground hover:text-foreground"
                       >
                         <Check className="h-4 w-4" />
-                      </button>
+                      </Button>
                     </div>
                   ) : (
                     <div className="flex items-center gap-1.5 min-w-0">
                       <p className="text-muted-foreground break-all">{userEmail}</p>
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={handleEmailEditToggle}
                         aria-label="Edit email"
                         className="shrink-0 text-muted-foreground hover:text-foreground"
                       >
                         <Pencil className="h-3.5 w-3.5" />
-                      </button>
+                      </Button>
                     </div>
                   )}
                   {emailError && (
