@@ -40,16 +40,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         const serverDefaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const userTimezone = timezoneFromCookie || bookingData.selectedTimezone || bookingData.userTimezone || serverDefaultTimezone;
 
+        const rawBookingDate = bookingData.selectedDate ?? bookingData.bookingDate;
         let bookingDateValue: string | null = null;
 
-        if (bookingData.selectedDate) {
-          bookingDateValue = typeof bookingData.selectedDate === 'string'
-            ? bookingData.selectedDate
-            : new Date(bookingData.selectedDate).toISOString();
-        } else if (bookingData.bookingDate) {
-          bookingDateValue = typeof bookingData.bookingDate === 'string'
-            ? bookingData.bookingDate
-            : new Date(bookingData.bookingDate).toISOString();
+        if (rawBookingDate) {
+          try {
+            bookingDateValue = new Date(rawBookingDate).toISOString();
+          } catch {
+            bookingDateValue = null;
+          }
         }
 
         if (!bookingDateValue) {

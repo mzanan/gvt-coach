@@ -6,7 +6,7 @@ import { BookingFrequency, PaymentOrderStatus } from '@/types/enums';
 import { CoachId } from '@/config/coaches';
 import { getEffectiveCoachesConfig } from '@/config/appConfig';
 import { getPolarProductId } from '@/lib/utils/productIds';
-import { insertBooking } from '@/lib/db/bookings';
+import { insertBooking, isCoachSlotPaidBooked } from '@/lib/db/bookings';
 import { insertPaymentStatus, upsertMapping } from '@/lib/db/payments';
 
 interface CheckoutBookingData {
@@ -85,6 +85,20 @@ export async function POST(request: NextRequest) {
     const selectedCoach: CoachId = bookingData.bookingPlan.coach;
     const frequency: BookingFrequency = bookingData.bookingPlan.frequency || BookingFrequency.Once;
     const paymentProvider = String(requestedProvider).toLowerCase().trim();
+
+    const rawBookingDate = bookingData.utcDate || bookingData.selectedDate;
+    if (rawBookingDate) {
+      let bookingDateValue: string | null = null;
+      try {
+        bookingDateValue = new Date(rawBookingDate).toISOString();
+      } catch {
+        bookingDateValue = null;
+      }
+
+      if (bookingDateValue && await isCoachSlotPaidBooked(selectedCoach, bookingDateValue)) {
+        return NextResponse.json({ error: 'This time slot is no longer available' }, { status: 409 });
+      }
+    }
 
     let checkoutUrl = '';
     let orderId = '';
