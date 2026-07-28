@@ -277,9 +277,17 @@ export function useBookingCalendar() {
       frequency: BookingFrequency.Once
     }));
 
-    setSections(prev => prev.map(s =>
-      s.id === 'coach' ? { ...s, completed: true } : s
-    ));
+    setSelectedDate(null);
+    setSelectedSlot(null);
+    setAvailableSlots([]);
+
+    setSections(prev => prev.map(s => {
+      if (s.id === 'coach') return { ...s, completed: true };
+      if (s.id === 'date') return { ...s, completed: false };
+      if (s.id === 'time') return { ...s, completed: false };
+      if (s.id === 'summary') return { ...s, completed: false };
+      return s;
+    }));
     setActiveSection('date');
   }, []);
 
