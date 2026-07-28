@@ -4,6 +4,7 @@ import { fulfillPaidBookings } from '@/services/bookingFulfillment';
 import { updateBooking, getBookingsByOrderId } from '@/lib/db/bookings';
 import {
   getMappingByOrderId,
+  getPaymentStatusByOrderId,
   getPaymentStatusById,
   insertPaymentStatus,
   updatePaymentStatus,
@@ -85,12 +86,21 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session, logId: 
 
     paymentId = mapping.payment_status_id;
   } else {
-    const newPayment = await insertPaymentStatus({
-      status: PaymentOrderStatus.Paid,
-      checkout_order_id: checkoutOrderId,
-      json_data: jsonData
-    });
-    paymentId = newPayment.id;
+    try {
+      const newPayment = await insertPaymentStatus({
+        status: PaymentOrderStatus.Paid,
+        checkout_order_id: checkoutOrderId,
+        json_data: jsonData
+      });
+      paymentId = newPayment.id;
+    } catch (error) {
+      if (!String(error).includes('UNIQUE constraint failed')) throw error;
+
+      const concurrentPayment = await getPaymentStatusByOrderId(checkoutOrderId);
+      if (!concurrentPayment) throw error;
+
+      paymentId = concurrentPayment.id;
+    }
   }
 
   await upsertMapping({
