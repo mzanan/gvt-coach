@@ -47,7 +47,7 @@ async function createPendingRecords(
     if (bookingData.selectedDate) {
       let bookingDateValue: string | null = null;
       try {
-        bookingDateValue = bookingData.utcDate || new Date(bookingData.selectedDate).toISOString();
+        bookingDateValue = new Date(bookingData.utcDate || bookingData.selectedDate).toISOString();
       } catch {
         console.error('Invalid date format:', bookingData.selectedDate);
       }
