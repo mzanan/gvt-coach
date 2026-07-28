@@ -127,7 +127,7 @@ export const usePaymentSuccess = () => {
 
         if (!checkoutOrderId) {
           toast({
-            title: 'Error',
+            title: 'Booking Not Found',
             description: 'Booking information is missing. Please contact support.',
             variant: 'destructive'
           })
@@ -175,7 +175,7 @@ export const usePaymentSuccess = () => {
       } catch {
         if (isMounted) {
           toast({
-            title: 'Error',
+            title: 'Confirmation Failed',
             description: 'Could not load booking information.',
             variant: 'destructive'
           })
