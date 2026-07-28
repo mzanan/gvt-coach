@@ -91,7 +91,7 @@ export function Calendar(props: CalendarProps) {
           <span className="sr-only">Next month</span>
         </Button>
       </div>
-      <div className="grid grid-cols-7 gap-0 text-center text-xs leading-6 text-muted-foreground">
+      <div className="-mx-2 grid grid-cols-7 gap-0 text-center text-xs leading-6 text-muted-foreground">
         <div className="flex items-center justify-center">Sun</div>
         <div className="flex items-center justify-center">Mon</div>
         <div className="flex items-center justify-center">Tue</div>
@@ -100,7 +100,7 @@ export function Calendar(props: CalendarProps) {
         <div className="flex items-center justify-center">Fri</div>
         <div className="flex items-center justify-center">Sat</div>
       </div>
-      <div className="grid grid-cols-7 gap-0 text-center text-sm">
+      <div className="-mx-2 grid grid-cols-7 gap-0 text-center text-sm">
         {days.map((date, index) => (
           <CalendarDay
             key={`${date.toFormat('yyyy-MM-dd')}-${index}`}
