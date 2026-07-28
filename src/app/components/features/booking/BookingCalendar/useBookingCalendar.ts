@@ -99,7 +99,7 @@ export function useBookingCalendar() {
       } catch {
         if (!ignore) {
           toast({
-            title: "Error",
+            title: "Profile Error",
             description: "Could not load user data.",
             variant: "destructive"
           });
@@ -144,7 +144,7 @@ export function useBookingCalendar() {
       console.error('Error fetching available slots:', error);
       const errorMessage = error instanceof Error ? error.message : "Failed to fetch available time slots. Please try again.";
       toast({
-        title: "Error",
+        title: "Availability Error",
         description: errorMessage,
         variant: "destructive"
       });
@@ -217,7 +217,7 @@ export function useBookingCalendar() {
       console.error('Error loading slots:', error);
       const errorMessage = error instanceof Error ? error.message : "Failed to load available time slots. Please try again.";
       toast({
-        title: "Error",
+        title: "Availability Error",
         description: errorMessage,
         variant: "destructive"
       });
@@ -227,7 +227,7 @@ export function useBookingCalendar() {
   const handleSlotSelect = useCallback((slot: TimeSlot) => {
     if (!slot.available || !slot.date) {
       toast({
-        title: "Error",
+        title: "Invalid Slot",
         description: "The selected time slot is invalid. Please try another one.",
         variant: "destructive"
       });
@@ -384,7 +384,7 @@ export function useBookingCalendar() {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Error creating booking.";
       toast({
-        title: "Error",
+        title: "Checkout Error",
         description: errorMessage,
         variant: "destructive"
       });
