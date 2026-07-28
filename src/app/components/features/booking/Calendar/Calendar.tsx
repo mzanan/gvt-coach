@@ -33,7 +33,7 @@ const CalendarDay = React.memo(({
 }) => (
   <button
     className={cn(
-      "flex aspect-square w-full items-center justify-center rounded-md p-0 font-normal",
+      "mx-auto flex aspect-square w-full max-w-12 items-center justify-center rounded-md p-0 font-normal",
       !isCurrentMonth && "text-muted-foreground",
       !isCurrentMonth && isDisabled && "opacity-50",
       !isCurrentMonth && !isDisabled && "hover:bg-accent hover:text-accent-foreground",
