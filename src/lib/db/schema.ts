@@ -76,4 +76,5 @@ export const SCHEMA_STATEMENTS = [
 export const COLUMN_MIGRATIONS = [
   `ALTER TABLE coaches ADD COLUMN polar_product_id TEXT NOT NULL DEFAULT ''`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_checkout_order_id_unique ON gvt_coach_meetings_bookings(checkout_order_id) WHERE checkout_order_id IS NOT NULL`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_status_checkout_order_id_unique ON gvt_coach_payments_status(checkout_order_id) WHERE checkout_order_id IS NOT NULL`,
 ];

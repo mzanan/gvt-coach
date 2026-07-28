@@ -140,13 +140,26 @@ export async function ensurePendingPaymentStatus(
   }
 
   const existingByJson = await findPaymentStatusByJsonOrderId(orderId);
-  const paymentStatusId = existingByJson
-    ? existingByJson.id
-    : (await insertPaymentStatus({
+  let paymentStatusId: string;
+
+  if (existingByJson) {
+    paymentStatusId = existingByJson.id;
+  } else {
+    try {
+      paymentStatusId = (await insertPaymentStatus({
         status: 'PENDING',
         checkout_order_id: orderId,
         json_data: { checkout_order_id: orderId, provider, ...extraJson }
       })).id;
+    } catch (error) {
+      if (!String(error).includes('UNIQUE constraint failed')) throw error;
+
+      const concurrentStatus = await getPaymentStatusByOrderId(orderId);
+      if (!concurrentStatus) throw error;
+
+      paymentStatusId = concurrentStatus.id;
+    }
+  }
 
   await upsertMapping({
     checkout_order_id: orderId,
