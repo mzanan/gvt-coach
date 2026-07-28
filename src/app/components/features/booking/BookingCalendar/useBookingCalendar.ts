@@ -163,13 +163,11 @@ export function useBookingCalendar() {
 
     setBookingPlan(prev => ({
       ...prev,
-      coach: prev?.coach as CoachId || 'MATIAS',
       frequency: BookingFrequency.Once,
       duration: 1
     }));
 
     setSections(prev => prev.map(s => {
-      if (s.id === 'coach') return { ...s, completed: true };
       if (s.id === 'date') return { ...s, completed: false };
       if (s.id === 'time') return { ...s, completed: false };
       if (s.id === 'summary') return { ...s, completed: false };
@@ -178,13 +176,13 @@ export function useBookingCalendar() {
 
     setEmailError(null);
     setIsEditingEmail(false);
-    setActiveSection('date');
+    setActiveSection(bookingPlan.coach ? 'date' : 'coach');
 
     toast({
       title: "Timezone Updated",
       description: `Your timezone has been updated to ${timezone}.`,
     });
-  }, [toast]);
+  }, [toast, bookingPlan.coach]);
 
   const handleDateSelect = useCallback(async (date: Date) => {
     setIsLoadingSlots(true);
