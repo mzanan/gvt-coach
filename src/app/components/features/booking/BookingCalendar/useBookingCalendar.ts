@@ -187,12 +187,25 @@ export function useBookingCalendar() {
   const handleDateSelect = useCallback(async (date: Date) => {
     if (!bookingPlan.coach) return;
 
-    setIsLoadingSlots(true);
     const selectedLocalDate = DateTime.fromJSDate(date).startOf('day').setZone(selectedTimezone, { keepLocalTime: true });
+
+    const isSameDay = selectedDate
+      ? DateTime.fromJSDate(selectedDate).setZone(selectedTimezone).hasSame(selectedLocalDate, 'day')
+      : false;
+
+    if (isSameDay) return;
+
+    setIsLoadingSlots(true);
     setSelectedDate(selectedLocalDate.toJSDate());
+    setSelectedSlot(null);
 
     try {
-      setSections(prev => prev.map(s => s.id === 'date' ? { ...s, completed: true } : s));
+      setSections(prev => prev.map(s => {
+        if (s.id === 'date') return { ...s, completed: true };
+        if (s.id === 'time') return { ...s, completed: false };
+        if (s.id === 'summary') return { ...s, completed: false };
+        return s;
+      }));
       setActiveSection('time');
 
       fetchAvailableSlots(
@@ -209,7 +222,7 @@ export function useBookingCalendar() {
         variant: "destructive"
       });
     }
-  }, [selectedTimezone, bookingPlan, fetchAvailableSlots, setSections, setActiveSection, toast, setIsLoadingSlots, setSelectedDate]);
+  }, [selectedTimezone, bookingPlan, selectedDate, fetchAvailableSlots, setSections, setActiveSection, toast, setIsLoadingSlots, setSelectedDate, setSelectedSlot]);
 
   const handleSlotSelect = useCallback((slot: TimeSlot) => {
     if (!slot.available || !slot.date) {
@@ -264,9 +277,17 @@ export function useBookingCalendar() {
       frequency: BookingFrequency.Once
     }));
 
-    setSections(prev => prev.map(s =>
-      s.id === 'coach' ? { ...s, completed: true } : s
-    ));
+    setSelectedDate(null);
+    setSelectedSlot(null);
+    setAvailableSlots([]);
+
+    setSections(prev => prev.map(s => {
+      if (s.id === 'coach') return { ...s, completed: true };
+      if (s.id === 'date') return { ...s, completed: false };
+      if (s.id === 'time') return { ...s, completed: false };
+      if (s.id === 'summary') return { ...s, completed: false };
+      return s;
+    }));
     setActiveSection('date');
   }, []);
 
