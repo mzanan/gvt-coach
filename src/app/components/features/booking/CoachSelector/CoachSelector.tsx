@@ -22,7 +22,7 @@ export const CoachSelector = ({
 
   return (
     <RadioGroup
-      value={selectedCoach}
+      value={selectedCoach ?? ''}
       onValueChange={(value) => onCoachSelect(value as CoachId)}
       className="grid gap-4 md:grid-cols-2"
     >
