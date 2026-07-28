@@ -58,6 +58,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           }, { status: 400 });
         }
 
+        const coach = bookingData.bookingPlan?.coach;
+
+        if (!coach) {
+          return NextResponse.json({
+            error: 'Missing coach information in request'
+          }, { status: 400 });
+        }
+
         const newBooking = await insertBooking({
           user_email: bookingData.userEmail,
           booking_date: bookingDateValue,
@@ -65,7 +73,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           frequency: BookingFrequency.Once,
           checkout_order_id: orderId,
           duration: 60,
-          coach: bookingData.bookingPlan?.coach || 'MATIAS'
+          coach
         });
 
         return NextResponse.json({
