@@ -2,6 +2,7 @@
 
 import { Plus } from 'lucide-react'
 import { Button } from '@/app/components/ui-kit/button'
+import { Card } from '@/app/components/ui-kit/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui-kit/tabs'
 import { AppConfig } from '@/config/appConfig'
 import { useAdminPanel } from './useAdminPanel'
@@ -40,7 +41,7 @@ export function AdminPanel({ initialConfig }: AdminPanelProps) {
         <TabsTrigger value="coaches" className="flex-1 sm:flex-none">Coaches</TabsTrigger>
       </TabsList>
 
-        <TabsContent value="general" className="mt-0">
+        <TabsContent value="general">
           <SiteSettingsForm
             site={site}
             isSaving={isSaving}
@@ -49,26 +50,28 @@ export function AdminPanel({ initialConfig }: AdminPanelProps) {
           />
         </TabsContent>
 
-        <TabsContent value="coaches" className="mt-0 space-y-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <Tabs value={activeCoach?.id} onValueChange={setActiveCoachId}>
-              <TabsList className="flex-wrap h-auto">
-                {coachList.map(coach => (
-                  <TabsTrigger key={coach.id} value={coach.id}>
-                    {coach.displayName}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-            <NewCoachDialog onCreate={createCoach} isSaving={isSaving}>
-              <Button variant="outline" size="sm" className="gap-1 self-start sm:self-auto">
-                <Plus className="h-4 w-4" />
-                New coach
-              </Button>
-            </NewCoachDialog>
-          </div>
+        <TabsContent value="coaches" className="space-y-6">
+          {coachList.length > 0 && (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <Tabs value={activeCoach?.id} onValueChange={setActiveCoachId}>
+                <TabsList className="w-full">
+                  {coachList.map(coach => (
+                    <TabsTrigger key={coach.id} value={coach.id} className="flex-1 min-w-28">
+                      {coach.displayName}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+              <NewCoachDialog onCreate={createCoach} isSaving={isSaving}>
+                <Button variant="outline" className="w-full sm:w-auto">
+                  <Plus />
+                  New coach
+                </Button>
+              </NewCoachDialog>
+            </div>
+          )}
 
-          {activeCoach && (
+          {activeCoach ? (
             <CoachForm
               key={activeCoach.id}
               coach={activeCoach}
@@ -78,6 +81,14 @@ export function AdminPanel({ initialConfig }: AdminPanelProps) {
               onSave={saveCoach}
               onDelete={removeCoach}
             />
+          ) : (
+            <Card className="p-6 text-center space-y-4">
+              <p className="font-medium">No coaches yet</p>
+              <p className="text-sm text-muted-foreground">Add the first coach to start taking bookings.</p>
+              <NewCoachDialog onCreate={createCoach} isSaving={isSaving}>
+                <Button className="w-full sm:w-auto">New coach</Button>
+              </NewCoachDialog>
+            </Card>
           )}
       </TabsContent>
     </Tabs>

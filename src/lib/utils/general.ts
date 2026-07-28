@@ -1,9 +1,21 @@
 import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { extendTailwindMerge } from "tailwind-merge"
 import { DateTime } from 'luxon'
 
+const customTwMerge = extendTailwindMerge({
+  extend: {
+    classGroups: {
+      'h': [{ h: ['control', 'control-lg'] }],
+      'min-h': [{ 'min-h': ['control'] }],
+      'w': [{ w: ['control'] }],
+      'max-h': [{ 'max-h': ['dialog-max'] }],
+      'size': [{ size: ['control'] }],
+    },
+  },
+})
+
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return customTwMerge(clsx(inputs))
 }
 
 export function isValidEmail(value: string): boolean {

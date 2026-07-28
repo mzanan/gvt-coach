@@ -17,20 +17,6 @@ import { getBookingSummary, cn } from '@/lib/utils'
 import { useAppConfig } from '@/app/components/core/AppConfigProvider'
 
 
-const PaymentButton = React.memo(({ onClick, isLoading }: { onClick: () => void, isLoading: boolean }) => (
-  <Button 
-    onClick={onClick} 
-    disabled={isLoading}
-    className="w-full max-w-sm"
-  >
-    {isLoading ? (
-      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-    ) : null}
-    Proceed to Payment
-  </Button>
-));
-PaymentButton.displayName = 'PaymentButton';
-
 const MemoizedBookingSection = React.memo(({
   section,
   activeSection,
@@ -186,7 +172,7 @@ export function BookingCalendar() {
                         onKeyDown={handleEmailKeyDown}
                         autoFocus
                         autoComplete="email"
-                        className="h-8 max-w-xs"
+                        className="max-w-xs"
                         aria-invalid={!!emailError}
                         aria-describedby={emailError ? "booking-email-error" : undefined}
                       />
@@ -198,7 +184,7 @@ export function BookingCalendar() {
                         aria-label="Confirm email"
                         className="shrink-0 text-muted-foreground hover:text-foreground"
                       >
-                        <Check className="h-4 w-4" />
+                        <Check />
                       </Button>
                     </div>
                   ) : (
@@ -212,7 +198,7 @@ export function BookingCalendar() {
                         aria-label="Edit email"
                         className="shrink-0 text-muted-foreground hover:text-foreground"
                       >
-                        <Pencil className="h-3.5 w-3.5" />
+                        <Pencil />
                       </Button>
                     </div>
                   )}
@@ -239,16 +225,17 @@ export function BookingCalendar() {
         <Button
           onClick={handleBookingConfirm}
           disabled={isBookingLoading || !isEmailValid}
-          className="w-full h-12 text-lg font-medium"
+          size="lg"
+          className="w-full font-medium"
         >
           {isBookingLoading ? (
             <>
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              <Loader2 className="mr-2 animate-spin" />
               Processing...
             </>
           ) : (
             <>
-              <CreditCard className="mr-2 h-5 w-5" />
+              <CreditCard className="mr-2" />
               Proceed to Payment
             </>
           )}

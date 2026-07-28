@@ -9,6 +9,7 @@ import { Label } from '@/app/components/ui-kit/label'
 import { Textarea } from '@/app/components/ui-kit/textarea'
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -72,7 +73,7 @@ function PriceInput({ id, label, value, onChange }: {
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
       <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base text-muted-foreground md:text-sm">$</span>
         <Input
           id={id}
           type="number"
@@ -90,7 +91,7 @@ export function CoachForm({ coach, canDelete, isSaving, onChange, onSave, onDele
   const set = (fields: Partial<CoachRecord>) => onChange({ ...coach, ...fields })
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 stagger-in">
       <Card className="p-6 space-y-6">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 relative rounded-full overflow-hidden bg-muted flex items-center justify-center shrink-0">
@@ -268,28 +269,36 @@ export function CoachForm({ coach, canDelete, isSaving, onChange, onSave, onDele
         </div>
       </Card>
 
-      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="destructive" size="sm" className="gap-1 w-full sm:w-auto" disabled={!canDelete || isSaving}>
-              <Trash2 className="h-4 w-4" />
-              Delete coach
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Delete {coach.displayName}?</DialogTitle>
-              <DialogDescription>
-                The coach and their configuration are removed permanently. Existing bookings are kept.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="destructive" onClick={() => onDelete(coach.id)} disabled={isSaving}>
-                Delete
+      <div className="sticky bottom-0 z-10 -mx-4 flex flex-col-reverse gap-3 border-t bg-background/95 px-4 py-3 pb-safe backdrop-blur sm:static sm:mx-0 sm:flex-row sm:items-center sm:justify-between sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:pb-0 sm:backdrop-blur-none">
+        <div className="space-y-1">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="destructive" className="w-full sm:w-auto" disabled={!canDelete || isSaving}>
+                <Trash2 />
+                Delete coach
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete {coach.displayName}?</DialogTitle>
+                <DialogDescription>
+                  The coach and their configuration are removed permanently. Existing bookings are kept.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button variant="outline" className="w-full sm:w-auto">Cancel</Button>
+                </DialogClose>
+                <Button variant="destructive" onClick={() => onDelete(coach.id)} disabled={isSaving} className="w-full sm:w-auto">
+                  Delete
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          {!canDelete && (
+            <p className="text-xs text-muted-foreground">The last coach cannot be deleted.</p>
+          )}
+        </div>
 
         <Button onClick={() => onSave(coach)} disabled={isSaving} className="w-full sm:w-auto">
           {isSaving ? 'Saving...' : 'Save coach'}

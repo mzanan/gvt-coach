@@ -20,7 +20,7 @@ export default async function AdminPage() {
             </p>
           </div>
           <form action={signInWithGoogle} className="w-full">
-            <Button type="submit" variant="outline" className="w-full gap-2">
+            <Button type="submit" variant="outline" className="w-full">
               <GoogleIcon />
               Sign in with Google
             </Button>
