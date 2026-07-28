@@ -187,8 +187,15 @@ export function useBookingCalendar() {
   const handleDateSelect = useCallback(async (date: Date) => {
     if (!bookingPlan.coach) return;
 
-    setIsLoadingSlots(true);
     const selectedLocalDate = DateTime.fromJSDate(date).startOf('day').setZone(selectedTimezone, { keepLocalTime: true });
+
+    const isSameDay = selectedDate
+      ? DateTime.fromJSDate(selectedDate).setZone(selectedTimezone).hasSame(selectedLocalDate, 'day')
+      : false;
+
+    if (isSameDay) return;
+
+    setIsLoadingSlots(true);
     setSelectedDate(selectedLocalDate.toJSDate());
     setSelectedSlot(null);
 
@@ -215,7 +222,7 @@ export function useBookingCalendar() {
         variant: "destructive"
       });
     }
-  }, [selectedTimezone, bookingPlan, fetchAvailableSlots, setSections, setActiveSection, toast, setIsLoadingSlots, setSelectedDate, setSelectedSlot]);
+  }, [selectedTimezone, bookingPlan, selectedDate, fetchAvailableSlots, setSections, setActiveSection, toast, setIsLoadingSlots, setSelectedDate, setSelectedSlot]);
 
   const handleSlotSelect = useCallback((slot: TimeSlot) => {
     if (!slot.available || !slot.date) {
