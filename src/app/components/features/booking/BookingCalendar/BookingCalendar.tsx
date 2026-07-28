@@ -5,7 +5,7 @@ import { useBookingCalendar } from './useBookingCalendar'
 import { Calendar } from '../Calendar'
 import { Button } from '@/app/components/ui-kit/button'
 import { Input } from '@/app/components/ui-kit/input'
-import { Check, Loader2, Globe, User, DollarSign, Clock, CreditCard, CalendarIcon, Mail, Pencil } from 'lucide-react'
+import { Check, Loader2, User, DollarSign, Clock, CreditCard, CalendarIcon, Mail, Pencil } from 'lucide-react'
 import { Card } from '@/app/components/ui-kit/card'
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/app/components/ui-kit/accordion'
 import { RadioGroup, RadioGroupItem } from '@/app/components/ui-kit/radio-group'
@@ -343,16 +343,13 @@ export function BookingCalendar() {
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px] items-start">
       <div className="space-y-6">
-        <div className="flex justify-between items-center gap-4">
-          <h2 className="text-2xl font-semibold shrink">Book a Consultation</h2>
-            <div className="flex items-center space-x-2 shrink-0">
-              <Globe className="h-4 w-4 text-muted-foreground" />
-              <TimeZoneSelector
-                className="max-w-xs"
-                currentTimezone={selectedTimezone}
-                onTimezoneChange={handleTimezoneChange}
-              />
-            </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <h2 className="text-2xl font-semibold">Book a Consultation</h2>
+          <TimeZoneSelector
+            className="w-full sm:max-w-xs"
+            currentTimezone={selectedTimezone}
+            onTimezoneChange={handleTimezoneChange}
+          />
         </div>
 
         <Accordion
