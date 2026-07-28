@@ -61,8 +61,8 @@ export function SiteSettingsForm({ site, isSaving, onChange, onSave }: SiteSetti
         </div>
       </div>
 
-      <div className="flex justify-end border-t pt-4">
-        <Button onClick={onSave} disabled={isSaving}>
+      <div className="flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end">
+        <Button onClick={onSave} disabled={isSaving} className="w-full sm:w-auto">
           {isSaving ? 'Saving...' : 'Save site settings'}
         </Button>
       </div>

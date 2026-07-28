@@ -33,7 +33,7 @@ const CalendarDay = React.memo(({
 }) => (
   <button
     className={cn(
-      "h-9 w-9 rounded-md p-0 font-normal flex items-center justify-center mx-auto",
+      "flex aspect-square w-full items-center justify-center rounded-md p-0 font-normal",
       !isCurrentMonth && "text-muted-foreground",
       !isCurrentMonth && isDisabled && "opacity-50",
       !isCurrentMonth && !isDisabled && "hover:bg-accent hover:text-accent-foreground",
@@ -70,11 +70,12 @@ export function Calendar(props: CalendarProps) {
       <div className="flex items-center justify-between">
         <Button
           variant="ghost"
+          size="icon"
           onClick={goToPreviousMonth}
           disabled={isPreviousMonthDisabled}
-          className="h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
+          className="opacity-60 hover:opacity-100"
         >
-          <ChevronLeft className="h-4 w-4" />
+          <ChevronLeft />
           <span className="sr-only">Previous month</span>
         </Button>
         <h3 className="text-sm font-medium">
@@ -82,14 +83,15 @@ export function Calendar(props: CalendarProps) {
         </h3>
         <Button
           variant="ghost"
+          size="icon"
           onClick={goToNextMonth}
-          className="h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
+          className="opacity-60 hover:opacity-100"
         >
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight />
           <span className="sr-only">Next month</span>
         </Button>
       </div>
-      <div className="grid grid-cols-7 gap-1 text-center text-xs leading-6 text-muted-foreground">
+      <div className="grid grid-cols-7 gap-0 text-center text-xs leading-6 text-muted-foreground">
         <div className="flex items-center justify-center">Sun</div>
         <div className="flex items-center justify-center">Mon</div>
         <div className="flex items-center justify-center">Tue</div>
@@ -98,7 +100,7 @@ export function Calendar(props: CalendarProps) {
         <div className="flex items-center justify-center">Fri</div>
         <div className="flex items-center justify-center">Sat</div>
       </div>
-      <div className="grid grid-cols-7 gap-1 text-center text-sm">
+      <div className="grid grid-cols-7 gap-0 text-center text-sm">
         {days.map((date, index) => (
           <CalendarDay
             key={`${date.toFormat('yyyy-MM-dd')}-${index}`}

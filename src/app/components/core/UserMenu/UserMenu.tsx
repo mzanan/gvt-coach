@@ -28,7 +28,10 @@ export function UserMenu({ email, name, image }: UserMenuProps) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+      <DropdownMenuTrigger
+        aria-label="Account menu"
+        className="flex size-control items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      >
         <Avatar>
           {image && <AvatarImage src={image} alt={name || email} />}
           <AvatarFallback>{initials}</AvatarFallback>
@@ -43,7 +46,7 @@ export function UserMenu({ email, name, image }: UserMenuProps) {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => signOutAction()}>
-          <LogOut className="h-4 w-4" />
+          <LogOut />
           Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>

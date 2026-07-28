@@ -6,6 +6,7 @@ import { Input } from '@/app/components/ui-kit/input'
 import { Label } from '@/app/components/ui-kit/label'
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -58,7 +59,10 @@ export function NewCoachDialog({ children, isSaving, onCreate }: NewCoachDialogP
           />
         </div>
         <DialogFooter>
-          <Button onClick={handleCreate} disabled={isSaving || !displayName.trim()}>
+          <DialogClose asChild>
+            <Button variant="outline" className="w-full sm:w-auto">Cancel</Button>
+          </DialogClose>
+          <Button onClick={handleCreate} disabled={isSaving || !displayName.trim()} className="w-full sm:w-auto">
             {isSaving ? 'Creating...' : 'Create coach'}
           </Button>
         </DialogFooter>
