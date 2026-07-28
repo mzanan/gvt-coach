@@ -283,6 +283,7 @@ export function useBookingCalendar() {
 
   const handleCoachSelect = useCallback((coach: CoachId) => {
     latestSlotsRequestRef.current += 1;
+    setIsLoadingSlots(false);
     setBookingPlan(prev => ({
       ...prev,
       coach,
