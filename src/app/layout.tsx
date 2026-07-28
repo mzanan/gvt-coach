@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/app/components/core/ThemeProvider"
 import { Header } from "@/app/components/core/Header"
 import { Footer } from "@/app/components/core/Footer"
+import { Toaster } from "@/app/components/ui-kit/toaster"
 import { getEffectiveSiteConfig } from "@/config/appConfig"
 import "./globals.css";
 
@@ -50,6 +51,7 @@ export default function RootLayout({
             </main>
             <Footer />
           </div>
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

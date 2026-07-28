@@ -118,7 +118,7 @@ export const usePaymentSuccess = () => {
         if (!checkoutOrderId) {
           toast({
             title: 'Error',
-            description: 'Falta información de la reserva. Por favor contacte soporte.',
+            description: 'Booking information is missing. Please contact support.',
             variant: 'destructive'
           })
           if (isMounted) setIsLoading(false)
@@ -148,7 +148,7 @@ export const usePaymentSuccess = () => {
         if (isMounted) {
           toast({
             title: 'Error',
-            description: 'No se pudo cargar la información de reserva',
+            description: 'Could not load booking information.',
             variant: 'destructive'
           })
           setIsLoading(false)
