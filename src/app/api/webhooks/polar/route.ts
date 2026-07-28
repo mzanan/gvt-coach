@@ -3,6 +3,7 @@ import { PaymentOrderStatus } from '@/types/enums'
 import { fulfillPaidBookings } from '@/services/bookingFulfillment'
 import {
   getMappingByOrderId,
+  getPaymentStatusByOrderId,
   getPaymentStatusById,
   insertPaymentStatus,
   updatePaymentStatus,
@@ -134,23 +135,54 @@ async function processWebhookEvent(body: WebhookPayload) {
 
     if (!existingPayment) {
       if (eventType === 'checkout.created' || eventType === 'order.created') {
-        const newPayment = await insertPaymentStatus({
-          status: paymentStatus,
-          checkout_order_id: checkoutOrderId,
-          json_data: {
-            event_type: eventType,
-            checkout_order_id: checkoutOrderId,
-            product_id: productId,
-            checkout_id: checkoutId,
-            order_id: orderId,
-            customer_email: userEmail,
+        try {
+          const newPayment = await insertPaymentStatus({
             status: paymentStatus,
-            webhook_event: eventType,
-            updated_at: new Date().toISOString(),
-            original_payload: body
+            checkout_order_id: checkoutOrderId,
+            json_data: {
+              event_type: eventType,
+              checkout_order_id: checkoutOrderId,
+              product_id: productId,
+              checkout_id: checkoutId,
+              order_id: orderId,
+              customer_email: userEmail,
+              status: paymentStatus,
+              webhook_event: eventType,
+              updated_at: new Date().toISOString(),
+              original_payload: body
+            }
+          });
+          paymentId = newPayment.id;
+        } catch (error) {
+          if (!String(error).includes('UNIQUE constraint failed')) throw error;
+
+          const concurrentPayment = await getPaymentStatusByOrderId(checkoutOrderId);
+          if (!concurrentPayment) throw error;
+
+          const alreadyPaid = concurrentPayment.status === PaymentOrderStatus.Paid && paymentStatus === PaymentOrderStatus.Pending;
+
+          if (!alreadyPaid && concurrentPayment.status !== paymentStatus) {
+            const jsonData = (concurrentPayment.json_data && typeof concurrentPayment.json_data === 'object')
+              ? concurrentPayment.json_data as Record<string, unknown>
+              : {};
+
+            await updatePaymentStatus(concurrentPayment.id, {
+              status: paymentStatus,
+              json_data: {
+                ...jsonData,
+                status: paymentStatus,
+                provider: 'polar',
+                payment_intent: data.payment_intent ?? '',
+                amount: data.amount ?? 0,
+                currency: data.currency ?? '',
+                customer_email: data.customer_email ?? '',
+                updated_at: new Date().toISOString()
+              }
+            });
           }
-        });
-        paymentId = newPayment.id;
+
+          paymentId = concurrentPayment.id;
+        }
       } else {
         return;
       }
