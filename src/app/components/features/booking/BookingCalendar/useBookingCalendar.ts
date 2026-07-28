@@ -392,14 +392,6 @@ export function useBookingCalendar() {
     }
   }, [bookingPlan, selectedSlot, userProfile, selectedTimezone, toast, coaches, userEmail]);
 
-  const handleNextSection = useCallback(() => {
-    const activeIndex = sections.findIndex(s => s.id === activeSection);
-    if (activeIndex < sections.length - 1) {
-      const nextSection = sections[activeIndex + 1].id;
-      setActiveSection(nextSection);
-    }
-  }, [activeSection, sections]);
-
   return {
     sections,
     activeSection,
@@ -427,7 +419,6 @@ export function useBookingCalendar() {
     handleCoachSelect,
     formatSlotTime,
     handleBookingConfirm,
-    handleNextSection,
     fetchAvailableSlots
   }
 }
