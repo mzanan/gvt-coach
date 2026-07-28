@@ -51,6 +51,7 @@ async function fetchLatestBookingByEmail(email: string): Promise<BookingDB | nul
 export const usePaymentSuccess = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
+  const [isVoided, setIsVoided] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const [booking, setBooking] = useState<BookingDB | null>(null)
   const [userTimezone, setUserTimezone] = useState('')
@@ -61,6 +62,7 @@ export const usePaymentSuccess = () => {
 
   const retry = useCallback(() => {
     setHasError(false)
+    setIsVoided(false)
     setIsLoading(true)
     setAttempt(previous => previous + 1)
   }, [])
@@ -105,10 +107,10 @@ export const usePaymentSuccess = () => {
     async function poll(checkoutOrderId: string) {
       const result = await confirmCheckout(checkoutOrderId)
 
-      if (!isMounted || !result) return false
+      if (!isMounted || !result) return { confirmed: false, voided: false }
 
       applyConfirmation(result)
-      return result.confirmed
+      return { confirmed: result.confirmed, voided: result.status === PaymentOrderStatus.Void }
     }
 
     async function loadData() {
@@ -136,9 +138,16 @@ export const usePaymentSuccess = () => {
           return
         }
 
-        const confirmed = await poll(checkoutOrderId)
+        const first = await poll(checkoutOrderId)
 
-        if (confirmed || !isMounted) return
+        if (first.confirmed || !isMounted) return
+
+        if (first.voided) {
+          setIsLoading(false)
+          setHasError(true)
+          setIsVoided(true)
+          return
+        }
 
         pollInterval = setInterval(async () => {
           retryCount += 1
@@ -152,10 +161,15 @@ export const usePaymentSuccess = () => {
             return
           }
 
-          const done = await poll(checkoutOrderId)
+          const result = await poll(checkoutOrderId)
 
-          if (done && pollInterval) {
-            clearInterval(pollInterval)
+          if (result.confirmed || result.voided) {
+            if (pollInterval) clearInterval(pollInterval)
+            if (result.voided && isMounted) {
+              setIsLoading(false)
+              setHasError(true)
+              setIsVoided(true)
+            }
           }
         }, POLL_INTERVAL_MS)
       } catch {
@@ -182,6 +196,7 @@ export const usePaymentSuccess = () => {
   return {
     isLoading,
     hasError,
+    isVoided,
     retry,
     isPaid: paymentStatus === PaymentOrderStatus.Paid || paymentStatus === PaymentOrderStatus.Active,
     booking,

@@ -16,6 +16,7 @@ export function PaymentSuccess() {
   const {
     isLoading,
     hasError,
+    isVoided,
     retry,
     isPaid,
     booking,
@@ -31,6 +32,17 @@ export function PaymentSuccess() {
     const timer = setTimeout(() => setMinLoadingElapsed(true), MIN_LOADING_MS);
     return () => clearTimeout(timer);
   }, []);
+
+  if (isVoided) {
+    return (
+      <PaymentProgress
+        icon={<AlertTriangle className="h-8 w-8 text-destructive mx-auto" />}
+        title="This payment was canceled"
+        description="This checkout was canceled or voided, so it can't be confirmed. Please start a new booking if you'd still like a session."
+        action={<Button asChild><Link href="/">Back to booking</Link></Button>}
+      />
+    )
+  }
 
   if (hasError && !isPaid) {
     return (
