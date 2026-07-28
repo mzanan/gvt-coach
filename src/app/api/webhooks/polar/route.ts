@@ -159,6 +159,28 @@ async function processWebhookEvent(body: WebhookPayload) {
           const concurrentPayment = await getPaymentStatusByOrderId(checkoutOrderId);
           if (!concurrentPayment) throw error;
 
+          const alreadyPaid = concurrentPayment.status === PaymentOrderStatus.Paid && paymentStatus === PaymentOrderStatus.Pending;
+
+          if (!alreadyPaid && concurrentPayment.status !== paymentStatus) {
+            const jsonData = (concurrentPayment.json_data && typeof concurrentPayment.json_data === 'object')
+              ? concurrentPayment.json_data as Record<string, unknown>
+              : {};
+
+            await updatePaymentStatus(concurrentPayment.id, {
+              status: paymentStatus,
+              json_data: {
+                ...jsonData,
+                status: paymentStatus,
+                provider: 'polar',
+                payment_intent: data.payment_intent ?? '',
+                amount: data.amount ?? 0,
+                currency: data.currency ?? '',
+                customer_email: data.customer_email ?? '',
+                updated_at: new Date().toISOString()
+              }
+            });
+          }
+
           paymentId = concurrentPayment.id;
         }
       } else {

@@ -99,6 +99,16 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session, logId: 
       const concurrentPayment = await getPaymentStatusByOrderId(checkoutOrderId);
       if (!concurrentPayment) throw error;
 
+      if (concurrentPayment.status !== PaymentOrderStatus.Paid) {
+        const existingJson = (concurrentPayment.json_data && typeof concurrentPayment.json_data === 'object')
+          ? concurrentPayment.json_data as Record<string, unknown>
+          : {};
+        await updatePaymentStatus(concurrentPayment.id, {
+          status: PaymentOrderStatus.Paid,
+          json_data: { ...existingJson, ...jsonData }
+        });
+      }
+
       paymentId = concurrentPayment.id;
     }
   }
