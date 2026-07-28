@@ -50,12 +50,20 @@ async function fetchLatestBookingByEmail(email: string): Promise<BookingDB | nul
 
 export const usePaymentSuccess = () => {
   const [isLoading, setIsLoading] = useState(true)
+  const [hasError, setHasError] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const [booking, setBooking] = useState<BookingDB | null>(null)
   const [userTimezone, setUserTimezone] = useState('')
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [paymentStatus, setPaymentStatus] = useState<PaymentOrderStatus>(PaymentOrderStatus.Pending)
   const searchParams = useSearchParams()
   const { toast } = useToast()
+
+  const retry = useCallback(() => {
+    setHasError(false)
+    setIsLoading(true)
+    setAttempt(previous => previous + 1)
+  }, [])
 
   const isCompletedRef = useRef(false)
 
@@ -121,7 +129,10 @@ export const usePaymentSuccess = () => {
             description: 'Booking information is missing. Please contact support.',
             variant: 'destructive'
           })
-          if (isMounted) setIsLoading(false)
+          if (isMounted) {
+            setIsLoading(false)
+            setHasError(true)
+          }
           return
         }
 
@@ -134,7 +145,10 @@ export const usePaymentSuccess = () => {
 
           if (!isMounted || retryCount > MAX_RETRIES) {
             if (pollInterval) clearInterval(pollInterval)
-            if (isMounted) setIsLoading(false)
+            if (isMounted) {
+              setIsLoading(false)
+              setHasError(true)
+            }
             return
           }
 
@@ -152,6 +166,7 @@ export const usePaymentSuccess = () => {
             variant: 'destructive'
           })
           setIsLoading(false)
+          setHasError(true)
         }
       }
     }
@@ -162,10 +177,12 @@ export const usePaymentSuccess = () => {
       isMounted = false
       if (pollInterval) clearInterval(pollInterval)
     }
-  }, [searchParams, toast, applyConfirmation])
+  }, [searchParams, toast, applyConfirmation, attempt])
 
   return {
     isLoading,
+    hasError,
+    retry,
     isPaid: paymentStatus === PaymentOrderStatus.Paid || paymentStatus === PaymentOrderStatus.Active,
     booking,
     userTimezone,

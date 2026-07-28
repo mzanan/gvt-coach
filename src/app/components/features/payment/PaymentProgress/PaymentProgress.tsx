@@ -5,9 +5,10 @@ import { PaymentCard } from "@/app/components/features/payment/PaymentCard/Payme
 interface PaymentProgressProps {
   icon: ReactNode
   title: string
-  loadingText: string
+  loadingText?: string
   description: string
-  fallbackText: string
+  fallbackText?: string
+  action?: ReactNode
 }
 
 export function PaymentProgress({
@@ -15,7 +16,8 @@ export function PaymentProgress({
   title,
   loadingText,
   description,
-  fallbackText
+  fallbackText,
+  action
 }: PaymentProgressProps) {
   return (
     <div className="page-container py-8 max-w-2xl">
@@ -24,16 +26,21 @@ export function PaymentProgress({
           {icon}
         </div>
         <h1 className="text-2xl font-bold mb-2">{title}</h1>
-        <div className="flex justify-center my-6">
-          <Loader2 className="h-6 w-6 animate-spin mr-2" />
-          <p>{loadingText}</p>
-        </div>
+        {loadingText && (
+          <div className="flex justify-center my-6">
+            <Loader2 className="h-6 w-6 animate-spin mr-2" />
+            <p>{loadingText}</p>
+          </div>
+        )}
         <p className="text-muted-foreground mb-4">
           {description}
         </p>
-        <p className="text-xs text-muted-foreground mt-2">
-          {fallbackText}
-        </p>
+        {fallbackText && (
+          <p className="text-xs text-muted-foreground mt-2">
+            {fallbackText}
+          </p>
+        )}
+        {action && <div className="mt-6">{action}</div>}
       </PaymentCard>
     </div>
   )
