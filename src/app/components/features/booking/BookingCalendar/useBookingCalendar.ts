@@ -163,6 +163,8 @@ export function useBookingCalendar() {
   }, [toast, setIsLoadingSlots, coaches]);
 
   const handleTimezoneChange = useCallback((timezone: string) => {
+    latestSlotsRequestRef.current += 1;
+    setIsLoadingSlots(false);
     setSelectedTimezone(timezone);
     setTimezoneCookie(timezone);
 
@@ -280,6 +282,7 @@ export function useBookingCalendar() {
   }, [sections, setActiveSection]);
 
   const handleCoachSelect = useCallback((coach: CoachId) => {
+    latestSlotsRequestRef.current += 1;
     setBookingPlan(prev => ({
       ...prev,
       coach,
