@@ -1,11 +1,11 @@
 'use client'
 
 import { Card } from '@/app/components/ui-kit/card'
+import { RadioGroup, RadioGroupItem } from '@/app/components/ui-kit/radio-group'
 import { cn } from '@/lib/utils'
 import { Check } from 'lucide-react'
 import type { CoachId } from '@/config/coaches'
 import { useAppConfig } from '@/app/components/core/AppConfigProvider'
-import { useCoachSelector } from './useCoachSelector'
 import Image from 'next/image'
 import { DateTime } from 'luxon'
 
@@ -19,24 +19,25 @@ export const CoachSelector = ({
   onCoachSelect
 }: CoachSelectorProps) => {
   const { coaches } = useAppConfig();
-  const { handleCoachCardClick } = useCoachSelector({ onCoachSelect });
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2">
-        {(Object.keys(coaches) as CoachId[]).map((coachId) => (
+    <RadioGroup
+      value={selectedCoach ?? ''}
+      onValueChange={(value) => onCoachSelect(value as CoachId)}
+      className="grid gap-4 md:grid-cols-2"
+    >
+      {(Object.keys(coaches) as CoachId[]).map((coachId) => (
+        <RadioGroupItem key={coachId} value={coachId} asChild>
           <Card
-            key={coachId}
             className={cn(
-              "p-4 cursor-pointer border-2 transition-colors",
+              "p-4 cursor-pointer border-2 transition-colors text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
               selectedCoach === coachId
                 ? "border-primary"
                 : "border-transparent hover:border-primary/50"
             )}
-            onClick={() => handleCoachCardClick(coachId)}
           >
             <div className="flex items-start p-2">
-              <div className="w-32 h-32 relative mr-4 rounded-full overflow-hidden bg-slate-200">
+              <div className="w-32 h-32 relative mr-4 rounded-full overflow-hidden bg-muted">
                 {coaches[coachId].photoUrl && (
                   <Image
                     src={coaches[coachId].photoUrl}
@@ -71,8 +72,8 @@ export const CoachSelector = ({
 
             </div>
           </Card>
-        ))}
-      </div>
-    </div>
+        </RadioGroupItem>
+      ))}
+    </RadioGroup>
   );
 };
