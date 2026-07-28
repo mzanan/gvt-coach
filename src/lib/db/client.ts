@@ -30,9 +30,13 @@ export function ensureSchema(): Promise<void> {
         try {
           await db.execute(statement);
         } catch (error) {
-          if (!String(error).includes('duplicate column name')) {
-            throw error;
+          const message = String(error);
+          if (message.includes('duplicate column name')) continue;
+          if (message.includes('UNIQUE constraint failed')) {
+            console.error('Skipping migration due to existing duplicate data:', statement, error);
+            continue;
           }
+          throw error;
         }
       }
     })();

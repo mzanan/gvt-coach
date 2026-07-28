@@ -66,22 +66,39 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           }, { status: 400 });
         }
 
-        const newBooking = await insertBooking({
-          user_email: bookingData.userEmail,
-          booking_date: bookingDateValue,
-          user_timezone: userTimezone,
-          frequency: BookingFrequency.Once,
-          checkout_order_id: orderId,
-          duration: 60,
-          coach
-        });
+        try {
+          const newBooking = await insertBooking({
+            user_email: bookingData.userEmail,
+            booking_date: bookingDateValue,
+            user_timezone: userTimezone,
+            frequency: BookingFrequency.Once,
+            checkout_order_id: orderId,
+            duration: 60,
+            coach
+          });
 
-        return NextResponse.json({
-          success: true,
-          orderId,
-          paymentStatusId,
-          bookingId: newBooking.id
-        });
+          return NextResponse.json({
+            success: true,
+            orderId,
+            paymentStatusId,
+            bookingId: newBooking.id
+          });
+        } catch (error) {
+          if (!String(error).includes('UNIQUE constraint failed')) {
+            throw error;
+          }
+
+          const concurrentBooking = await getBookingByOrderId(orderId);
+          if (!concurrentBooking) throw error;
+
+          return NextResponse.json({
+            success: true,
+            orderId,
+            paymentStatusId,
+            bookingId: concurrentBooking.id,
+            message: 'Used existing booking record'
+          });
+        }
       }
 
       return NextResponse.json({
