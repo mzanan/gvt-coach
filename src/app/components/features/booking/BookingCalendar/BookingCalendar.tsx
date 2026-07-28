@@ -8,6 +8,7 @@ import { Input } from '@/app/components/ui-kit/input'
 import { Check, Loader2, Globe, User, DollarSign, Clock, CreditCard, CalendarIcon, Mail, Pencil } from 'lucide-react'
 import { Card } from '@/app/components/ui-kit/card'
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/app/components/ui-kit/accordion'
+import { RadioGroup, RadioGroupItem } from '@/app/components/ui-kit/radio-group'
 import { DateTime } from 'luxon'
 import { CoachSelector } from '../CoachSelector'
 import { TimeZoneSelector } from '../TimeZoneSelector'
@@ -291,35 +292,47 @@ export function BookingCalendar() {
 
         return (
           <>
-            {availableSlots.map((dayGroup) => {
-              return (
-                <div key={dayGroup.date.toString()} className="mb-4">
-                  <h3 className="font-medium mb-2">
-                    {DateTime.fromJSDate(dayGroup.date).setZone(selectedTimezone).toFormat('EEEE, MMMM d')}
-                  </h3>
-                  <div className="grid grid-cols-3 gap-2">
-                    {dayGroup.slots.map((slot, index) => {
-                      return (
-                        <Button
-                          key={`${slot.date.toString()}-${index}`}
-                          variant={selectedSlot?.date.toString() === slot.date.toString() ? 'default' : 'outline'}
-                          disabled={!slot.available}
-                          onClick={() => {
-                            handleSlotSelect(slot);
-                          }}
-                          className={cn(
-                            "whitespace-nowrap",
-                            !slot.available && "opacity-60 cursor-not-allowed dark:bg-gray-800 bg-gray-100 dark:text-gray-400 text-gray-500"
-                          )}
-                        >
-                          {DateTime.fromJSDate(slot.date).setZone(selectedTimezone).toFormat('h:mm a')}
-                        </Button>
-                      );
-                    })}
+            <RadioGroup
+              value={selectedSlot?.date.toString() ?? ''}
+              onValueChange={(value) => {
+                const slot = availableSlots
+                  .flatMap(group => group.slots)
+                  .find(s => s.date.toString() === value);
+                if (slot) handleSlotSelect(slot);
+              }}
+            >
+              {availableSlots.map((dayGroup) => {
+                return (
+                  <div key={dayGroup.date.toString()} className="mb-4">
+                    <h3 className="font-medium mb-2">
+                      {DateTime.fromJSDate(dayGroup.date).setZone(selectedTimezone).toFormat('EEEE, MMMM d')}
+                    </h3>
+                    <div className="grid grid-cols-3 gap-2">
+                      {dayGroup.slots.map((slot, index) => {
+                        return (
+                          <RadioGroupItem
+                            key={`${slot.date.toString()}-${index}`}
+                            value={slot.date.toString()}
+                            disabled={!slot.available}
+                            asChild
+                          >
+                            <Button
+                              variant={selectedSlot?.date.toString() === slot.date.toString() ? 'default' : 'outline'}
+                              className={cn(
+                                "whitespace-nowrap",
+                                !slot.available && "opacity-60 cursor-not-allowed bg-muted text-muted-foreground"
+                              )}
+                            >
+                              {DateTime.fromJSDate(slot.date).setZone(selectedTimezone).toFormat('h:mm a')}
+                            </Button>
+                          </RadioGroupItem>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </RadioGroup>
 
             <div className="mt-6 p-4 bg-muted/30 rounded-lg">
               <p className="text-sm text-muted-foreground">
