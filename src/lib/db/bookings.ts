@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { DateTime } from 'luxon';
 import type { Row } from '@libsql/client';
 import { getDb, ensureSchema } from './client';
 import { BookingDB } from '@/types/booking';
@@ -116,6 +117,20 @@ export async function claimConfirmationEmail(id: string): Promise<boolean> {
     args: [id]
   });
   return result.rowsAffected > 0;
+}
+
+export async function isCoachSlotPaidBooked(coach: string, bookingDateIso: string): Promise<boolean> {
+  const slotStart = DateTime.fromISO(bookingDateIso, { zone: 'utc' }).startOf('hour');
+  if (!slotStart.isValid) return false;
+  const slotEnd = slotStart.plus({ hours: 1 });
+
+  const candidates = await getBookingsBetween(slotStart.toISO() as string, slotEnd.toISO() as string);
+  const sameCoach = candidates.filter(booking => booking.coach === coach && booking.checkout_order_id);
+  if (sameCoach.length === 0) return false;
+
+  const orderIds = sameCoach.map(booking => booking.checkout_order_id as string);
+  const paidOrderIds = await getPaidOrderIds(orderIds);
+  return sameCoach.some(booking => paidOrderIds.has(booking.checkout_order_id as string));
 }
 
 export async function getPaidOrderIds(orderIds: string[]): Promise<Set<string>> {

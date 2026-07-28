@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BookingFrequency } from '@/types/enums';
-import { getBookingByOrderId, insertBooking } from '@/lib/db/bookings';
+import { getBookingByOrderId, insertBooking, isCoachSlotPaidBooked } from '@/lib/db/bookings';
 import { ensurePendingPaymentStatus } from '@/lib/db/payments';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -64,6 +64,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           return NextResponse.json({
             error: 'Missing coach information in request'
           }, { status: 400 });
+        }
+
+        const slotTaken = await isCoachSlotPaidBooked(coach, bookingDateValue);
+        if (slotTaken) {
+          return NextResponse.json({
+            error: 'This time slot is no longer available'
+          }, { status: 409 });
         }
 
         try {

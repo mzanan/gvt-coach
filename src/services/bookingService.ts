@@ -18,8 +18,9 @@ const cache = {
   }
 };
 
-async function fetchPaidBookings(startIso: string, endIso: string): Promise<BookingDB[]> {
-  const response = await fetch(`/api/bookings/paid?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`);
+async function fetchPaidBookings(startIso: string, endIso: string, coach?: CoachId): Promise<BookingDB[]> {
+  const coachParam = coach ? `&coach=${encodeURIComponent(coach)}` : '';
+  const response = await fetch(`/api/bookings/paid?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}${coachParam}`);
   if (!response.ok) {
     return [];
   }
@@ -52,7 +53,7 @@ export const bookingService = {
     const utcStartOfDay = userDateTime.toUTC();
     const utcEndOfDay = userDateTime.plus({ days: 1 }).toUTC();
 
-    const mainBookings = await fetchPaidBookings(utcStartOfDay.toISO() as string, utcEndOfDay.toISO() as string);
+    const mainBookings = await fetchPaidBookings(utcStartOfDay.toISO() as string, utcEndOfDay.toISO() as string, coach);
 
     const bookedSlotsMap = new Map();
 
