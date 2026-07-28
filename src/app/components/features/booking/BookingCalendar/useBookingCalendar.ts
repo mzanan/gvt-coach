@@ -185,6 +185,8 @@ export function useBookingCalendar() {
   }, [toast, bookingPlan.coach]);
 
   const handleDateSelect = useCallback(async (date: Date) => {
+    if (!bookingPlan.coach) return;
+
     setIsLoadingSlots(true);
     const selectedLocalDate = DateTime.fromJSDate(date).startOf('day').setZone(selectedTimezone, { keepLocalTime: true });
     setSelectedDate(selectedLocalDate.toJSDate());
@@ -196,7 +198,7 @@ export function useBookingCalendar() {
       fetchAvailableSlots(
         selectedLocalDate.toJSDate(),
         selectedTimezone,
-        bookingPlan?.coach as CoachId || 'MATIAS'
+        bookingPlan.coach
       );
     } catch (error: unknown) {
       console.error('Error loading slots:', error);

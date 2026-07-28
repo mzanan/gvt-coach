@@ -262,16 +262,21 @@ export function BookingCalendar() {
           />
         )
       case 'date':
+        if (!bookingPlan.coach) return null;
+
         return (
-          <Calendar 
+          <Calendar
             onSelectDate={handleDateSelect}
             selectedDate={selectedDate}
             bookedDates={bookedDates}
             selectedTimezone={selectedTimezone}
-            selectedCoach={bookingPlan.coach || 'MATIAS'}
+            selectedCoach={bookingPlan.coach}
           />
         )
-      case 'time':
+      case 'time': {
+        const coach = bookingPlan.coach;
+        if (!coach) return null;
+
         if (isLoadingSlots) {
           return (
             <div className="flex justify-center items-center py-8">
@@ -313,17 +318,13 @@ export function BookingCalendar() {
             })}
 
             <div className="mt-6 p-4 bg-muted/30 rounded-lg">
-              {(() => {
-                const coach = bookingPlan.coach || 'MATIAS';
-                return (
-                  <p className="text-sm text-muted-foreground">
-                    These time slots are available based on {coaches[coach].displayName}&apos;s working hours in their timezone ({coaches[coach].timezone}, UTC{DateTime.now().setZone(coaches[coach].timezone).toFormat('ZZ')}).
-                  </p>
-                );
-              })()}
+              <p className="text-sm text-muted-foreground">
+                These time slots are available based on {coaches[coach].displayName}&apos;s working hours in their timezone ({coaches[coach].timezone}, UTC{DateTime.now().setZone(coaches[coach].timezone).toFormat('ZZ')}).
+              </p>
             </div>
           </>
         )
+      }
       case 'summary':
         return (
           <div className="space-y-6">
