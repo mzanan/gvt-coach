@@ -5,8 +5,9 @@ import { useBookingCalendar } from './useBookingCalendar'
 import { Calendar } from '../Calendar'
 import { Button } from '@/app/components/ui-kit/button'
 import { Input } from '@/app/components/ui-kit/input'
-import { ChevronDown, ChevronUp, Check, Loader2, Globe, User, DollarSign, Clock, CreditCard, CalendarIcon, Mail, Pencil } from 'lucide-react'
+import { Check, Loader2, Globe, User, DollarSign, Clock, CreditCard, CalendarIcon, Mail, Pencil } from 'lucide-react'
 import { Card } from '@/app/components/ui-kit/card'
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/app/components/ui-kit/accordion'
 import { DateTime } from 'luxon'
 import { CoachSelector } from '../CoachSelector'
 import { TimeZoneSelector } from '../TimeZoneSelector'
@@ -34,52 +35,35 @@ const MemoizedBookingSection = React.memo(({
   activeSection,
   isAvailable,
   summaryText,
-  onSectionClick,
   renderContent
 }: {
   section: { id: string, title: string, completed: boolean },
   activeSection: string,
   isAvailable: boolean,
   summaryText?: string | null,
-  onSectionClick: (id: string) => void,
   renderContent: () => React.ReactNode
 }) => {
   const isCollapsedWithSummary = section.completed && activeSection !== section.id && summaryText;
 
   return (
-    <Card className="overflow-hidden">
-      <button
-        id={`section-header-${section.id}`}
-        className={`
-          w-full p-4 flex items-center justify-between text-left gap-4
-          ${isAvailable ? 'hover:bg-accent/50' : 'opacity-50 cursor-not-allowed'}
-        `}
-        onClick={() => onSectionClick(section.id)}
-        disabled={!isAvailable}
-        aria-expanded={activeSection === section.id}
-        aria-controls={`section-panel-${section.id}`}
-      >
-        <div className="flex items-center space-x-2 min-w-0">
-          {section.completed && <Check className="w-4 h-4 shrink-0" />}
-          <span className="font-medium shrink-0">{section.title}</span>
-          {isCollapsedWithSummary && (
-            <span className="lg:hidden text-sm text-muted-foreground truncate">
-              &middot; {summaryText}
-            </span>
-          )}
-        </div>
-        {activeSection === section.id ?
-          <ChevronUp className="w-4 h-4 shrink-0" /> :
-          <ChevronDown className="w-4 h-4 shrink-0" />
-        }
-      </button>
-
-      {activeSection === section.id && isAvailable && (
-        <div id={`section-panel-${section.id}`} role="region" aria-labelledby={`section-header-${section.id}`} className="p-4 border-t">
+    <AccordionItem value={section.id} disabled={!isAvailable} asChild>
+      <Card className="overflow-hidden">
+        <AccordionTrigger className="p-4">
+          <div className="flex items-center space-x-2 min-w-0">
+            {section.completed && <Check className="w-4 h-4 shrink-0" />}
+            <span className="font-medium shrink-0">{section.title}</span>
+            {isCollapsedWithSummary && (
+              <span className="lg:hidden text-sm text-muted-foreground truncate">
+                &middot; {summaryText}
+              </span>
+            )}
+          </div>
+        </AccordionTrigger>
+        <AccordionContent className="p-4 border-t">
           {renderContent()}
-        </div>
-      )}
-    </Card>
+        </AccordionContent>
+      </Card>
+    </AccordionItem>
   );
 });
 MemoizedBookingSection.displayName = 'MemoizedBookingSection';
@@ -278,16 +262,21 @@ export function BookingCalendar() {
           />
         )
       case 'date':
+        if (!bookingPlan.coach) return null;
+
         return (
-          <Calendar 
+          <Calendar
             onSelectDate={handleDateSelect}
             selectedDate={selectedDate}
             bookedDates={bookedDates}
             selectedTimezone={selectedTimezone}
-            selectedCoach={bookingPlan.coach || 'MATIAS'}
+            selectedCoach={bookingPlan.coach}
           />
         )
-      case 'time':
+      case 'time': {
+        const coach = bookingPlan.coach;
+        if (!coach) return null;
+
         if (isLoadingSlots) {
           return (
             <div className="flex justify-center items-center py-8">
@@ -329,17 +318,13 @@ export function BookingCalendar() {
             })}
 
             <div className="mt-6 p-4 bg-muted/30 rounded-lg">
-              {(() => {
-                const coach = bookingPlan.coach || 'MATIAS';
-                return (
-                  <p className="text-sm text-muted-foreground">
-                    These time slots are available based on {coaches[coach].displayName}&apos;s working hours in their timezone ({coaches[coach].timezone}, UTC{DateTime.now().setZone(coaches[coach].timezone).toFormat('ZZ')}).
-                  </p>
-                );
-              })()}
+              <p className="text-sm text-muted-foreground">
+                These time slots are available based on {coaches[coach].displayName}&apos;s working hours in their timezone ({coaches[coach].timezone}, UTC{DateTime.now().setZone(coaches[coach].timezone).toFormat('ZZ')}).
+              </p>
             </div>
           </>
         )
+      }
       case 'summary':
         return (
           <div className="space-y-6">
@@ -366,8 +351,13 @@ export function BookingCalendar() {
             </div>
         </div>
 
-        {sections
-          .map((section) => {
+        <Accordion
+          type="single"
+          value={activeSection}
+          onValueChange={(value) => { if (value) handleSectionClick(value) }}
+          className="space-y-6"
+        >
+          {sections.map((section) => {
             const sectionIndex = sections.findIndex(s => s.id === section.id)
             const previousSectionsCompleted = sections
               .slice(0, sectionIndex)
@@ -385,11 +375,11 @@ export function BookingCalendar() {
                 activeSection={activeSection}
                 isAvailable={isAvailable}
                 summaryText={sectionSummaries[section.id]}
-                onSectionClick={handleSectionClick}
                 renderContent={() => renderSectionContent(section.id)}
               />
             )
           })}
+        </Accordion>
       </div>
 
       <div className="hidden lg:block sticky top-6">
