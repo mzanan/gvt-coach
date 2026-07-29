@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BookingFrequency } from '@/types/enums';
-import { getBookingByOrderId, insertBooking, isCoachSlotPaidBooked } from '@/lib/db/bookings';
+import { getBookingByOrderId, insertBooking, isCoachSlotPaidBooked, toIsoDateOrNull } from '@/lib/db/bookings';
 import { ensurePendingPaymentStatus } from '@/lib/db/payments';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -40,16 +40,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         const serverDefaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const userTimezone = timezoneFromCookie || bookingData.selectedTimezone || bookingData.userTimezone || serverDefaultTimezone;
 
-        const rawBookingDate = bookingData.selectedDate ?? bookingData.bookingDate;
-        let bookingDateValue: string | null = null;
-
-        if (rawBookingDate) {
-          try {
-            bookingDateValue = new Date(rawBookingDate).toISOString();
-          } catch {
-            bookingDateValue = null;
-          }
-        }
+        const bookingDateValue = toIsoDateOrNull(bookingData.selectedDate ?? bookingData.bookingDate);
 
         if (!bookingDateValue) {
           return NextResponse.json({

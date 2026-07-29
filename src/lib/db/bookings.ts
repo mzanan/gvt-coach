@@ -119,6 +119,15 @@ export async function claimConfirmationEmail(id: string): Promise<boolean> {
   return result.rowsAffected > 0;
 }
 
+export function toIsoDateOrNull(raw: unknown): string | null {
+  if (!raw || (typeof raw !== 'string' && typeof raw !== 'number' && !(raw instanceof Date))) return null;
+  try {
+    return new Date(raw as string | number | Date).toISOString();
+  } catch {
+    return null;
+  }
+}
+
 export async function isCoachSlotPaidBooked(coach: string, bookingDateIso: string): Promise<boolean> {
   const slotStart = DateTime.fromISO(bookingDateIso, { zone: 'utc' }).startOf('hour');
   if (!slotStart.isValid) return false;
