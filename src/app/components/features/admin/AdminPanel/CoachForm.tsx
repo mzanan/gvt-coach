@@ -134,7 +134,7 @@ export function CoachForm({ coach, canDelete, isSaving, onSave, onDelete }: Coac
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSave)} className="space-y-6 stagger-in">
+      <form noValidate onSubmit={form.handleSubmit(onSave)} className="space-y-6 stagger-in">
         <Card className="p-6 space-y-6">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 relative rounded-full overflow-hidden bg-muted flex items-center justify-center shrink-0">

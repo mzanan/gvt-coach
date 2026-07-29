@@ -39,7 +39,7 @@ export function AdminPanel({ initialConfig }: AdminPanelProps) {
         <TabsTrigger value="coaches" className="flex-1 sm:flex-none">Coaches</TabsTrigger>
       </TabsList>
 
-        <TabsContent value="general">
+        <TabsContent value="general" forceMount hidden={section !== 'general'}>
           <SiteSettingsForm
             site={site}
             isSaving={isSaving}
@@ -47,7 +47,7 @@ export function AdminPanel({ initialConfig }: AdminPanelProps) {
           />
         </TabsContent>
 
-        <TabsContent value="coaches" className="space-y-6">
+        <TabsContent value="coaches" className="space-y-6" forceMount hidden={section !== 'coaches'}>
           {coachList.length > 0 && (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <Tabs value={activeCoach?.id} onValueChange={setActiveCoachId}>

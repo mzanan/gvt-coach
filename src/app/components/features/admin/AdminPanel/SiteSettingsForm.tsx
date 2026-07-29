@@ -31,7 +31,7 @@ export function SiteSettingsForm({ site, isSaving, onSave }: SiteSettingsFormPro
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSave)}>
+      <form noValidate onSubmit={form.handleSubmit(onSave)}>
         <Card className="p-6 space-y-6">
           <div>
             <h2 className="text-lg font-medium">Site</h2>

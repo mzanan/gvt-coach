@@ -65,7 +65,7 @@ export function NewCoachDialog({ children, isSaving, onCreate }: NewCoachDialogP
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleCreate)} className="grid gap-4">
+          <form noValidate onSubmit={form.handleSubmit(handleCreate)} className="grid gap-4">
             <DialogHeader>
               <DialogTitle>New coach</DialogTitle>
               <DialogDescription>
