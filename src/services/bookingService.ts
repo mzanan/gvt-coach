@@ -21,7 +21,7 @@ const cache = {
 async function fetchPaidBookings(startIso: string, endIso: string): Promise<BookingDB[]> {
   const response = await fetch(`/api/bookings/paid?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`);
   if (!response.ok) {
-    return [];
+    throw new Error('Could not load booked slots. Please try again.');
   }
   return response.json();
 }
