@@ -58,7 +58,7 @@ export function PaymentSuccess() {
   if (isLoading || !isPaid || !minLoadingElapsed) {
     return (
       <PaymentProgress
-        icon={<Clock className="h-8 w-8 text-orange-500 mx-auto" />}
+        icon={<Clock className="h-8 w-8 text-warning-text mx-auto" />}
         title="Payment Processing"
         loadingText="Confirming your payment..."
         description="This will be updated automatically when your payment is processed. Please don't close this page."
@@ -76,8 +76,8 @@ export function PaymentSuccess() {
 
       <PaymentCard>
         <div className="text-center mb-8">
-          <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Check className="h-6 w-6 text-green-600" />
+          <div className="h-12 w-12 bg-success-surface rounded-full flex items-center justify-center mx-auto mb-4">
+            <Check className="h-6 w-6 text-success-text" />
           </div>
           <h1 className="text-2xl font-bold mb-2">Booking Confirmed!</h1>
           <p className="text-muted-foreground">
@@ -106,17 +106,17 @@ export function PaymentSuccess() {
             
             <div className="flex items-center justify-center border-t pt-4 mt-4">
               {isEmailSending ? (
-                <div className="flex items-center text-sm text-amber-600">
+                <div className="flex items-center text-sm text-warning-text">
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   <span>Sending email to your account...</span>
                 </div>
               ) : isEmailSent ? (
-                <div className="flex items-center text-sm text-green-600">
+                <div className="flex items-center text-sm text-success-text">
                   <Check className="h-4 w-4 mr-2" />
                   <span>You can now close this screen</span>
                 </div>
               ) : (
-                <div className="flex items-center text-sm text-amber-600">
+                <div className="flex items-center text-sm text-warning-text">
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   <span>Preparing email confirmation...</span>
                 </div>

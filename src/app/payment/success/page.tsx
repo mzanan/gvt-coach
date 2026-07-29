@@ -13,7 +13,7 @@ export default function PaymentSuccessPage() {
   return (
     <Suspense fallback={
       <PaymentProgress
-        icon={<Clock className="h-8 w-8 text-orange-500 mx-auto" />}
+        icon={<Clock className="h-8 w-8 text-warning-text mx-auto" />}
         title="Payment Processing"
         loadingText="Confirming your payment..."
         description="This will be updated automatically when your payment is processed. Please don't close this page."

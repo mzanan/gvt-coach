@@ -37,9 +37,15 @@
 
   --color-success: hsl(var(--success));
   --color-success-foreground: hsl(var(--success-foreground));
+  --color-success-text: var(--success-text);
+  --color-success-surface: var(--success-surface);
 
   --color-warning: hsl(var(--warning));
   --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-warning-text: var(--warning-text);
+
+  --color-info-text: var(--info-text);
+  --color-info-surface: var(--info-surface);
 
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
@@ -164,8 +170,13 @@
     --danger-text: 0 72% 41%;
     --success: 142 71% 45%;
     --success-foreground: 0 0% 98%;
+    --success-text: oklch(62.7% 0.194 149.214);
+    --success-surface: oklch(98.2% 0.018 155.826);
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 9%;
+    --warning-text: oklch(66.6% 0.179 58.318);
+    --info-text: oklch(54.6% 0.245 262.881);
+    --info-surface: oklch(97% 0.014 254.604);
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
     --ring: 0 0% 3.9%;
@@ -196,8 +207,13 @@
     --danger-text: 0 91% 76%;
     --success: 142 71% 35%;
     --success-foreground: 0 0% 98%;
+    --success-text: oklch(79.2% 0.209 151.711);
+    --success-surface: oklch(39.3% 0.095 152.535 / 20%);
     --warning: 38 92% 40%;
     --warning-foreground: 0 0% 98%;
+    --warning-text: oklch(82.8% 0.189 84.429);
+    --info-text: oklch(70.7% 0.165 254.624);
+    --info-surface: oklch(37.9% 0.146 265.522 / 20%);
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
     --ring: 0 0% 83.1%;

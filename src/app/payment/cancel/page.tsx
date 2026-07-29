@@ -16,7 +16,7 @@ export default function PaymentCancelPage() {
     <div className="page-container py-8 max-w-2xl">
       <PaymentCard className="text-center">
         <div className="mb-6">
-          <XCircle className="h-12 w-12 text-red-500 mx-auto" />
+          <XCircle className="h-12 w-12 text-danger-text mx-auto" />
         </div>
         <h1 className="text-2xl font-bold mb-2">Payment Cancelled</h1>
         <p className="text-muted-foreground mb-6">
