@@ -22,7 +22,7 @@ async function fetchPaidBookings(startIso: string, endIso: string, coach?: Coach
   const coachParam = coach ? `&coach=${encodeURIComponent(coach)}` : '';
   const response = await fetch(`/api/bookings/paid?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}${coachParam}`);
   if (!response.ok) {
-    return [];
+    throw new Error('Could not load booked slots. Please try again.');
   }
   return response.json();
 }
