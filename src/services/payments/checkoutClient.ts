@@ -3,6 +3,7 @@ import { BookingPlan } from '@/types/booking';
 import { CheckoutResponse } from '@/types/payment';
 import { UserProfile } from '@/types/user';
 import { getClientCookie, setClientCookie } from '@/lib/utils/cookies';
+import { bookingService } from '@/services/bookingService';
 
 export interface CheckoutBookingData {
   userEmail: string;
@@ -61,9 +62,20 @@ export async function postCheckout(
   });
 
   if (!response.ok) {
-    const errorData = await response.text();
-    console.error(`${provider} checkout error:`, errorData);
-    throw new Error(`Failed to create ${provider} checkout`);
+    const raw = await response.text();
+    console.error(`${provider} checkout error:`, raw);
+
+    let message = `Failed to create ${provider} checkout`;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed?.error) message = parsed.error;
+    } catch {}
+
+    if (response.status === 409) {
+      bookingService.clearTimeSlotsCache();
+    }
+
+    throw new Error(message);
   }
 
   const { checkoutUrl, orderId } = await response.json();

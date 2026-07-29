@@ -6,7 +6,7 @@ import { BookingFrequency, PaymentOrderStatus } from '@/types/enums';
 import { CoachId } from '@/config/coaches';
 import { getEffectiveCoachesConfig } from '@/config/appConfig';
 import { getPolarProductId } from '@/lib/utils/productIds';
-import { insertBooking } from '@/lib/db/bookings';
+import { insertBooking, isCoachSlotPaidBooked, toIsoDateOrNull } from '@/lib/db/bookings';
 import { insertPaymentStatus, upsertMapping } from '@/lib/db/payments';
 
 interface CheckoutBookingData {
@@ -45,10 +45,9 @@ async function createPendingRecords(
     });
 
     if (bookingData.selectedDate) {
-      let bookingDateValue: string | null = null;
-      try {
-        bookingDateValue = bookingData.utcDate || new Date(bookingData.selectedDate).toISOString();
-      } catch {
+      const bookingDateValue = toIsoDateOrNull(bookingData.utcDate || bookingData.selectedDate);
+
+      if (!bookingDateValue) {
         console.error('Invalid date format:', bookingData.selectedDate);
       }
 
@@ -85,6 +84,12 @@ export async function POST(request: NextRequest) {
     const selectedCoach: CoachId = bookingData.bookingPlan.coach;
     const frequency: BookingFrequency = bookingData.bookingPlan.frequency || BookingFrequency.Once;
     const paymentProvider = String(requestedProvider).toLowerCase().trim();
+
+    const bookingDateValue = toIsoDateOrNull(bookingData.utcDate || bookingData.selectedDate);
+
+    if (bookingDateValue && await isCoachSlotPaidBooked(selectedCoach, bookingDateValue)) {
+      return NextResponse.json({ error: 'This time slot is no longer available' }, { status: 409 });
+    }
 
     let checkoutUrl = '';
     let orderId = '';

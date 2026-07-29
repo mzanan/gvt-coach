@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BookingFrequency } from '@/types/enums';
-import { getBookingByOrderId, insertBooking } from '@/lib/db/bookings';
+import { getBookingByOrderId, insertBooking, isCoachSlotPaidBooked, toIsoDateOrNull } from '@/lib/db/bookings';
 import { ensurePendingPaymentStatus } from '@/lib/db/payments';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -40,17 +40,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         const serverDefaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const userTimezone = timezoneFromCookie || bookingData.selectedTimezone || bookingData.userTimezone || serverDefaultTimezone;
 
-        let bookingDateValue: string | null = null;
-
-        if (bookingData.selectedDate) {
-          bookingDateValue = typeof bookingData.selectedDate === 'string'
-            ? bookingData.selectedDate
-            : new Date(bookingData.selectedDate).toISOString();
-        } else if (bookingData.bookingDate) {
-          bookingDateValue = typeof bookingData.bookingDate === 'string'
-            ? bookingData.bookingDate
-            : new Date(bookingData.bookingDate).toISOString();
-        }
+        const bookingDateValue = toIsoDateOrNull(bookingData.selectedDate ?? bookingData.bookingDate);
 
         if (!bookingDateValue) {
           return NextResponse.json({
@@ -64,6 +54,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           return NextResponse.json({
             error: 'Missing coach information in request'
           }, { status: 400 });
+        }
+
+        const slotTaken = await isCoachSlotPaidBooked(coach, bookingDateValue);
+        if (slotTaken) {
+          return NextResponse.json({
+            error: 'This time slot is no longer available'
+          }, { status: 409 });
         }
 
         try {
