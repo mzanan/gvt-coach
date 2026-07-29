@@ -1,10 +1,19 @@
 import { test, expect } from '@playwright/test';
+import {
+  TAKEN_SLOT_COACH,
+  TAKEN_SLOT_COACH_LABEL,
+  TAKEN_SLOT_UTC_ISO,
+  TAKEN_SLOT_YEAR,
+  TAKEN_SLOT_MONTH,
+  TAKEN_SLOT_DAY,
+  TAKEN_SLOT_LABEL_SAIGON
+} from './fixtures';
 
-const COACH_NAME = 'Gabriel';
-const TARGET_YEAR = 2026;
-const TARGET_MONTH = 'August';
-const TARGET_DAY = '12';
-const PAID_SLOT_LABEL = '8:00 PM';
+const COACH_NAME = TAKEN_SLOT_COACH_LABEL;
+const TARGET_YEAR = TAKEN_SLOT_YEAR;
+const TARGET_MONTH = TAKEN_SLOT_MONTH;
+const TARGET_DAY = TAKEN_SLOT_DAY;
+const PAID_SLOT_LABEL = TAKEN_SLOT_LABEL_SAIGON;
 
 test.use({ timezoneId: 'Asia/Saigon' });
 
@@ -36,11 +45,11 @@ test.describe('slot already paid is not selectable and checkout rejects it', () 
         bookingData: {
           userEmail: 'qa-forced-checkout@example.com',
           bookingPlan: {
-            coach: 'GABRIEL',
+            coach: TAKEN_SLOT_COACH,
             frequency: 'ONCE',
           },
           selectedDate: '2026-08-12T20:00:00.000+07:00',
-          utcDate: '2026-08-12T13:00:00.000Z',
+          utcDate: TAKEN_SLOT_UTC_ISO,
           selectedTimezone: 'Asia/Saigon',
         },
       },
