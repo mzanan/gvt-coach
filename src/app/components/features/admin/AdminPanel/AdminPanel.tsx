@@ -23,8 +23,6 @@ export function AdminPanel({ initialConfig }: AdminPanelProps) {
     activeCoachId,
     setActiveCoachId,
     isSaving,
-    updateSite,
-    updateCoach,
     saveSite,
     saveCoach,
     createCoach,
@@ -45,7 +43,6 @@ export function AdminPanel({ initialConfig }: AdminPanelProps) {
           <SiteSettingsForm
             site={site}
             isSaving={isSaving}
-            onChange={updateSite}
             onSave={saveSite}
           />
         </TabsContent>
@@ -77,7 +74,6 @@ export function AdminPanel({ initialConfig }: AdminPanelProps) {
               coach={activeCoach}
               canDelete={coachList.length > 1}
               isSaving={isSaving}
-              onChange={updateCoach}
               onSave={saveCoach}
               onDelete={removeCoach}
             />

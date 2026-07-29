@@ -15,14 +15,6 @@ export function useAdminPanel(initialConfig: AppConfig) {
   const [activeCoachId, setActiveCoachId] = useState(Object.keys(initialConfig.coaches)[0] || '')
   const [isSaving, setIsSaving] = useState(false)
 
-  const updateSite = useCallback((field: keyof SiteConfig, value: string) => {
-    setSite(prev => ({ ...prev, [field]: value }))
-  }, [])
-
-  const updateCoach = useCallback((coach: CoachRecord) => {
-    setCoaches(prev => ({ ...prev, [coach.id]: coach }))
-  }, [])
-
   const notifyError = useCallback((error: unknown, fallback: string, title: string) => {
     toast({
       title,
@@ -31,13 +23,13 @@ export function useAdminPanel(initialConfig: AppConfig) {
     })
   }, [toast])
 
-  const saveSite = useCallback(async () => {
+  const saveSite = useCallback(async (nextSite: SiteConfig) => {
     setIsSaving(true)
     try {
       const response = await fetch('/api/admin/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ site })
+        body: JSON.stringify({ site: nextSite })
       })
 
       if (!response.ok) {
@@ -45,6 +37,7 @@ export function useAdminPanel(initialConfig: AppConfig) {
         throw new Error(errorData.error || 'Could not save site settings')
       }
 
+      setSite(nextSite)
       toast({ title: 'Saved', description: 'Site settings updated.' })
       router.refresh()
     } catch (error) {
@@ -52,7 +45,7 @@ export function useAdminPanel(initialConfig: AppConfig) {
     } finally {
       setIsSaving(false)
     }
-  }, [site, toast, router, notifyError])
+  }, [toast, router, notifyError])
 
   const saveCoach = useCallback(async (coach: CoachRecord) => {
     setIsSaving(true)
@@ -155,8 +148,6 @@ export function useAdminPanel(initialConfig: AppConfig) {
     activeCoachId,
     setActiveCoachId,
     isSaving,
-    updateSite,
-    updateCoach,
     saveSite,
     saveCoach,
     createCoach,
