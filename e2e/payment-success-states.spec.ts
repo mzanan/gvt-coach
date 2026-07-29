@@ -1,12 +1,14 @@
 import { test, expect } from '@playwright/test';
+import { PAYMENT_PAID_ORDER_ID, PAYMENT_PENDING_ORDER_ID, PAYMENT_VOID_ORDER_ID } from './fixtures';
 
-const PAID_ORDER_ID = 'qa-paid-0001';
-const PENDING_ORDER_ID = 'qa-pending-0001';
-const VOID_ORDER_ID = 'qa-void-0001';
+const PAID_ORDER_ID = PAYMENT_PAID_ORDER_ID;
+const PENDING_ORDER_ID = PAYMENT_PENDING_ORDER_ID;
+const VOID_ORDER_ID = PAYMENT_VOID_ORDER_ID;
 
 test.use({ timezoneId: 'UTC' });
 
 test.describe('/payment/success terminal states', () => {
+
   test('already paid checkout renders the confirmed booking', async ({ page }) => {
     await page.goto(`/payment/success?checkout_order_id=${PAID_ORDER_ID}`);
 
