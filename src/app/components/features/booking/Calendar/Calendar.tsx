@@ -25,6 +25,7 @@ export function Calendar(props: CalendarProps) {
   return (
     <CalendarPrimitive
       mode="single"
+      timeZone={props.selectedTimezone}
       month={month}
       onMonthChange={setMonth}
       startMonth={earliestMonth}
