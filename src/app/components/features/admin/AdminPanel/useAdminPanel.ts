@@ -23,9 +23,9 @@ export function useAdminPanel(initialConfig: AppConfig) {
     setCoaches(prev => ({ ...prev, [coach.id]: coach }))
   }, [])
 
-  const notifyError = useCallback((error: unknown, fallback: string) => {
+  const notifyError = useCallback((error: unknown, fallback: string, title: string) => {
     toast({
-      title: 'Error',
+      title,
       description: error instanceof Error ? error.message : fallback,
       variant: 'destructive'
     })
@@ -48,7 +48,7 @@ export function useAdminPanel(initialConfig: AppConfig) {
       toast({ title: 'Saved', description: 'Site settings updated.' })
       router.refresh()
     } catch (error) {
-      notifyError(error, 'Could not save site settings.')
+      notifyError(error, 'Could not save site settings.', 'Save Failed')
     } finally {
       setIsSaving(false)
     }
@@ -73,7 +73,7 @@ export function useAdminPanel(initialConfig: AppConfig) {
       toast({ title: 'Saved', description: `${saved.displayName} updated.` })
       router.refresh()
     } catch (error) {
-      notifyError(error, 'Could not save coach.')
+      notifyError(error, 'Could not save coach.', 'Save Failed')
     } finally {
       setIsSaving(false)
     }
@@ -113,7 +113,7 @@ export function useAdminPanel(initialConfig: AppConfig) {
       router.refresh()
       return true
     } catch (error) {
-      notifyError(error, 'Could not create coach.')
+      notifyError(error, 'Could not create coach.', 'Create Failed')
       return false
     } finally {
       setIsSaving(false)
@@ -141,7 +141,7 @@ export function useAdminPanel(initialConfig: AppConfig) {
       toast({ title: 'Deleted', description: `Coach ${id} removed.` })
       router.refresh()
     } catch (error) {
-      notifyError(error, 'Could not delete coach.')
+      notifyError(error, 'Could not delete coach.', 'Delete Failed')
     } finally {
       setIsSaving(false)
     }
