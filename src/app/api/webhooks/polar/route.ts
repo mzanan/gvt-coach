@@ -84,7 +84,7 @@ async function processWebhookEvent(body: WebhookPayload) {
     const logId = Math.random().toString(36).substring(2, 8);
     const eventType: string = body.type || '';
 
-    const RELEVANT_EVENTS = ['checkout.created', 'order.created', 'order.completed'];
+    const RELEVANT_EVENTS = ['checkout.created', 'order.created', 'order.paid'];
     if (!RELEVANT_EVENTS.includes(eventType)) {
       return;
     }
@@ -106,15 +106,13 @@ async function processWebhookEvent(body: WebhookPayload) {
       if (data.status === 'open') {
         paymentStatus = PaymentOrderStatus.Pending;
       }
-    } else if (eventType === 'order.created' || eventType === 'order.completed') {
+    } else if (eventType === 'order.created' || eventType === 'order.paid') {
       productId = data.product_id ?? '';
       orderId = data.id ?? '';
       checkoutId = data.checkout_id ?? '';
       metadataCheckoutOrderId = data.metadata?.checkoutOrderId ?? '';
       userEmail = data.customer?.email ?? data.email ?? '';
-      if (eventType === 'order.created') {
-        paymentStatus = PaymentOrderStatus.Paid;
-      }
+      paymentStatus = PaymentOrderStatus.Paid;
     }
 
     const checkoutOrderId = checkoutId || orderId || metadataCheckoutOrderId || productId;
@@ -134,7 +132,7 @@ async function processWebhookEvent(body: WebhookPayload) {
     }
 
     if (!existingPayment) {
-      if (eventType === 'checkout.created' || eventType === 'order.created') {
+      if (eventType === 'checkout.created' || eventType === 'order.created' || eventType === 'order.paid') {
         try {
           const newPayment = await insertPaymentStatus({
             status: paymentStatus,
@@ -225,7 +223,7 @@ async function processWebhookEvent(body: WebhookPayload) {
       });
     }
 
-    if ((eventType === 'order.created' || eventType === 'order.completed') && paymentStatus === PaymentOrderStatus.Paid) {
+    if ((eventType === 'order.created' || eventType === 'order.paid') && paymentStatus === PaymentOrderStatus.Paid) {
       await fulfillPaidBookings(checkoutOrderId, logId);
     }
   } catch (error) {
