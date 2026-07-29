@@ -133,8 +133,8 @@ export function BookingCalendar() {
               {/* Coach info */}
               {coach && (
                 <div className="flex items-start space-x-3">
-                  <div className="mt-1 p-2 bg-blue-50 rounded-full dark:bg-blue-900/20">
-                    <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  <div className="mt-1 p-2 bg-info-surface rounded-full">
+                    <User className="h-5 w-5 text-info-text" />
                   </div>
                   <div>
                     <h3 className="text-lg font-medium">Coach</h3>
@@ -145,8 +145,8 @@ export function BookingCalendar() {
               
               {/* Price */}
               <div className="flex items-start space-x-3">
-                <div className="mt-1 p-2 bg-green-50 rounded-full dark:bg-green-900/20">
-                  <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400" />
+                <div className="mt-1 p-2 bg-success-surface rounded-full">
+                  <DollarSign className="h-5 w-5 text-success-text" />
                 </div>
                 <div>
                   <h3 className="text-lg font-medium">Price</h3>
