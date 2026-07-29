@@ -50,12 +50,22 @@ async function fetchLatestBookingByEmail(email: string): Promise<BookingDB | nul
 
 export const usePaymentSuccess = () => {
   const [isLoading, setIsLoading] = useState(true)
+  const [hasError, setHasError] = useState(false)
+  const [isVoided, setIsVoided] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const [booking, setBooking] = useState<BookingDB | null>(null)
   const [userTimezone, setUserTimezone] = useState('')
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [paymentStatus, setPaymentStatus] = useState<PaymentOrderStatus>(PaymentOrderStatus.Pending)
   const searchParams = useSearchParams()
   const { toast } = useToast()
+
+  const retry = useCallback(() => {
+    setHasError(false)
+    setIsVoided(false)
+    setIsLoading(true)
+    setAttempt(previous => previous + 1)
+  }, [])
 
   const isCompletedRef = useRef(false)
 
@@ -97,10 +107,10 @@ export const usePaymentSuccess = () => {
     async function poll(checkoutOrderId: string) {
       const result = await confirmCheckout(checkoutOrderId)
 
-      if (!isMounted || !result) return false
+      if (!isMounted || !result) return { confirmed: false, voided: false }
 
       applyConfirmation(result)
-      return result.confirmed
+      return { confirmed: result.confirmed, voided: result.status === PaymentOrderStatus.Void }
     }
 
     async function loadData() {
@@ -117,41 +127,60 @@ export const usePaymentSuccess = () => {
 
         if (!checkoutOrderId) {
           toast({
-            title: 'Error',
+            title: 'Booking Not Found',
             description: 'Booking information is missing. Please contact support.',
             variant: 'destructive'
           })
-          if (isMounted) setIsLoading(false)
+          if (isMounted) {
+            setIsLoading(false)
+            setHasError(true)
+          }
           return
         }
 
-        const confirmed = await poll(checkoutOrderId)
+        const first = await poll(checkoutOrderId)
 
-        if (confirmed || !isMounted) return
+        if (first.confirmed || !isMounted) return
+
+        if (first.voided) {
+          setIsLoading(false)
+          setHasError(true)
+          setIsVoided(true)
+          return
+        }
 
         pollInterval = setInterval(async () => {
           retryCount += 1
 
           if (!isMounted || retryCount > MAX_RETRIES) {
             if (pollInterval) clearInterval(pollInterval)
-            if (isMounted) setIsLoading(false)
+            if (isMounted) {
+              setIsLoading(false)
+              setHasError(true)
+            }
             return
           }
 
-          const done = await poll(checkoutOrderId)
+          const result = await poll(checkoutOrderId)
 
-          if (done && pollInterval) {
-            clearInterval(pollInterval)
+          if (result.confirmed || result.voided) {
+            if (pollInterval) clearInterval(pollInterval)
+            if (result.voided && isMounted) {
+              setIsLoading(false)
+              setHasError(true)
+              setIsVoided(true)
+            }
           }
         }, POLL_INTERVAL_MS)
       } catch {
         if (isMounted) {
           toast({
-            title: 'Error',
+            title: 'Confirmation Failed',
             description: 'Could not load booking information.',
             variant: 'destructive'
           })
           setIsLoading(false)
+          setHasError(true)
         }
       }
     }
@@ -162,10 +191,13 @@ export const usePaymentSuccess = () => {
       isMounted = false
       if (pollInterval) clearInterval(pollInterval)
     }
-  }, [searchParams, toast, applyConfirmation])
+  }, [searchParams, toast, applyConfirmation, attempt])
 
   return {
     isLoading,
+    hasError,
+    isVoided,
+    retry,
     isPaid: paymentStatus === PaymentOrderStatus.Paid || paymentStatus === PaymentOrderStatus.Active,
     booking,
     userTimezone,

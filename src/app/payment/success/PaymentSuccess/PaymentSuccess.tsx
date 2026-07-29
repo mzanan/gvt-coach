@@ -1,8 +1,9 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { Clock, Loader2, Check } from 'lucide-react'
+import { Clock, Loader2, Check, AlertTriangle } from 'lucide-react'
 import { PaymentCard } from '@/app/components/features/payment/PaymentCard/PaymentCard'
+import { Button } from '@/app/components/ui-kit/button'
 import Link from 'next/link'
 import { ChevronLeft } from "lucide-react"
 import { BookingSummaryDisplay } from '@/app/components/features/booking/BookingSummaryDisplay'
@@ -14,6 +15,9 @@ const MIN_LOADING_MS = 600
 export function PaymentSuccess() {
   const {
     isLoading,
+    hasError,
+    isVoided,
+    retry,
     isPaid,
     booking,
     userTimezone,
@@ -28,6 +32,28 @@ export function PaymentSuccess() {
     const timer = setTimeout(() => setMinLoadingElapsed(true), MIN_LOADING_MS);
     return () => clearTimeout(timer);
   }, []);
+
+  if (isVoided) {
+    return (
+      <PaymentProgress
+        icon={<AlertTriangle className="h-8 w-8 text-destructive mx-auto" />}
+        title="This payment was canceled"
+        description="This checkout was canceled or voided, so it can't be confirmed. Please start a new booking if you'd still like a session."
+        action={<Button asChild><Link href="/">Back to booking</Link></Button>}
+      />
+    )
+  }
+
+  if (hasError && !isPaid) {
+    return (
+      <PaymentProgress
+        icon={<AlertTriangle className="h-8 w-8 text-destructive mx-auto" />}
+        title="We couldn't confirm your payment"
+        description="This can happen if the confirmation is just delayed. If you completed checkout, your booking may still go through, try again in a moment or contact support with your email."
+        action={<Button onClick={retry}>Try again</Button>}
+      />
+    )
+  }
 
   if (isLoading || !isPaid || !minLoadingElapsed) {
     return (
