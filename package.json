@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack -p 3120",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",
@@ -40,6 +41,7 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.0",
     "@svgr/webpack": "^8.1.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^20.19.43",
