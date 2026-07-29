@@ -210,30 +210,20 @@ export function useBookingCalendar() {
     setSelectedDate(selectedLocalDate.toJSDate());
     setSelectedSlot(null);
 
-    try {
-      setSections(prev => prev.map(s => {
-        if (s.id === 'date') return { ...s, completed: true };
-        if (s.id === 'time') return { ...s, completed: false };
-        if (s.id === 'summary') return { ...s, completed: false };
-        return s;
-      }));
-      setActiveSection('time');
+    setSections(prev => prev.map(s => {
+      if (s.id === 'date') return { ...s, completed: true };
+      if (s.id === 'time') return { ...s, completed: false };
+      if (s.id === 'summary') return { ...s, completed: false };
+      return s;
+    }));
+    setActiveSection('time');
 
-      fetchAvailableSlots(
-        selectedLocalDate.toJSDate(),
-        selectedTimezone,
-        bookingPlan.coach
-      );
-    } catch (error: unknown) {
-      console.error('Error loading slots:', error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to load available time slots. Please try again.";
-      toast({
-        title: "Availability Error",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    }
-  }, [selectedTimezone, bookingPlan, selectedDate, fetchAvailableSlots, setSections, setActiveSection, toast, setIsLoadingSlots, setSelectedDate, setSelectedSlot]);
+    fetchAvailableSlots(
+      selectedLocalDate.toJSDate(),
+      selectedTimezone,
+      bookingPlan.coach
+    );
+  }, [selectedTimezone, bookingPlan, selectedDate, fetchAvailableSlots, setSections, setActiveSection, setIsLoadingSlots, setSelectedDate, setSelectedSlot]);
 
   const handleSlotSelect = useCallback((slot: TimeSlot) => {
     if (!slot.available || !slot.date) {
