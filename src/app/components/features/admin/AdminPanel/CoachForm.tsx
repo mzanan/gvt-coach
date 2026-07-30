@@ -221,10 +221,13 @@ export function CoachForm({ coach, canDelete, isSaving, onSave, onDelete }: Coac
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Timezone</FormLabel>
-                  <TimeZoneSelector
-                    currentTimezone={field.value}
-                    onTimezoneChange={field.onChange}
-                  />
+                  <FormControl>
+                    <TimeZoneSelector
+                      triggerId={`${coach.id}-timezone`}
+                      currentTimezone={field.value}
+                      onTimezoneChange={field.onChange}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
