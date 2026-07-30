@@ -39,10 +39,12 @@ import { CoachRecord } from '@/types/coach'
 
 interface CoachFormProps {
   coach: CoachRecord;
+  draft?: CoachRecord;
   canDelete: boolean;
   isSaving: boolean;
   onSave: (coach: CoachRecord) => void;
   onDelete: (id: string) => void;
+  onKeepDraft: (id: string, values: CoachRecord) => void;
 }
 
 type HourFieldName =
@@ -120,12 +122,16 @@ function PriceInput({ control, name, label }: {
   )
 }
 
-export function CoachForm({ coach, canDelete, isSaving, onSave, onDelete }: CoachFormProps) {
-  const form = useForm<CoachRecord>({ defaultValues: coach, mode: 'onTouched' });
+export function CoachForm({ coach, draft, canDelete, isSaving, onSave, onDelete, onKeepDraft }: CoachFormProps) {
+  const form = useForm<CoachRecord>({ defaultValues: draft ?? coach, mode: 'onTouched' });
 
   useEffect(() => {
-    form.reset(coach);
-  }, [coach, form]);
+    form.reset(draft ?? coach);
+  }, [coach, draft, form]);
+
+  useEffect(() => () => {
+    onKeepDraft(coach.id, form.getValues());
+  }, [coach.id, form, onKeepDraft]);
 
   const paymentProvider = useWatch({ control: form.control, name: 'paymentProvider' });
   const photoUrl = useWatch({ control: form.control, name: 'photoUrl' });

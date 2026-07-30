@@ -11,11 +11,16 @@ async function getCoaches(): Promise<CoachRecord[]> {
   return res.json();
 }
 
-async function putCoach(coach: CoachRecord): Promise<void> {
-  await adminApiFetch(`/api/admin/coaches/${encodeURIComponent(coach.id)}`, {
-    method: 'PUT',
-    body: JSON.stringify(coach),
-  });
+async function restoreCoach(coach: CoachRecord): Promise<void> {
+  const current = await getCoaches();
+  const path = current.some(c => c.id === coach.id)
+    ? { url: `/api/admin/coaches/${encodeURIComponent(coach.id)}`, method: 'PUT' }
+    : { url: '/api/admin/coaches', method: 'POST' };
+
+  const res = await adminApiFetch(path.url, { method: path.method, body: JSON.stringify(coach) });
+  if (!res.ok) {
+    throw new Error(`Could not restore coach ${coach.id}: ${res.status} ${await res.text()}`);
+  }
 }
 
 test.describe('/admin Coaches tab: coach form behavior', () => {
@@ -27,8 +32,26 @@ test.describe('/admin Coaches tab: coach form behavior', () => {
 
   test.afterAll(async () => {
     for (const coach of originalCoaches) {
-      await putCoach(coach);
+      await restoreCoach(coach);
     }
+  });
+
+  test('an unsaved edit on one coach survives switching to another coach and back', async ({ page }) => {
+    const draftName = `Matias Draft ${Date.now()}`;
+
+    await loginAsAdmin(page);
+    await page.goto('/admin');
+    await page.getByRole('tab', { name: 'Coaches' }).click();
+
+    const panel = page.getByRole('tabpanel');
+    await expect(panel.getByLabel('Display name')).toHaveValue('Matias');
+    await panel.getByLabel('Display name').fill(draftName);
+
+    await page.getByRole('tab', { name: 'Gabriel' }).click();
+    await expect(page.getByRole('tabpanel').getByLabel('Display name')).toHaveValue('Gabriel');
+
+    await page.getByRole('tab', { name: 'Matias' }).click();
+    await expect(page.getByRole('tabpanel').getByLabel('Display name')).toHaveValue(draftName);
   });
 
   test('saving a coach persists the Polar product id even though the field is hidden again before Save is clicked', async ({ page }) => {
