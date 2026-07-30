@@ -1,4 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
+import { selectDay } from './calendar';
 
 const COACH_NAME = 'Gabriel';
 const TARGET_YEAR = 2026;
@@ -12,13 +13,7 @@ async function selectCoach(page: Page) {
 }
 
 async function selectTargetDate(page: Page) {
-  const monthHeading = page.getByRole('heading', { name: new RegExp(`${TARGET_MONTH} ${TARGET_YEAR}`, 'i') });
-  for (let i = 0; i < 6; i++) {
-    if (await monthHeading.isVisible().catch(() => false)) break;
-    await page.getByRole('button', { name: /next month/i }).click();
-  }
-  await expect(monthHeading).toBeVisible();
-  await page.getByRole('button', { name: TARGET_DAY, exact: true }).click();
+  await selectDay(page, new RegExp(`${TARGET_MONTH} ${TARGET_YEAR}`, 'i'), TARGET_DAY);
 }
 
 function toastTitle(page: Page, title: string) {

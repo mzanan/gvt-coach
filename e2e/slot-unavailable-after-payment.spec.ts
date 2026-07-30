@@ -8,6 +8,7 @@ import {
   TAKEN_SLOT_DAY,
   TAKEN_SLOT_LABEL_SAIGON
 } from './fixtures';
+import { selectDay } from './calendar';
 
 const COACH_NAME = TAKEN_SLOT_COACH_LABEL;
 const TARGET_YEAR = TAKEN_SLOT_YEAR;
@@ -23,14 +24,7 @@ test.describe('slot already paid is not selectable and checkout rejects it', () 
 
     await page.getByRole('radio', { name: new RegExp(COACH_NAME, 'i') }).click();
 
-    const monthHeading = page.getByRole('heading', { name: new RegExp(`${TARGET_MONTH} ${TARGET_YEAR}`, 'i') });
-    for (let i = 0; i < 6; i++) {
-      if (await monthHeading.isVisible().catch(() => false)) break;
-      await page.getByRole('button', { name: /next month/i }).click();
-    }
-    await expect(monthHeading).toBeVisible();
-
-    await page.getByRole('button', { name: TARGET_DAY, exact: true }).click();
+    await selectDay(page, new RegExp(`${TARGET_MONTH} ${TARGET_YEAR}`, 'i'), TARGET_DAY);
 
     const paidSlotRadio = page.getByRole('radio', { name: PAID_SLOT_LABEL, exact: true });
     await expect(paidSlotRadio).toBeVisible();

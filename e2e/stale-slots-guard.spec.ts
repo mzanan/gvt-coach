@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route } from '@playwright/test';
+import { selectDay as selectCalendarDay } from './calendar';
 
 test.setTimeout(60000);
 
@@ -21,14 +22,6 @@ const CURRENT = {
 
 const STALE_RESPONSE_DELAY_MS = 10000;
 
-async function openTargetMonth(page: Page) {
-  const monthHeading = page.getByRole('heading', { name: TARGET_MONTH_HEADING });
-  for (let i = 0; i < 8; i++) {
-    if (await monthHeading.isVisible().catch(() => false)) break;
-    await page.getByRole('button', { name: /next month/i }).click();
-  }
-  await expect(monthHeading).toBeVisible();
-}
 
 async function selectCoach(page: Page, coach: string) {
   const coachSection = page.getByRole('button', { name: /select coach/i });
@@ -39,8 +32,7 @@ async function selectCoach(page: Page, coach: string) {
 }
 
 async function selectDay(page: Page, day: string) {
-  await openTargetMonth(page);
-  await page.getByRole('button', { name: day, exact: true }).click();
+  await selectCalendarDay(page, TARGET_MONTH_HEADING, day);
 }
 
 function isAbandonedSlotsRequest(url: string) {
