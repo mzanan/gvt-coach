@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, ReactNode } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { Button } from '@/app/components/ui-kit/button'
 import { Input } from '@/app/components/ui-kit/input'
 import {
@@ -39,7 +39,8 @@ function toCoachId(displayName: string): string {
 
 export function NewCoachDialog({ children, isSaving, onCreate }: NewCoachDialogProps) {
   const [open, setOpen] = useState(false)
-  const form = useForm<NewCoachValues>({ defaultValues: { displayName: '' } })
+  const form = useForm<NewCoachValues>({ defaultValues: { displayName: '' }, mode: 'onTouched' })
+  const displayName = useWatch({ control: form.control, name: 'displayName' })
 
   const handleCreate = async ({ displayName }: NewCoachValues) => {
     const id = toCoachId(displayName)
@@ -90,7 +91,7 @@ export function NewCoachDialog({ children, isSaving, onCreate }: NewCoachDialogP
               <DialogClose asChild>
                 <Button type="button" variant="outline" className="w-full sm:w-auto">Cancel</Button>
               </DialogClose>
-              <Button type="submit" disabled={isSaving} className="w-full sm:w-auto">
+              <Button type="submit" disabled={isSaving || !displayName?.trim()} className="w-full sm:w-auto">
                 {isSaving ? 'Creating...' : 'Create coach'}
               </Button>
             </DialogFooter>

@@ -121,7 +121,7 @@ function PriceInput({ control, name, label }: {
 }
 
 export function CoachForm({ coach, canDelete, isSaving, onSave, onDelete }: CoachFormProps) {
-  const form = useForm<CoachRecord>({ defaultValues: coach });
+  const form = useForm<CoachRecord>({ defaultValues: coach, mode: 'onTouched' });
 
   useEffect(() => {
     form.reset(coach);

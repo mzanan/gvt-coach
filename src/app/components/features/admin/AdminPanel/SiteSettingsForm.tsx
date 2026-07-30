@@ -23,7 +23,7 @@ interface SiteSettingsFormProps {
 }
 
 export function SiteSettingsForm({ site, isSaving, onSave }: SiteSettingsFormProps) {
-  const form = useForm<SiteConfig>({ defaultValues: site });
+  const form = useForm<SiteConfig>({ defaultValues: site, mode: 'onTouched' });
 
   useEffect(() => {
     form.reset(site);
