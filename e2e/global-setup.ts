@@ -1,15 +1,10 @@
 import { createClient } from '@libsql/client';
-import { rmSync } from 'fs';
 import { SCHEMA_STATEMENTS, COLUMN_MIGRATIONS } from '../src/lib/db/schema';
-import { E2E_DATABASE_FILE, E2E_DATABASE_URL } from './database';
+import { E2E_DATABASE_URL } from './database';
 import { E2E_FIXTURES } from './fixtures';
 import { seedBookings } from './seed';
 
 export default async function globalSetup() {
-  rmSync(E2E_DATABASE_FILE, { force: true });
-  rmSync(`${E2E_DATABASE_FILE}-shm`, { force: true });
-  rmSync(`${E2E_DATABASE_FILE}-wal`, { force: true });
-
   const db = createClient({ url: E2E_DATABASE_URL });
 
   for (const statement of SCHEMA_STATEMENTS) {
@@ -19,10 +14,20 @@ export default async function globalSetup() {
   for (const statement of COLUMN_MIGRATIONS) {
     try {
       await db.execute(statement);
-    } catch {
-      // migrations are idempotent, an already-applied one is expected here
-    }
+    } catch {}
   }
+
+  const tables = await db.execute(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+  );
+
+  await db.execute('PRAGMA foreign_keys = OFF');
+
+  for (const row of tables.rows) {
+    await db.execute(`DELETE FROM "${row.name as string}"`);
+  }
+
+  await db.execute('PRAGMA foreign_keys = ON');
 
   db.close();
 
