@@ -14,6 +14,19 @@ export function useAdminPanel(initialConfig: AppConfig) {
   const [section, setSection] = useState('general')
   const [activeCoachId, setActiveCoachId] = useState(Object.keys(initialConfig.coaches)[0] || '')
   const [isSaving, setIsSaving] = useState(false)
+  const [coachDrafts, setCoachDrafts] = useState<Record<string, CoachRecord>>({})
+  const keepCoachDraft = useCallback((id: string, values: CoachRecord) => {
+    setCoachDrafts(prev => ({ ...prev, [id]: values }))
+  }, [])
+
+  const dropCoachDraft = useCallback((id: string) => {
+    setCoachDrafts(prev => {
+      if (!(id in prev)) return prev
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+  }, [])
 
   const notifyError = useCallback((error: unknown, fallback: string, title: string) => {
     toast({
@@ -63,6 +76,7 @@ export function useAdminPanel(initialConfig: AppConfig) {
 
       const saved = await response.json()
       setCoaches(prev => ({ ...prev, [saved.id]: saved }))
+      dropCoachDraft(saved.id)
       toast({ title: 'Saved', description: `${saved.displayName} updated.` })
       router.refresh()
     } catch (error) {
@@ -70,7 +84,7 @@ export function useAdminPanel(initialConfig: AppConfig) {
     } finally {
       setIsSaving(false)
     }
-  }, [toast, router, notifyError])
+  }, [toast, router, notifyError, dropCoachDraft])
 
   const createCoach = useCallback(async (id: string, displayName: string) => {
     setIsSaving(true)
@@ -101,6 +115,7 @@ export function useAdminPanel(initialConfig: AppConfig) {
 
       const created = await response.json()
       setCoaches(prev => ({ ...prev, [created.id]: created }))
+      dropCoachDraft(created.id)
       setActiveCoachId(created.id)
       toast({ title: 'Created', description: `${created.displayName} added.` })
       router.refresh()
@@ -111,7 +126,7 @@ export function useAdminPanel(initialConfig: AppConfig) {
     } finally {
       setIsSaving(false)
     }
-  }, [coaches, site.contactEmail, toast, router, notifyError])
+  }, [coaches, site.contactEmail, toast, router, notifyError, dropCoachDraft])
 
   const removeCoach = useCallback(async (id: string) => {
     setIsSaving(true)
@@ -131,6 +146,7 @@ export function useAdminPanel(initialConfig: AppConfig) {
         setActiveCoachId(Object.keys(next)[0] || '')
         return next
       })
+      dropCoachDraft(id)
       toast({ title: 'Deleted', description: `Coach ${id} removed.` })
       router.refresh()
     } catch (error) {
@@ -138,7 +154,7 @@ export function useAdminPanel(initialConfig: AppConfig) {
     } finally {
       setIsSaving(false)
     }
-  }, [toast, router, notifyError])
+  }, [toast, router, notifyError, dropCoachDraft])
 
   return {
     site,
@@ -152,5 +168,7 @@ export function useAdminPanel(initialConfig: AppConfig) {
     saveCoach,
     createCoach,
     removeCoach,
+    coachDrafts,
+    keepCoachDraft,
   }
 }

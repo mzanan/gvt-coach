@@ -27,6 +27,8 @@ export function AdminPanel({ initialConfig }: AdminPanelProps) {
     saveCoach,
     createCoach,
     removeCoach,
+    coachDrafts,
+    keepCoachDraft,
   } = useAdminPanel(initialConfig)
 
   const coachList = Object.values(coaches)
@@ -72,10 +74,12 @@ export function AdminPanel({ initialConfig }: AdminPanelProps) {
             <CoachForm
               key={activeCoach.id}
               coach={activeCoach}
+              draft={coachDrafts[activeCoach.id]}
               canDelete={coachList.length > 1}
               isSaving={isSaving}
               onSave={saveCoach}
               onDelete={removeCoach}
+              onKeepDraft={keepCoachDraft}
             />
           ) : (
             <Card className="p-6 text-center space-y-4">

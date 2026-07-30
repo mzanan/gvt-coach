@@ -104,6 +104,38 @@ test.describe('/admin Coaches tab: create and delete lifecycle', () => {
     await expect(dialog.getByRole('button', { name: 'Create coach' })).toBeEnabled();
   });
 
+  test('recreating a coach with the id of a deleted one does not resurrect the deleted coach unsaved values', async ({ page }) => {
+    const reusedName = `Recycled Coach ${Date.now()}`;
+    const ghostValue = 'GHOST DRAFT VALUE';
+
+    const temp: CoachRecord = { ...originalCoaches[0], id: 'RECYCLED', displayName: reusedName, name: reusedName };
+    const seeded = await adminApiFetch('/api/admin/coaches', { method: 'POST', body: JSON.stringify(temp) });
+    if (!seeded.ok) throw new Error(`Could not seed the recycled coach: ${seeded.status}`);
+
+    await loginAsAdmin(page);
+    await page.goto('/admin');
+    await page.getByRole('tab', { name: 'Coaches' }).click();
+    await page.getByRole('tab', { name: reusedName }).click();
+
+    const panel = page.getByRole('tabpanel');
+    await panel.getByLabel('Display name').fill(ghostValue);
+
+    await panel.getByRole('button', { name: 'Delete coach' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+    await expect(page.getByRole('tab', { name: reusedName })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'New coach' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Name').fill('Recycled');
+    await dialog.getByRole('button', { name: 'Create coach' }).click();
+
+    await expect(page.getByRole('tab', { name: 'Recycled', exact: true })).toBeVisible();
+    await expect(page.getByRole('tabpanel').getByLabel('Display name')).toHaveValue('Recycled');
+    await expect(page.getByRole('tabpanel').getByLabel('Display name')).not.toHaveValue(ghostValue);
+
+    await deleteCoachIfExists('RECYCLED');
+  });
+
   test('deleting a coach via its Delete dialog removes its tab, and the last remaining coach cannot be deleted', async ({ page }) => {
     const temp: CoachRecord = {
       ...originalCoaches[0],
