@@ -1,71 +1,114 @@
 'use client'
 
+import { useEffect } from 'react'
+import { useForm } from 'react-hook-form'
 import { Button } from '@/app/components/ui-kit/button'
 import { Card } from '@/app/components/ui-kit/card'
 import { Input } from '@/app/components/ui-kit/input'
-import { Label } from '@/app/components/ui-kit/label'
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
+} from '@/app/components/ui-kit/form'
 import { SiteConfig } from '@/config/appConfig'
 
 interface SiteSettingsFormProps {
   site: SiteConfig;
   isSaving: boolean;
-  onChange: (field: keyof SiteConfig, value: string) => void;
-  onSave: () => void;
+  onSave: (site: SiteConfig) => void;
 }
 
-export function SiteSettingsForm({ site, isSaving, onChange, onSave }: SiteSettingsFormProps) {
+export function SiteSettingsForm({ site, isSaving, onSave }: SiteSettingsFormProps) {
+  const form = useForm<SiteConfig>({ defaultValues: site, mode: 'onTouched' });
+
+  useEffect(() => {
+    form.reset(site);
+  }, [site, form]);
+
   return (
-    <Card className="p-6 space-y-6">
-      <div>
-        <h2 className="text-lg font-medium">Site</h2>
-        <p className="text-sm text-muted-foreground">Public identity of the booking site.</p>
-      </div>
+    <Form {...form}>
+      <form noValidate onSubmit={form.handleSubmit(onSave)}>
+        <Card className="p-6 space-y-6">
+          <div>
+            <h2 className="text-lg font-medium">Site</h2>
+            <p className="text-sm text-muted-foreground">Public identity of the booking site.</p>
+          </div>
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="siteName">Site name</Label>
-          <Input
-            id="siteName"
-            value={site.siteName}
-            onChange={e => onChange('siteName', e.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="siteDescription">Description</Label>
-          <Input
-            id="siteDescription"
-            value={site.siteDescription}
-            onChange={e => onChange('siteDescription', e.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="companyName">Company name</Label>
-          <Input
-            id="companyName"
-            value={site.companyName}
-            onChange={e => onChange('companyName', e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">Shown in the footer.</p>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="contactEmail">Contact email</Label>
-          <Input
-            id="contactEmail"
-            type="email"
-            value={site.contactEmail}
-            onChange={e => onChange('contactEmail', e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">
-            Sender of booking confirmation emails when no dedicated sender is configured.
-          </p>
-        </div>
-      </div>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="siteName"
+              rules={{ required: 'Site name is required.' }}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Site name</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="siteDescription"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="companyName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Company name</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormDescription>Shown in the footer.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="contactEmail"
+              rules={{
+                required: 'Contact email is required.',
+                pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Enter a valid email address.' }
+              }}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Contact email</FormLabel>
+                  <FormControl>
+                    <Input type="email" {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    Sender of booking confirmation emails when no dedicated sender is configured.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
 
-      <div className="flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end">
-        <Button onClick={onSave} disabled={isSaving} className="w-full sm:w-auto">
-          {isSaving ? 'Saving...' : 'Save site settings'}
-        </Button>
-      </div>
-    </Card>
+          <div className="flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end">
+            <Button type="submit" disabled={isSaving} className="w-full sm:w-auto">
+              {isSaving ? 'Saving...' : 'Save site settings'}
+            </Button>
+          </div>
+        </Card>
+      </form>
+    </Form>
   )
 }
