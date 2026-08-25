@@ -1,13 +1,18 @@
-import { getEffectiveSiteConfig } from '@/config/appConfig'
-
-export async function Footer() {
-  const site = await getEffectiveSiteConfig()
-  const year = new Date().getFullYear()
-
+export function Footer() {
   return (
     <footer className="w-full bg-background">
       <div className="page-container py-8 md:py-12 text-center">
-          <p className="text-sm">© {year} {site.companyName}. All rights reserved.</p>
+        <p className="text-sm">
+          Built by{' '}
+          <a
+            href="https://itsmatias.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline-offset-4 transition-colors hover:underline"
+          >
+            itsmatias.com
+          </a>
+        </p>
       </div>
     </footer>
   )
