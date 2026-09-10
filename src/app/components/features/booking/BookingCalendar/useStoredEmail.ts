@@ -1,7 +1,7 @@
 'use client'
 
 import { getClientCookie, setClientCookie, USER_EMAIL_COOKIE } from '@/lib/utils/cookies'
-import { createClientValue } from '@/hooks/createClientValue'
+import { createClientValue } from './createClientValue'
 
 const readStoredEmail = () => {
   const stored = getClientCookie(USER_EMAIL_COOKIE)

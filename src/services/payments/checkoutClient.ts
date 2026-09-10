@@ -2,7 +2,7 @@ import { DateTime } from 'luxon';
 import { BookingPlan } from '@/types/booking';
 import { CheckoutResponse } from '@/types/payment';
 import { UserProfile } from '@/types/user';
-import { getClientCookie, setClientCookie } from '@/lib/utils/cookies';
+import { getClientCookie, setClientCookie, getTimezoneCookie } from '@/lib/utils/cookies';
 import { bookingService } from '@/services/bookingService';
 
 export interface CheckoutBookingData {
@@ -14,7 +14,7 @@ export interface CheckoutBookingData {
 }
 
 export function resolveUserTimezone(userProfile: UserProfile): string {
-  return getClientCookie('user_timezone') ||
+  return getTimezoneCookie() ||
     userProfile?.timezone ||
     Intl.DateTimeFormat().resolvedOptions().timeZone;
 }

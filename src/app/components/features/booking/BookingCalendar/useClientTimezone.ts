@@ -2,7 +2,7 @@
 
 import { DEFAULT_TIMEZONE } from '@/config/site'
 import { getTimezoneCookie, setTimezoneCookie, deleteClientCookie, LEGACY_TIMEZONE_COOKIE } from '@/lib/utils/cookies'
-import { createClientValue } from '@/hooks/createClientValue'
+import { createClientValue } from './createClientValue'
 
 let legacyCookieCleared = false
 
