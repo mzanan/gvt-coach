@@ -161,7 +161,7 @@ export function BookingCalendar() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <h3 className="text-lg font-medium">
-                    Your email <span className="text-xs font-normal text-muted-foreground">(from your Google account)</span>
+                    Your email
                   </h3>
                   {isEditingEmail ? (
                     <div className="flex items-center gap-1.5">
@@ -172,6 +172,7 @@ export function BookingCalendar() {
                         onKeyDown={handleEmailKeyDown}
                         autoFocus
                         autoComplete="email"
+                        placeholder="you@example.com"
                         className="max-w-xs"
                         aria-invalid={!!emailError}
                         aria-describedby={emailError ? "booking-email-error" : undefined}

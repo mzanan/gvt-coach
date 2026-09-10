@@ -7,12 +7,12 @@ import { bookingService } from '@/services/bookingService'
 import { getPaymentService } from '@/services/payments'
 import { BookingFrequency } from '@/types/enums'
 import { useAppConfig } from '@/app/components/core/AppConfigProvider'
-import { setClientCookie, setTimezoneCookie, getTimezoneCookie } from '@/lib/utils/cookies'
+import { setClientCookie } from '@/lib/utils/cookies'
+import { useClientTimezone } from './useClientTimezone'
+import { useStoredEmail } from './useStoredEmail'
 import { isValidEmail } from '@/lib/utils'
-import { userService } from '@/services/userService'
 import { useToast } from '@/app/components/ui-kit/use-toast'
 import type { CoachId } from "@/config/coaches"
-import { DEFAULT_TIMEZONE } from '@/config/site'
 import { UserProfile } from '@/types/user'
 
 interface Section {
@@ -38,82 +38,18 @@ export function useBookingCalendar() {
     frequency: BookingFrequency.Once,
     duration: 1
   })
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [bookedDates, setBookedDates] = useState<Array<{ date: Date, fullyBooked: boolean }>>([])
   const [isBookingLoading, setIsBookingLoading] = useState(false)
   const [isLoadingSlots, setIsLoadingSlots] = useState(false)
   const latestSlotsRequestRef = useRef(0)
-  const [userEmail, setUserEmail] = useState('')
+  const [storedEmail, setStoredEmail] = useStoredEmail()
+  const [emailDraft, setEmailDraft] = useState<string | null>(null)
   const [emailError, setEmailError] = useState<string | null>(null)
-  const [isEditingEmail, setIsEditingEmail] = useState(false)
+  const [isEditingOverride, setIsEditingOverride] = useState<boolean | null>(null)
+  const [selectedTimezone, setSelectedTimezone] = useClientTimezone()
 
-  const [selectedTimezone, setSelectedTimezone] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      if (document.cookie.includes('user_timezone=')) {
-        document.cookie = 'user_timezone=;expires=Thu, 01 Jan 1970 00:00:01 GMT;path=/;';
-      }
-
-      const cookieTimezone = getTimezoneCookie();
-
-      if (cookieTimezone) {
-        return cookieTimezone;
-      }
-
-      const profileTimezone = userProfile?.timezone;
-
-      if (profileTimezone) {
-        setTimezoneCookie(profileTimezone);
-        return profileTimezone;
-      }
-
-      const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-      setTimezoneCookie(detectedTimezone);
-      return detectedTimezone;
-    }
-    return DEFAULT_TIMEZONE;
-  });
-
-  useEffect(() => {
-    let ignore = false;
-
-    const loadUserData = async () => {
-      try {
-        const userData = await userService.getUserFromAuthUsers();
-        if (!userData || ignore) return;
-
-        const userProfileData: UserProfile = {
-          id: String(userData.id ?? ''),
-          email: userData.email,
-          first_name: userData.first_name,
-          last_name: userData.last_name,
-          phone: '',
-          timezone: userData.timezone,
-          full_name: `${userData.first_name} ${userData.last_name}`
-        };
-
-        setUserProfile(userProfileData);
-
-        if (userData.email) {
-          setUserEmail(prev => prev || userData.email);
-        }
-      } catch {
-        if (!ignore) {
-          toast({
-            title: "Profile Error",
-            description: "Could not load user data.",
-            variant: "destructive"
-          });
-        }
-      }
-    };
-
-    loadUserData();
-
-    return () => {
-      ignore = true;
-    };
-  }, [toast]);
+  const userEmail = emailDraft ?? storedEmail
+  const isEditingEmail = isEditingOverride ?? !storedEmail
 
   useEffect(() => {
     let ignore = false;
@@ -166,7 +102,6 @@ export function useBookingCalendar() {
     latestSlotsRequestRef.current += 1;
     setIsLoadingSlots(false);
     setSelectedTimezone(timezone);
-    setTimezoneCookie(timezone);
 
     setSelectedDate(null);
     setSelectedSlot(null);
@@ -186,14 +121,14 @@ export function useBookingCalendar() {
     }));
 
     setEmailError(null);
-    setIsEditingEmail(false);
+    setIsEditingOverride(false);
     setActiveSection(bookingPlan.coach ? 'date' : 'coach');
 
     toast({
       title: "Timezone Updated",
       description: `Your timezone has been updated to ${timezone}.`,
     });
-  }, [toast, bookingPlan.coach]);
+  }, [toast, bookingPlan.coach, setSelectedTimezone]);
 
   const handleDateSelect = useCallback(async (date: Date) => {
     if (!bookingPlan.coach) return;
@@ -300,7 +235,7 @@ export function useBookingCalendar() {
   }, [selectedTimezone]);
 
   const handleEmailChange = useCallback((value: string) => {
-    setUserEmail(value);
+    setEmailDraft(value);
 
     if (emailError && isValidEmail(value)) {
       setEmailError(null);
@@ -309,7 +244,7 @@ export function useBookingCalendar() {
 
   const handleEmailEditToggle = useCallback(() => {
     if (!isEditingEmail) {
-      setIsEditingEmail(true);
+      setIsEditingOverride(true);
       return;
     }
 
@@ -318,9 +253,9 @@ export function useBookingCalendar() {
       return;
     }
 
-    setUserEmail(userEmail.trim());
+    setEmailDraft(userEmail.trim());
     setEmailError(null);
-    setIsEditingEmail(false);
+    setIsEditingOverride(false);
   }, [isEditingEmail, userEmail]);
 
   const isEmailValid = isValidEmail(userEmail);
@@ -337,7 +272,7 @@ export function useBookingCalendar() {
 
     if (!isValidEmail(email)) {
       setEmailError('Enter a valid email address.');
-      setIsEditingEmail(true);
+      setIsEditingOverride(true);
       return;
     }
 
@@ -358,8 +293,16 @@ export function useBookingCalendar() {
         frequency: bookingPlan?.frequency || BookingFrequency.Once
       };
 
-      const profileWithEmail = { ...userProfile, email } as UserProfile;
-      setClientCookie('user_email', email);
+      const profileWithEmail: UserProfile = {
+        id: '',
+        email,
+        first_name: '',
+        last_name: '',
+        phone: '',
+        timezone: selectedTimezone,
+        full_name: ''
+      };
+      setStoredEmail(email);
 
       const coachProvider = updatedBookingPlan.coach ? coaches[updatedBookingPlan.coach]?.paymentProvider : undefined;
 
@@ -393,7 +336,7 @@ export function useBookingCalendar() {
       });
       setIsBookingLoading(false);
     }
-  }, [bookingPlan, selectedSlot, userProfile, selectedTimezone, toast, coaches, userEmail]);
+  }, [bookingPlan, selectedSlot, selectedTimezone, toast, coaches, userEmail, setStoredEmail]);
 
   return {
     sections,
@@ -402,13 +345,11 @@ export function useBookingCalendar() {
     selectedSlot,
     availableSlots,
     bookingPlan,
-    userProfile,
     bookedDates,
     isBookingLoading,
     isLoadingSlots,
     selectedTimezone,
     userEmail,
-    setUserEmail,
     emailError,
     isEmailValid,
     isEditingEmail,
