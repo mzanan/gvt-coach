@@ -73,6 +73,9 @@ test.describe('error toasts carry a per-flow title, not a generic "Error"', () =
     expect(picked, 'expected at least one selectable time slot').not.toBeNull();
     await picked!.click();
 
+    await page.getByPlaceholder('you@example.com').fill('qa@example.com');
+    await page.getByRole('button', { name: /confirm email/i }).click();
+
     const payButton = page.getByRole('button', { name: /proceed to payment/i });
     await expect(payButton).toBeEnabled();
     await payButton.click();
