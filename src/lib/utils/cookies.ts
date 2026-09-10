@@ -66,6 +66,8 @@ export function deleteClientCookie(name: string) {
 
 export const USER_DATA_COOKIE = 'user_data';
 
+export const USER_EMAIL_COOKIE = 'user_email';
+
 export const setTimezoneCookie = (timezone: string) => {
   if (typeof window === 'undefined') return timezone;
 
@@ -96,3 +98,5 @@ export const getTimezoneCookie = (): string | null => {
     return null;
   }
 };
+
+export const LEGACY_TIMEZONE_COOKIE = 'user_timezone';
