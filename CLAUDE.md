@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Coaching booking platform for GVT (Matias + Gabriel coach profiles). Vault tracking: `personal-brain/01-Projects/18-gvt-coach/`.
+Coaching booking platform for GVT (Matias + Gabriel coach profiles). Vault tracking: `personal-brain/01-Projects/13-gvt-coach/`.
 
 ## Stack
 
@@ -33,4 +33,4 @@ Stripe Checkout Sessions build `price_data` inline from the coach's DB-stored pr
 
 ## Conventions
 
-Personal engineering standards apply (reuse/SRP/DRY/tokens/server-first, zero code comments, branch per change, adversarial+regression review before merge): see `personal/CLAUDE.md` and `personal-brain/02-Areas/Engineering-standards.md`. Secrets in `.env.local`, tracked in Infisical (`personal-brain/02-Areas/Secrets-management.md`); never commit values.
+Personal engineering standards apply: see `personal/CLAUDE.md` and `personal-brain/02-Areas/Engineering-standards.md`. Secrets in `.env.local`, tracked in Infisical (`personal-brain/02-Areas/Secrets-management.md`); never commit values.
